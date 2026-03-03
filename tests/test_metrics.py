@@ -1,0 +1,77 @@
+"""Tests for MASE metric — hand-checkable values."""
+
+import numpy as np
+import pytest
+
+from ts_autopilot.evaluation.metrics import mase
+
+
+def test_mase_perfect_forecast():
+    """Perfect predictions → MASE = 0."""
+    y_train = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    y_true = np.array([6.0, 7.0])
+    y_pred = np.array([6.0, 7.0])
+    assert mase(y_true, y_pred, y_train) == 0.0
+
+
+def test_mase_naive_baseline():
+    """Naive forecast (repeat last value) on linear series → MASE = 1.0.
+
+    y_train = [1, 2, 3, 4, 5], scale = mean(|diff|) = 1.0
+    y_true = [6, 7], y_pred = [5, 5] → MAE = mean(|1, 2|) = 1.5
+    Wait — naive(1-step) = repeat last = [5, 5], MAE = (1+2)/2 = 1.5
+    That gives MASE = 1.5, not 1.0.
+
+    For MASE = 1.0 exactly, we need MAE = scale = 1.0.
+    y_pred = [5, 7] → |6-5|=1, |7-7|=0 → MAE=0.5 → MASE=0.5
+    y_pred = [5, 6] → |6-5|=1, |7-6|=1 → MAE=1.0 → MASE=1.0 ✓
+    """
+    y_train = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    y_true = np.array([6.0, 7.0])
+    y_pred = np.array([5.0, 6.0])  # one-step-behind naive
+    result = mase(y_true, y_pred, y_train)
+    assert result == pytest.approx(1.0)
+
+
+def test_mase_seasonal():
+    """Seasonal MASE with season_length=2.
+
+    y_train = [1, 3, 2, 4, 3, 5]
+    seasonal diffs (m=2): |2-1|=1, |4-3|=1, |3-2|=1, |5-4|=1 → scale = 1.0
+    y_true = [4, 6], y_pred = [3, 5] → MAE = 1.0 → MASE = 1.0
+    """
+    y_train = np.array([1.0, 3.0, 2.0, 4.0, 3.0, 5.0])
+    y_true = np.array([4.0, 6.0])
+    y_pred = np.array([3.0, 5.0])
+    result = mase(y_true, y_pred, y_train, season_length=2)
+    assert result == pytest.approx(1.0)
+
+
+def test_mase_known_value():
+    """Concrete arithmetic check.
+
+    y_train = [0, 1, 2, 3], scale (m=1) = mean([1,1,1]) = 1.0
+    y_true = [4, 5], y_pred = [3, 6] → MAE = (1+1)/2 = 1.0 → MASE = 1.0
+    """
+    y_train = np.array([0.0, 1.0, 2.0, 3.0])
+    y_true = np.array([4.0, 5.0])
+    y_pred = np.array([3.0, 6.0])
+    assert mase(y_true, y_pred, y_train) == pytest.approx(1.0)
+
+
+def test_mase_zero_scale_raises():
+    """Constant training series → ZeroDivisionError."""
+    y_train = np.array([5.0, 5.0, 5.0, 5.0])
+    y_true = np.array([6.0])
+    y_pred = np.array([5.0])
+    with pytest.raises(ZeroDivisionError):
+        mase(y_true, y_pred, y_train)
+
+
+def test_mase_short_train_raises():
+    """Too-short training series raises ValueError."""
+    y_train = np.array([1.0])
+    y_true = np.array([2.0])
+    y_pred = np.array([2.0])
+    with pytest.raises(ValueError, match="needs at least"):
+        mase(y_true, y_pred, y_train)
