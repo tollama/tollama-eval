@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import time
 import traceback
+from enum import IntEnum
 from pathlib import Path
 
 import typer
@@ -16,6 +17,15 @@ app = typer.Typer(
     help="Automated time series benchmarking.",
     no_args_is_help=True,
 )
+
+
+class ExitCode(IntEnum):
+    """Distinct exit codes for different failure modes."""
+
+    SUCCESS = 0
+    SCHEMA_ERROR = 1
+    DATA_ERROR = 2
+    UNEXPECTED_ERROR = 3
 
 
 def _version_callback(value: bool) -> None:
@@ -100,7 +110,11 @@ def run(
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
     from ts_autopilot.ingestion.loader import SchemaError
+    from ts_autopilot.logging_config import setup_logging
     from ts_autopilot.pipeline import run_from_csv
+
+    # Initialize structured logging
+    setup_logging(verbose=verbose, quiet=quiet)
 
     if tollama_url is not None:
         typer.secho(
@@ -152,7 +166,7 @@ def run(
             "or is in wide format with dates in the first column.",
             err=True,
         )
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=ExitCode.SCHEMA_ERROR) from exc
     except ValueError as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
         typer.echo(
@@ -160,7 +174,7 @@ def run(
             "requested horizon and number of folds.",
             err=True,
         )
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
     except ZeroDivisionError:
         typer.secho(
             "Error: One or more training series has zero variation "
@@ -172,7 +186,7 @@ def run(
             "Hint: Remove constant series from your dataset.",
             err=True,
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=ExitCode.DATA_ERROR)
     except Exception as exc:
         typer.secho(f"Unexpected error: {exc}", fg=typer.colors.RED, err=True)
         if verbose:
@@ -181,7 +195,7 @@ def run(
             typer.echo(
                 "Hint: Use --verbose for full traceback.", err=True
             )
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
 
     elapsed = time.perf_counter() - t0
 
@@ -201,7 +215,7 @@ def run(
         typer.echo(f"  Total rows: {p.total_rows}")
         typer.echo(f"  Frequency: {p.frequency}")
         typer.echo(f"  Season length: {p.season_length_guess}")
-        typer.echo(f"  Series lengths: {p.min_length}–{p.max_length}")
+        typer.echo(f"  Series lengths: {p.min_length}\u2013{p.max_length}")
         typer.echo(f"  Missing ratio: {p.missing_ratio:.2%}")
 
     typer.echo("")
