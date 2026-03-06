@@ -48,17 +48,26 @@ def callback(
     """Automated time series benchmarking."""
 
 
+_INPUT_OPTION = typer.Option(
+    ...,
+    "--input",
+    "-i",
+    help="Path to input CSV file (long or wide format).",
+    exists=True,
+    file_okay=True,
+    readable=True,
+)
+_OUTPUT_OPTION = typer.Option(
+    Path("out/"),
+    "--output",
+    "-o",
+    help="Output directory for results.json and report.html.",
+)
+
+
 @app.command()
 def run(
-    input: Path = typer.Option(
-        ...,
-        "--input",
-        "-i",
-        help="Path to input CSV file (long or wide format).",
-        exists=True,
-        file_okay=True,
-        readable=True,
-    ),
+    input: Path = _INPUT_OPTION,
     horizon: int = typer.Option(
         14,
         "--horizon",
@@ -73,12 +82,7 @@ def run(
         help="Number of cross-validation folds.",
         min=1,
     ),
-    output: Path = typer.Option(
-        Path("out/"),
-        "--output",
-        "-o",
-        help="Output directory for results.json and report.html.",
-    ),
+    output: Path = _OUTPUT_OPTION,
     models: str = typer.Option(
         None,
         "--models",
@@ -143,8 +147,7 @@ def run(
 
     if not quiet:
         typer.secho(
-            f"Running benchmark: input={input}, horizon={horizon}, "
-            f"n_folds={n_folds}",
+            f"Running benchmark: input={input}, horizon={horizon}, n_folds={n_folds}",
             bold=True,
         )
 
@@ -177,8 +180,7 @@ def run(
         raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
     except ZeroDivisionError:
         typer.secho(
-            "Error: One or more training series has zero variation "
-            "(constant values).",
+            "Error: One or more training series has zero variation (constant values).",
             fg=typer.colors.RED,
             err=True,
         )
@@ -186,15 +188,13 @@ def run(
             "Hint: Remove constant series from your dataset.",
             err=True,
         )
-        raise typer.Exit(code=ExitCode.DATA_ERROR)
+        raise typer.Exit(code=ExitCode.DATA_ERROR) from None
     except Exception as exc:
         typer.secho(f"Unexpected error: {exc}", fg=typer.colors.RED, err=True)
         if verbose:
             traceback.print_exc(file=sys.stderr)
         else:
-            typer.echo(
-                "Hint: Use --verbose for full traceback.", err=True
-            )
+            typer.echo("Hint: Use --verbose for full traceback.", err=True)
         raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
 
     elapsed = time.perf_counter() - t0
@@ -218,15 +218,20 @@ def run(
         typer.echo(f"  Series lengths: {p.min_length}\u2013{p.max_length}")
         typer.echo(f"  Missing ratio: {p.missing_ratio:.2%}")
 
+    abs_output = output.resolve()
     typer.echo("")
-    typer.echo(f"Results written to {output}/results.json")
-    typer.echo(f"Report written to {output}/report.html")
+    typer.echo(f"Results written to {abs_output}/results.json")
+    typer.echo(f"Report written to {abs_output}/report.html")
 
     # Leaderboard
+    std_by_name = {m.name: m.std_mase for m in result.models}
     typer.echo("")
     typer.secho("Leaderboard:", bold=True)
     for entry in result.leaderboard:
-        line = f"  #{entry.rank} {entry.name}: mean_mase={entry.mean_mase:.4f}"
+        std = std_by_name.get(entry.name, 0.0)
+        line = (
+            f"  #{entry.rank} {entry.name}: MASE={entry.mean_mase:.4f} \u00b1 {std:.4f}"
+        )
         if entry.rank == 1:
             typer.secho(line, fg=typer.colors.GREEN, bold=True)
         else:

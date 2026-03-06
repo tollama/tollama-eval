@@ -96,9 +96,7 @@ def test_model_names_unknown_raises(tiny_long_df):
     import pytest
 
     with pytest.raises(ValueError, match="Unknown model"):
-        run_benchmark(
-            tiny_long_df, horizon=7, n_folds=2, model_names=["FakeModel"]
-        )
+        run_benchmark(tiny_long_df, horizon=7, n_folds=2, model_names=["FakeModel"])
 
 
 def test_progress_callback_called(tiny_long_df):
@@ -108,9 +106,7 @@ def test_progress_callback_called(tiny_long_df):
     def cb(step, current, total):
         calls.append((step, current, total))
 
-    run_benchmark(
-        tiny_long_df, horizon=7, n_folds=2, progress_callback=cb
-    )
+    run_benchmark(tiny_long_df, horizon=7, n_folds=2, progress_callback=cb)
     model_calls = [c for c in calls if c[0] == "model"]
     fold_calls = [c for c in calls if c[0] == "fold"]
     assert len(model_calls) == 2  # 2 runners
@@ -119,8 +115,13 @@ def test_progress_callback_called(tiny_long_df):
 
 def test_generate_warnings_short_series():
     profile = DataProfile(
-        n_series=2, frequency="D", missing_ratio=0.0,
-        season_length_guess=7, min_length=10, max_length=20, total_rows=30,
+        n_series=2,
+        frequency="D",
+        missing_ratio=0.0,
+        season_length_guess=7,
+        min_length=10,
+        max_length=20,
+        total_rows=30,
     )
     warnings = generate_warnings(profile, horizon=7, n_folds=3)
     assert any("rows" in w and "unreliable" in w for w in warnings)
@@ -128,8 +129,13 @@ def test_generate_warnings_short_series():
 
 def test_generate_warnings_high_missing():
     profile = DataProfile(
-        n_series=2, frequency="D", missing_ratio=0.25,
-        season_length_guess=7, min_length=100, max_length=100, total_rows=200,
+        n_series=2,
+        frequency="D",
+        missing_ratio=0.25,
+        season_length_guess=7,
+        min_length=100,
+        max_length=100,
+        total_rows=200,
     )
     warnings = generate_warnings(profile, horizon=7, n_folds=3)
     assert any("Missing ratio" in w for w in warnings)
@@ -137,8 +143,13 @@ def test_generate_warnings_high_missing():
 
 def test_generate_warnings_single_series():
     profile = DataProfile(
-        n_series=1, frequency="D", missing_ratio=0.0,
-        season_length_guess=7, min_length=100, max_length=100, total_rows=100,
+        n_series=1,
+        frequency="D",
+        missing_ratio=0.0,
+        season_length_guess=7,
+        min_length=100,
+        max_length=100,
+        total_rows=100,
     )
     warnings = generate_warnings(profile, horizon=7, n_folds=3)
     assert any("1 series" in w for w in warnings)
@@ -147,8 +158,13 @@ def test_generate_warnings_single_series():
 def test_generate_warnings_clean_data():
     """No warnings for well-formed data."""
     profile = DataProfile(
-        n_series=5, frequency="D", missing_ratio=0.0,
-        season_length_guess=7, min_length=200, max_length=200, total_rows=1000,
+        n_series=5,
+        frequency="D",
+        missing_ratio=0.0,
+        season_length_guess=7,
+        min_length=200,
+        max_length=200,
+        total_rows=1000,
     )
     warnings = generate_warnings(profile, horizon=7, n_folds=3)
     assert warnings == []

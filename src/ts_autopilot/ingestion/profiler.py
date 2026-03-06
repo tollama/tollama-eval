@@ -51,12 +51,25 @@ def profile_dataframe(df: pd.DataFrame) -> DataProfile:
 
 def _infer_frequency(df: pd.DataFrame) -> str:
     """Infer frequency from the first series. Falls back to 'D'."""
+    from ts_autopilot.logging_config import get_logger
+
+    _logger = get_logger("profiler")
     first_uid = df["unique_id"].iloc[0]
     dates = df.loc[df["unique_id"] == first_uid, "ds"].sort_values()
     try:
         freq = pd.infer_freq(dates)
-        return freq if freq is not None else "D"
+        if freq is not None:
+            return freq
+        _logger.warning(
+            "Could not infer frequency for series '%s'; defaulting to 'D'.",
+            first_uid,
+        )
+        return "D"
     except Exception:
+        _logger.warning(
+            "Frequency inference failed for series '%s'; defaulting to 'D'.",
+            first_uid,
+        )
         return "D"
 
 
