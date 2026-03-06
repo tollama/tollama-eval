@@ -6,7 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from ts_autopilot.logging_config import get_logger
+
 REQUIRED_LONG_COLS = {"unique_id", "ds", "y"}
+
+logger = get_logger("loader")
 
 
 class SchemaError(ValueError):
@@ -27,15 +31,19 @@ def load_csv(path: str | Path) -> pd.DataFrame:
     Raises:
         SchemaError: if the file cannot be parsed into canonical format.
     """
+    path = Path(path)
+    logger.debug("Reading CSV: %s (%.1f KB)", path, path.stat().st_size / 1024)
     df = pd.read_csv(path)
 
     cols = set(df.columns)
 
     # Long format: has ds and y columns
     if "ds" in cols and "y" in cols:
+        logger.debug("Detected long format (columns: %s)", sorted(cols))
         return _parse_long(df)
 
     # Wide format: try to parse first column as dates
+    logger.debug("Attempting wide format parse (columns: %s)", sorted(cols))
     return _parse_wide(df, path)
 
 
@@ -94,4 +102,10 @@ def _coerce_canonical(df: pd.DataFrame) -> pd.DataFrame:
     df["y"] = df["y"].astype("float64")
 
     df = df.sort_values(["unique_id", "ds"]).reset_index(drop=True)
+
+    logger.debug(
+        "Canonical DataFrame: %d rows, %d series",
+        len(df),
+        df["unique_id"].nunique(),
+    )
     return df

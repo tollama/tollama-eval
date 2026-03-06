@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from typing import Any
+
+from ts_autopilot import __version__
 
 
 @dataclass
@@ -113,20 +116,45 @@ class BenchmarkConfig:
 
 
 @dataclass
+class ResultMetadata:
+    """Run metadata attached to every results.json output."""
+
+    version: str
+    generated_at: str  # ISO 8601 UTC timestamp
+    total_runtime_sec: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> ResultMetadata:
+        return cls(**d)
+
+    @classmethod
+    def create_now(cls) -> ResultMetadata:
+        return cls(
+            version=__version__,
+            generated_at=datetime.now(tz=timezone.utc).isoformat(),
+        )
+
+
+@dataclass
 class BenchmarkResult:
     profile: DataProfile
     config: BenchmarkConfig
     models: list[ModelResult]
     leaderboard: list[LeaderboardEntry]
     warnings: list[str] = field(default_factory=list)
+    metadata: ResultMetadata | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {
-            "profile": self.profile.to_dict(),
-            "config": self.config.to_dict(),
-            "models": [m.to_dict() for m in self.models],
-            "leaderboard": [e.to_dict() for e in self.leaderboard],
-        }
+        d: dict[str, Any] = {}
+        if self.metadata is not None:
+            d["metadata"] = self.metadata.to_dict()
+        d["profile"] = self.profile.to_dict()
+        d["config"] = self.config.to_dict()
+        d["models"] = [m.to_dict() for m in self.models]
+        d["leaderboard"] = [e.to_dict() for e in self.leaderboard]
         if self.warnings:
             d["warnings"] = self.warnings
         return d
@@ -136,12 +164,16 @@ class BenchmarkResult:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> BenchmarkResult:
+        metadata = None
+        if "metadata" in d:
+            metadata = ResultMetadata.from_dict(d["metadata"])
         return cls(
             profile=DataProfile.from_dict(d["profile"]),
             config=BenchmarkConfig.from_dict(d["config"]),
             models=[ModelResult.from_dict(m) for m in d["models"]],
             leaderboard=[LeaderboardEntry.from_dict(e) for e in d["leaderboard"]],
             warnings=d.get("warnings", []),
+            metadata=metadata,
         )
 
     @classmethod

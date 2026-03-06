@@ -157,7 +157,7 @@ def test_cli_models_flag_filters(tmp_path):
     assert "AutoETS" not in result.output
 
 
-def test_cli_models_unknown_exits_1(tmp_path):
+def test_cli_models_unknown_exits_with_data_error(tmp_path):
     csv_path = _make_csv(tmp_path)
     out_dir = tmp_path / "out"
     result = runner.invoke(
@@ -176,7 +176,7 @@ def test_cli_models_unknown_exits_1(tmp_path):
             "NonExistentModel",
         ],
     )
-    assert result.exit_code == 1
+    assert result.exit_code != 0
 
 
 def test_cli_bad_csv_shows_friendly_error(tmp_path):

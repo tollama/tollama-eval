@@ -9,7 +9,10 @@ from statsforecast import StatsForecast
 from statsforecast.models import AutoETS, SeasonalNaive
 
 from ts_autopilot.contracts import ForecastOutput
+from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
+
+logger = get_logger("runners")
 
 
 class SeasonalNaiveRunner(BaseRunner):
@@ -24,6 +27,13 @@ class SeasonalNaiveRunner(BaseRunner):
         freq: str,
         season_length: int,
     ) -> ForecastOutput:
+        logger.debug(
+            "SeasonalNaive.fit_predict: %d rows, horizon=%d, freq=%s, season=%d",
+            len(train),
+            horizon,
+            freq,
+            season_length,
+        )
         t0 = time.perf_counter()
         sf = StatsForecast(
             models=[SeasonalNaive(season_length=season_length)],
@@ -36,6 +46,7 @@ class SeasonalNaiveRunner(BaseRunner):
 
         # StatsForecast returns (unique_id, ds, <ModelName>) columns
         preds = preds.reset_index() if "unique_id" not in preds.columns else preds
+        logger.debug("SeasonalNaive completed in %.4fs", elapsed)
         return ForecastOutput(
             unique_id=preds["unique_id"].astype(str).tolist(),
             ds=preds["ds"].astype(str).tolist(),
@@ -57,6 +68,13 @@ class AutoETSRunner(BaseRunner):
         freq: str,
         season_length: int,
     ) -> ForecastOutput:
+        logger.debug(
+            "AutoETS.fit_predict: %d rows, horizon=%d, freq=%s, season=%d",
+            len(train),
+            horizon,
+            freq,
+            season_length,
+        )
         t0 = time.perf_counter()
         sf = StatsForecast(
             models=[AutoETS(season_length=season_length)],
@@ -68,6 +86,7 @@ class AutoETSRunner(BaseRunner):
         elapsed = time.perf_counter() - t0
 
         preds = preds.reset_index() if "unique_id" not in preds.columns else preds
+        logger.debug("AutoETS completed in %.4fs", elapsed)
         return ForecastOutput(
             unique_id=preds["unique_id"].astype(str).tolist(),
             ds=preds["ds"].astype(str).tolist(),
