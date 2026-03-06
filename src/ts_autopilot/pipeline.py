@@ -170,7 +170,7 @@ def _fit_predict_with_retry(
                 freq=freq,
                 season_length=season_length,
             )
-        except (RuntimeError, FloatingPointError) as exc:
+        except (RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
             last_exc = exc
             if attempt < _MAX_RETRIES:
                 wait = _RETRY_BACKOFF_SEC * (2**attempt)

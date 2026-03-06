@@ -17,6 +17,9 @@ class SchemaError(ValueError):
     """Raised when the CSV cannot be coerced to canonical long format."""
 
 
+_MAX_CSV_BYTES = 500 * 1024 * 1024  # 500 MB
+
+
 def load_csv(path: str | Path) -> pd.DataFrame:
     """Load a CSV and return a canonical long-format DataFrame.
 
@@ -30,9 +33,17 @@ def load_csv(path: str | Path) -> pd.DataFrame:
 
     Raises:
         SchemaError: if the file cannot be parsed into canonical format.
+        ValueError: if the file exceeds the size limit.
     """
     path = Path(path)
-    logger.debug("Reading CSV: %s (%.1f KB)", path, path.stat().st_size / 1024)
+    file_size = path.stat().st_size
+    if file_size > _MAX_CSV_BYTES:
+        raise ValueError(
+            f"CSV file is {file_size / 1024 / 1024:.0f} MB, "
+            f"exceeding the {_MAX_CSV_BYTES // 1024 // 1024} MB limit. "
+            "Split large datasets before benchmarking."
+        )
+    logger.debug("Reading CSV: %s (%.1f KB)", path, file_size / 1024)
     df = pd.read_csv(path)
 
     cols = set(df.columns)

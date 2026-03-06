@@ -222,15 +222,21 @@ def run(
         typer.echo(f"  Series lengths: {p.min_length}\u2013{p.max_length}")
         typer.echo(f"  Missing ratio: {p.missing_ratio:.2%}")
 
+    abs_output = output.resolve()
     typer.echo("")
-    typer.echo(f"Results written to {output}/results.json")
-    typer.echo(f"Report written to {output}/report.html")
+    typer.echo(f"Results written to {abs_output}/results.json")
+    typer.echo(f"Report written to {abs_output}/report.html")
 
     # Leaderboard
+    std_by_name = {m.name: m.std_mase for m in result.models}
     typer.echo("")
     typer.secho("Leaderboard:", bold=True)
     for entry in result.leaderboard:
-        line = f"  #{entry.rank} {entry.name}: mean_mase={entry.mean_mase:.4f}"
+        std = std_by_name.get(entry.name, 0.0)
+        line = (
+            f"  #{entry.rank} {entry.name}: "
+            f"MASE={entry.mean_mase:.4f} \u00b1 {std:.4f}"
+        )
         if entry.rank == 1:
             typer.secho(line, fg=typer.colors.GREEN, bold=True)
         else:

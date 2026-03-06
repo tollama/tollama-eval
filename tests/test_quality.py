@@ -353,6 +353,38 @@ def test_retry_does_not_catch_value_error():
     assert mock_runner.fit_predict.call_count == 1
 
 
+def test_retry_catches_linalg_error():
+    """LinAlgError should be retried."""
+    from unittest.mock import MagicMock, patch
+
+    from ts_autopilot.contracts import ForecastOutput
+    from ts_autopilot.pipeline import _fit_predict_with_retry
+    from ts_autopilot.runners.base import BaseRunner
+
+    mock_runner = MagicMock(spec=BaseRunner)
+    mock_runner.name = "MockModel"
+
+    good_output = ForecastOutput(
+        unique_id=["s1"], ds=["2020-01-01"], y_hat=[1.0],
+        model_name="MockModel", runtime_sec=0.01,
+    )
+    mock_runner.fit_predict.side_effect = [
+        np.linalg.LinAlgError("singular matrix"),
+        good_output,
+    ]
+
+    with patch("ts_autopilot.pipeline._RETRY_BACKOFF_SEC", 0.01):
+        result = _fit_predict_with_retry(
+            runner=mock_runner,
+            train=pd.DataFrame(),
+            horizon=7,
+            freq="D",
+            season_length=7,
+        )
+    assert result == good_output
+    assert mock_runner.fit_predict.call_count == 2
+
+
 # ---------------------------------------------------------------------------
 # CLI exit code integration tests
 # ---------------------------------------------------------------------------

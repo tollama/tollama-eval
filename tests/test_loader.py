@@ -60,3 +60,28 @@ def test_sorted_by_unique_id_and_ds(long_csv):
     df = load_csv(long_csv)
     for _uid, group in df.groupby("unique_id"):
         assert group["ds"].is_monotonic_increasing
+
+
+def test_oversized_file_rejected(tmp_path):
+    """Files exceeding _MAX_CSV_BYTES are rejected before loading."""
+    from unittest.mock import patch
+
+    from ts_autopilot.ingestion.loader import _MAX_CSV_BYTES
+
+    csv = tmp_path / "big.csv"
+    csv.write_text("unique_id,ds,y\ns1,2020-01-01,1.0\n")
+
+    # Patch stat to report a huge file
+    real_stat = csv.stat
+
+    class FakeStat:
+        def __init__(self):
+            s = real_stat()
+            self.st_size = _MAX_CSV_BYTES + 1
+            self.st_mode = s.st_mode
+
+    with (
+        patch.object(type(csv), "stat", return_value=FakeStat()),
+        pytest.raises(ValueError, match="exceeding"),
+    ):
+        load_csv(csv)

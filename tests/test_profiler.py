@@ -85,3 +85,21 @@ def test_profile_single_row_series():
     assert profile.n_series == 1
     assert profile.min_length == 1
     assert profile.total_rows == 1
+
+
+def test_frequency_fallback_logs_warning(caplog):
+    """When frequency can't be inferred, a warning should be logged."""
+    import logging
+
+    root_logger = logging.getLogger("ts_autopilot")
+    old_propagate = root_logger.propagate
+    root_logger.propagate = True
+    try:
+        dates = pd.to_datetime(["2020-01-01", "2020-01-05", "2020-01-20"])
+        df = pd.DataFrame({"unique_id": "s1", "ds": dates, "y": [1.0, 2.0, 3.0]})
+        with caplog.at_level(logging.WARNING, logger="ts_autopilot"):
+            profile = profile_dataframe(df)
+        assert profile.frequency == "D"
+        assert any("defaulting" in r.message.lower() for r in caplog.records)
+    finally:
+        root_logger.propagate = old_propagate
