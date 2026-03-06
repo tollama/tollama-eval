@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+import time
+import traceback
 from pathlib import Path
 
 import typer
+
+from ts_autopilot import __version__
 
 app = typer.Typer(
     name="ts-autopilot",
@@ -13,8 +18,23 @@ app = typer.Typer(
 )
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"ts-autopilot {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
-def callback() -> None:
+def callback(
+    version: bool = typer.Option(
+        None,
+        "--version",
+        "-V",
+        help="Show version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    ),
+) -> None:
     """Automated time series benchmarking."""
 
 
@@ -49,6 +69,24 @@ def run(
         "-o",
         help="Output directory for results.json and report.html.",
     ),
+    models: str = typer.Option(
+        None,
+        "--models",
+        "-m",
+        help="Comma-separated list of models to run (e.g. SeasonalNaive,AutoETS).",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed progress and data profile.",
+    ),
+    quiet: bool = typer.Option(
+        False,
+        "--quiet",
+        "-q",
+        help="Suppress all output except errors.",
+    ),
     tollama_url: str | None = typer.Option(
         None,
         "--tollama-url",
@@ -61,33 +99,133 @@ def run(
     ),
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
+    from ts_autopilot.ingestion.loader import SchemaError
     from ts_autopilot.pipeline import run_from_csv
 
     if tollama_url is not None:
-        typer.echo(
-            "[WARNING] --tollama-url is reserved and not yet implemented.", err=True
+        typer.secho(
+            "[WARNING] --tollama-url is reserved and not yet implemented.",
+            fg=typer.colors.YELLOW,
+            err=True,
         )
     if no_tollama:
-        typer.echo(
-            "[WARNING] --no-tollama is reserved and not yet implemented.", err=True
+        typer.secho(
+            "[WARNING] --no-tollama is reserved and not yet implemented.",
+            fg=typer.colors.YELLOW,
+            err=True,
         )
 
-    typer.echo(
-        f"Running benchmark: input={input}, horizon={horizon}, n_folds={n_folds}"
-    )
+    model_names = None
+    if models is not None:
+        model_names = [m.strip() for m in models.split(",") if m.strip()]
 
-    result = run_from_csv(
-        csv_path=input,
-        horizon=horizon,
-        n_folds=n_folds,
-        output_dir=output,
-    )
+    def _progress_cb(step: str, current: int, total: int) -> None:
+        if quiet:
+            return
+        if step == "model":
+            typer.echo(f"  Running model {current}/{total}...")
+        elif step == "fold" and verbose:
+            typer.echo(f"    Fold {current}/{total}")
 
+    if not quiet:
+        typer.secho(
+            f"Running benchmark: input={input}, horizon={horizon}, "
+            f"n_folds={n_folds}",
+            bold=True,
+        )
+
+    t0 = time.perf_counter()
+
+    try:
+        result = run_from_csv(
+            csv_path=input,
+            horizon=horizon,
+            n_folds=n_folds,
+            output_dir=output,
+            model_names=model_names,
+            progress_callback=_progress_cb,
+        )
+    except SchemaError as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+        typer.echo(
+            "Hint: Ensure your CSV has columns (unique_id, ds, y) "
+            "or is in wide format with dates in the first column.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+    except ValueError as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+        typer.echo(
+            "Hint: Check that your series are long enough for the "
+            "requested horizon and number of folds.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+    except ZeroDivisionError:
+        typer.secho(
+            "Error: One or more training series has zero variation "
+            "(constant values).",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        typer.echo(
+            "Hint: Remove constant series from your dataset.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        typer.secho(f"Unexpected error: {exc}", fg=typer.colors.RED, err=True)
+        if verbose:
+            traceback.print_exc(file=sys.stderr)
+        else:
+            typer.echo(
+                "Hint: Use --verbose for full traceback.", err=True
+            )
+        raise typer.Exit(code=1) from exc
+
+    elapsed = time.perf_counter() - t0
+
+    if quiet:
+        return
+
+    # Print warnings
+    for warning in result.warnings:
+        typer.secho(f"[WARNING] {warning}", fg=typer.colors.YELLOW)
+
+    # Verbose: data profile summary
+    if verbose:
+        p = result.profile
+        typer.echo("")
+        typer.secho("Dataset Profile:", bold=True)
+        typer.echo(f"  Series: {p.n_series}")
+        typer.echo(f"  Total rows: {p.total_rows}")
+        typer.echo(f"  Frequency: {p.frequency}")
+        typer.echo(f"  Season length: {p.season_length_guess}")
+        typer.echo(f"  Series lengths: {p.min_length}–{p.max_length}")
+        typer.echo(f"  Missing ratio: {p.missing_ratio:.2%}")
+
+    typer.echo("")
     typer.echo(f"Results written to {output}/results.json")
     typer.echo(f"Report written to {output}/report.html")
-    typer.echo("Leaderboard:")
+
+    # Leaderboard
+    typer.echo("")
+    typer.secho("Leaderboard:", bold=True)
     for entry in result.leaderboard:
-        typer.echo(f"  #{entry.rank} {entry.name}: mean_mase={entry.mean_mase:.4f}")
+        line = f"  #{entry.rank} {entry.name}: mean_mase={entry.mean_mase:.4f}"
+        if entry.rank == 1:
+            typer.secho(line, fg=typer.colors.GREEN, bold=True)
+        else:
+            typer.echo(line)
+
+    # Summary
+    typer.echo("")
+    winner = result.leaderboard[0]
+    typer.secho(
+        f"Best model: {winner.name} (MASE={winner.mean_mase:.4f})",
+        fg=typer.colors.GREEN,
+    )
+    typer.echo(f"Completed in {elapsed:.2f}s")
 
 
 if __name__ == "__main__":

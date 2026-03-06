@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,7 @@ import pandas as pd
 from ts_autopilot.contracts import (
     BenchmarkConfig,
     BenchmarkResult,
+    DataProfile,
     FoldResult,
     LeaderboardEntry,
     ModelResult,
@@ -27,11 +29,41 @@ DEFAULT_RUNNERS: list[BaseRunner] = [
 ]
 
 
+def generate_warnings(
+    profile: DataProfile, horizon: int, n_folds: int
+) -> list[str]:
+    """Produce user-facing warnings based on data profile and config."""
+    warnings: list[str] = []
+
+    min_needed = (n_folds + 2) * horizon
+    if profile.min_length < min_needed:
+        warnings.append(
+            f"Shortest series has {profile.min_length} rows but "
+            f"{min_needed} are recommended for horizon={horizon}, "
+            f"n_folds={n_folds}. Results may be unreliable."
+        )
+
+    if profile.missing_ratio > 0.1:
+        warnings.append(
+            f"Missing ratio is {profile.missing_ratio:.1%}. "
+            "Consider imputing or removing series with gaps."
+        )
+
+    if profile.n_series == 1:
+        warnings.append(
+            "Only 1 series found. Cross-series patterns cannot be leveraged."
+        )
+
+    return warnings
+
+
 def run_benchmark(
     df: pd.DataFrame,
     horizon: int,
     n_folds: int,
     runners: list[BaseRunner] | None = None,
+    model_names: list[str] | None = None,
+    progress_callback: Callable[[str, int, int], None] | None = None,
 ) -> BenchmarkResult:
     """Run the full benchmark pipeline (pure logic, no I/O).
 
@@ -43,19 +75,36 @@ def run_benchmark(
       5. Return BenchmarkResult
     """
     if runners is None:
-        runners = DEFAULT_RUNNERS
+        runners = list(DEFAULT_RUNNERS)
+
+    if model_names is not None:
+        available = {r.name for r in runners}
+        unknown = set(model_names) - available
+        if unknown:
+            raise ValueError(
+                f"Unknown model(s): {', '.join(sorted(unknown))}. "
+                f"Available: {', '.join(sorted(available))}"
+            )
+        runners = [r for r in runners if r.name in model_names]
 
     profile = profile_dataframe(df)
     config = BenchmarkConfig(horizon=horizon, n_folds=n_folds)
+    warnings = generate_warnings(profile, horizon, n_folds)
     splits = make_expanding_splits(df, horizon=horizon, n_folds=n_folds)
 
     model_results: list[ModelResult] = []
 
-    for runner in runners:
+    for runner_idx, runner in enumerate(runners):
+        if progress_callback is not None:
+            progress_callback("model", runner_idx + 1, len(runners))
+
         fold_results: list[FoldResult] = []
         total_runtime = 0.0
 
-        for split in splits:
+        for fold_idx, split in enumerate(splits):
+            if progress_callback is not None:
+                progress_callback("fold", fold_idx + 1, len(splits))
+
             output = runner.fit_predict(
                 train=split.train,
                 horizon=horizon,
@@ -111,6 +160,7 @@ def run_benchmark(
         config=config,
         models=model_results,
         leaderboard=leaderboard,
+        warnings=warnings,
     )
 
 
@@ -119,6 +169,8 @@ def run_from_csv(
     horizon: int,
     n_folds: int,
     output_dir: str | Path,
+    model_names: list[str] | None = None,
+    progress_callback: Callable[[str, int, int], None] | None = None,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html."""
     from ts_autopilot.reporting.html_report import render_report
@@ -127,7 +179,13 @@ def run_from_csv(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     df = load_csv(csv_path)
-    result = run_benchmark(df, horizon=horizon, n_folds=n_folds)
+    result = run_benchmark(
+        df,
+        horizon=horizon,
+        n_folds=n_folds,
+        model_names=model_names,
+        progress_callback=progress_callback,
+    )
 
     # Write results.json
     results_path = output_dir / "results.json"

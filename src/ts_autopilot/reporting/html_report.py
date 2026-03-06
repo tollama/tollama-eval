@@ -1,7 +1,8 @@
-"""Minimal HTML report generator."""
+"""HTML report generator."""
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -12,7 +13,7 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 def render_report(result: BenchmarkResult) -> str:
-    """Render a minimal HTML report from a BenchmarkResult.
+    """Render an HTML report from a BenchmarkResult.
 
     Args:
         result: Fully populated BenchmarkResult.
@@ -25,9 +26,21 @@ def render_report(result: BenchmarkResult) -> str:
         autoescape=select_autoescape(["html"]),
     )
     template = env.get_template("report.html.j2")
+
+    max_mase = (
+        max(e.mean_mase for e in result.leaderboard)
+        if result.leaderboard
+        else 1.0
+    )
+
     return template.render(
         profile=result.profile,
         config=result.config,
         leaderboard=result.leaderboard,
         models=result.models,
+        warnings=result.warnings,
+        max_mase=max_mase,
+        generated_at=datetime.now(tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M UTC"
+        ),
     )
