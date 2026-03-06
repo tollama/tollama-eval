@@ -18,7 +18,7 @@ from ts_autopilot import __version__
 class DataProfile:
     n_series: int
     frequency: str  # pandas freq string: 'D', 'W', 'ME', 'h', etc.
-    missing_ratio: float  # 0.0–1.0
+    missing_ratio: float  # 0.0-1.0
     season_length_guess: int
     min_length: int
     max_length: int

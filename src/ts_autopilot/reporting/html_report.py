@@ -28,9 +28,7 @@ def render_report(result: BenchmarkResult) -> str:
     template = env.get_template("report.html.j2")
 
     max_mase = (
-        max(e.mean_mase for e in result.leaderboard)
-        if result.leaderboard
-        else 1.0
+        max(e.mean_mase for e in result.leaderboard) if result.leaderboard else 1.0
     )
 
     return template.render(
@@ -40,7 +38,5 @@ def render_report(result: BenchmarkResult) -> str:
         models=result.models,
         warnings=result.warnings,
         max_mase=max_mase,
-        generated_at=datetime.now(tz=timezone.utc).strftime(
-            "%Y-%m-%d %H:%M UTC"
-        ),
+        generated_at=datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
     )

@@ -60,7 +60,7 @@ def make_expanding_splits(
         test_parts = []
         cutoff_ts = None
 
-        for uid, group in df.groupby("unique_id"):
+        for _uid, group in df.groupby("unique_id"):
             group = group.sort_values("ds").reset_index(drop=True)
             n = len(group)
 
@@ -68,6 +68,12 @@ def make_expanding_splits(
             train = group.iloc[: cutoff_idx + 1]
             test = group.iloc[cutoff_idx + 1 : cutoff_idx + 1 + horizon]
 
+            if len(test) != horizon:
+                raise ValueError(
+                    f"Series '{_uid}' produced {len(test)} test rows "
+                    f"(expected {horizon}) at fold {fold_idx + 1}. "
+                    "Check that the series is long enough."
+                )
             train_parts.append(train)
             test_parts.append(test)
 

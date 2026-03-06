@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 import time
@@ -82,9 +83,7 @@ def _validate_dataframe(df: pd.DataFrame) -> list[str]:
     return warnings
 
 
-def generate_warnings(
-    profile: DataProfile, horizon: int, n_folds: int
-) -> list[str]:
+def generate_warnings(profile: DataProfile, horizon: int, n_folds: int) -> list[str]:
     """Produce user-facing warnings based on data profile and config."""
     warnings: list[str] = []
 
@@ -121,9 +120,7 @@ def _detect_date_gaps(df: pd.DataFrame, freq: str) -> list[str]:
         if len(dates) < 3:
             continue
         try:
-            expected = pd.date_range(
-                start=dates.iloc[0], end=dates.iloc[-1], freq=freq
-            )
+            expected = pd.date_range(start=dates.iloc[0], end=dates.iloc[-1], freq=freq)
             actual_set = set(dates)
             missing = set(expected) - actual_set
             if missing:
@@ -169,7 +166,7 @@ def _fit_predict_with_retry(
                 freq=freq,
                 season_length=season_length,
             )
-        except (RuntimeError, FloatingPointError) as exc:
+        except (RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
             last_exc = exc
             if attempt < _MAX_RETRIES:
                 wait = _RETRY_BACKOFF_SEC * (2**attempt)
@@ -377,10 +374,8 @@ def _atomic_write(path: Path, content: str) -> None:
             f.write(content)
         os.replace(tmp_path, path)
     except BaseException:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp_path)
-        except OSError:
-            pass
         raise
 
 

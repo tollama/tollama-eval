@@ -44,7 +44,7 @@ def test_test_length_per_series(cv_df):
     horizon = 7
     splits = make_expanding_splits(cv_df, horizon=horizon, n_folds=3)
     for split in splits:
-        for uid, g in split.test.groupby("unique_id"):
+        for _uid, g in split.test.groupby("unique_id"):
             assert len(g) == horizon
 
 

@@ -75,9 +75,7 @@ def mean_mase_per_fold(
 
     for uid in actuals_df["unique_id"].unique():
         actual_series = (
-            actuals_df.loc[actuals_df["unique_id"] == uid]
-            .sort_values("ds")["y"]
-            .values
+            actuals_df.loc[actuals_df["unique_id"] == uid].sort_values("ds")["y"].values
         )
         pred_series = (
             forecast_df.loc[forecast_df["unique_id"] == uid]
@@ -85,9 +83,7 @@ def mean_mase_per_fold(
             .values
         )
         train_series = (
-            train_df.loc[train_df["unique_id"] == uid]
-            .sort_values("ds")["y"]
-            .values
+            train_df.loc[train_df["unique_id"] == uid].sort_values("ds")["y"].values
         )
 
         scores.append(mase(actual_series, pred_series, train_series, season_length))
