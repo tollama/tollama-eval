@@ -7,7 +7,7 @@ the results.json schema is frozen.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
@@ -118,14 +118,18 @@ class BenchmarkResult:
     config: BenchmarkConfig
     models: list[ModelResult]
     leaderboard: list[LeaderboardEntry]
+    warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "profile": self.profile.to_dict(),
             "config": self.config.to_dict(),
             "models": [m.to_dict() for m in self.models],
             "leaderboard": [e.to_dict() for e in self.leaderboard],
         }
+        if self.warnings:
+            d["warnings"] = self.warnings
+        return d
 
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent)
@@ -137,6 +141,7 @@ class BenchmarkResult:
             config=BenchmarkConfig.from_dict(d["config"]),
             models=[ModelResult.from_dict(m) for m in d["models"]],
             leaderboard=[LeaderboardEntry.from_dict(e) for e in d["leaderboard"]],
+            warnings=d.get("warnings", []),
         )
 
     @classmethod

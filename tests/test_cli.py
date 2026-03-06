@@ -72,3 +72,148 @@ def test_cli_help_shows_reserved_flags():
     result = runner.invoke(app, ["run", "--help"])
     assert "--tollama-url" in result.output
     assert "--no-tollama" in result.output
+
+
+def test_cli_version_flag():
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert "ts-autopilot" in result.output
+    assert "0.1.0" in result.output
+
+
+def test_cli_version_short_flag():
+    result = runner.invoke(app, ["-V"])
+    assert result.exit_code == 0
+    assert "ts-autopilot" in result.output
+
+
+def test_cli_quiet_suppresses_output(tmp_path):
+    csv_path = _make_csv(tmp_path)
+    out_dir = tmp_path / "out"
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--input",
+            str(csv_path),
+            "--horizon",
+            "7",
+            "--n-folds",
+            "2",
+            "--output",
+            str(out_dir),
+            "--quiet",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "Leaderboard" not in result.output
+
+
+def test_cli_verbose_shows_profile(tmp_path):
+    csv_path = _make_csv(tmp_path)
+    out_dir = tmp_path / "out"
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--input",
+            str(csv_path),
+            "--horizon",
+            "7",
+            "--n-folds",
+            "2",
+            "--output",
+            str(out_dir),
+            "--verbose",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "Dataset Profile" in result.output
+    assert "Series:" in result.output
+    assert "Frequency:" in result.output
+
+
+def test_cli_models_flag_filters(tmp_path):
+    csv_path = _make_csv(tmp_path)
+    out_dir = tmp_path / "out"
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--input",
+            str(csv_path),
+            "--horizon",
+            "7",
+            "--n-folds",
+            "2",
+            "--output",
+            str(out_dir),
+            "--models",
+            "SeasonalNaive",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "SeasonalNaive" in result.output
+    assert "AutoETS" not in result.output
+
+
+def test_cli_models_unknown_exits_1(tmp_path):
+    csv_path = _make_csv(tmp_path)
+    out_dir = tmp_path / "out"
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--input",
+            str(csv_path),
+            "--horizon",
+            "7",
+            "--n-folds",
+            "2",
+            "--output",
+            str(out_dir),
+            "--models",
+            "NonExistentModel",
+        ],
+    )
+    assert result.exit_code == 1
+
+
+def test_cli_bad_csv_shows_friendly_error(tmp_path):
+    bad = tmp_path / "bad.csv"
+    bad.write_text("foo,bar\nabc,def\n")
+    result = runner.invoke(
+        app,
+        ["run", "--input", str(bad), "--output", str(tmp_path / "out")],
+    )
+    assert result.exit_code == 1
+    assert "Hint:" in result.output
+
+
+def test_cli_summary_shows_best_model(tmp_path):
+    csv_path = _make_csv(tmp_path)
+    out_dir = tmp_path / "out"
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--input",
+            str(csv_path),
+            "--horizon",
+            "7",
+            "--n-folds",
+            "2",
+            "--output",
+            str(out_dir),
+        ],
+    )
+    assert result.exit_code == 0
+    assert "Best model:" in result.output
+    assert "Completed in" in result.output
+
+
+def test_cli_help_shows_models_flag():
+    result = runner.invoke(app, ["run", "--help"])
+    assert "--models" in result.output
+    assert "--verbose" in result.output
+    assert "--quiet" in result.output

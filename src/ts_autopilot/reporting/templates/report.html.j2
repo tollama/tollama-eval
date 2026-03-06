@@ -5,16 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ts-autopilot Report</title>
     <style>
-        body { font-family: sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+        :root {
+            --green: #28a745;
+            --green-bg: #d4edda;
+            --red: #dc3545;
+            --red-bg: #f8d7da;
+            --yellow: #856404;
+            --yellow-bg: #fff3cd;
+            --yellow-border: #ffc107;
+            --gold: #ffc107;
+            --silver: #adb5bd;
+            --bronze: #cd7f32;
+            --bar-bg: #e2e6ea;
+            --bar-fill: #4a90d9;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 960px; margin: 2rem auto; padding: 0 1.5rem;
+            color: #212529; line-height: 1.5;
+        }
+        h1 { border-bottom: 2px solid #dee2e6; padding-bottom: 0.5rem; }
+        h2 { margin-top: 2rem; color: #495057; }
+        h3 { color: #495057; }
         table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-        th, td { border: 1px solid #ccc; padding: 0.5rem 1rem; text-align: left; }
-        th { background: #f0f0f0; }
-        tr:nth-child(even) { background: #f9f9f9; }
-        .rank-1 { font-weight: bold; color: #155724; }
+        th, td { border: 1px solid #dee2e6; padding: 0.5rem 1rem; text-align: left; }
+        th { background: #f8f9fa; font-weight: 600; }
+        tr:nth-child(even) { background: #f8f9fa; }
+
+        .rank-1 { font-weight: bold; }
+        .rank-1 td:first-child { color: var(--gold); }
+        .rank-2 td:first-child { color: var(--silver); }
+        .rank-3 td:first-child { color: var(--bronze); }
+
+        .mase-good { color: var(--green); font-weight: 600; }
+        .mase-bad { color: var(--red); font-weight: 600; }
+
+        .warnings-box {
+            background: var(--yellow-bg); border: 1px solid var(--yellow-border);
+            border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0;
+            color: var(--yellow);
+        }
+        .warnings-box ul { margin: 0.25rem 0 0 0; padding-left: 1.25rem; }
+
+        .bar-chart { margin: 1.5rem 0; }
+        .bar-row { display: flex; align-items: center; margin-bottom: 0.5rem; }
+        .bar-label { width: 140px; font-weight: 500; flex-shrink: 0; }
+        .bar-track { flex: 1; background: var(--bar-bg); border-radius: 4px; height: 28px; position: relative; }
+        .bar-fill {
+            background: var(--bar-fill); border-radius: 4px; height: 100%;
+            display: flex; align-items: center; padding: 0 8px;
+            color: white; font-size: 0.85rem; font-weight: 500;
+            min-width: fit-content; box-sizing: border-box;
+        }
+        .bar-fill.best { background: var(--green); }
+
+        .meta { color: #6c757d; font-size: 0.9rem; }
+
+        @media print {
+            body { max-width: 100%; margin: 0; }
+            .bar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            tr:nth-child(even) { background: transparent !important; }
+            th { background: transparent !important; border-bottom: 2px solid #000; }
+        }
     </style>
 </head>
 <body>
     <h1>ts-autopilot Benchmark Report</h1>
+
+    {% if warnings %}
+    <div class="warnings-box">
+        <strong>Warnings:</strong>
+        <ul>
+        {% for w in warnings %}
+            <li>{{ w }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 
     <h2>Dataset Summary</h2>
     <table>
@@ -31,6 +98,20 @@
     </table>
 
     <h2>Leaderboard</h2>
+
+    <div class="bar-chart">
+        {% for entry in leaderboard %}
+        <div class="bar-row">
+            <span class="bar-label">#{{ entry.rank }} {{ entry.name }}</span>
+            <div class="bar-track">
+                <div class="bar-fill{% if entry.rank == 1 %} best{% endif %}" style="width: {{ (entry.mean_mase / max_mase * 100)|round }}%">
+                    {{ "%.4f"|format(entry.mean_mase) }}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
     <table>
         <tr>
             <th>Rank</th>
@@ -38,10 +119,10 @@
             <th>Mean MASE</th>
         </tr>
         {% for entry in leaderboard %}
-        <tr class="{% if entry.rank == 1 %}rank-1{% endif %}">
+        <tr class="{% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% endif %}">
             <td>{{ entry.rank }}</td>
             <td>{{ entry.name }}</td>
-            <td>{{ "%.6f"|format(entry.mean_mase) }}</td>
+            <td class="{% if entry.mean_mase < 1.0 %}mase-good{% elif entry.mean_mase > 1.0 %}mase-bad{% endif %}">{{ "%.6f"|format(entry.mean_mase) }}</td>
         </tr>
         {% endfor %}
     </table>
@@ -50,7 +131,7 @@
     {% for model in models %}
     <h3>{{ model.name }}</h3>
     <p>Runtime: {{ "%.4f"|format(model.runtime_sec) }}s |
-       Mean MASE: {{ "%.6f"|format(model.mean_mase) }} |
+       Mean MASE: <span class="{% if model.mean_mase < 1.0 %}mase-good{% elif model.mean_mase > 1.0 %}mase-bad{% endif %}">{{ "%.6f"|format(model.mean_mase) }}</span> |
        Std MASE: {{ "%.6f"|format(model.std_mase) }}</p>
     <table>
         <tr><th>Fold</th><th>Cutoff</th><th>MASE</th></tr>
@@ -58,14 +139,14 @@
         <tr>
             <td>{{ fold.fold }}</td>
             <td>{{ fold.cutoff }}</td>
-            <td>{{ "%.6f"|format(fold.mase) }}</td>
+            <td class="{% if fold.mase < 1.0 %}mase-good{% elif fold.mase > 1.0 %}mase-bad{% endif %}">{{ "%.6f"|format(fold.mase) }}</td>
         </tr>
         {% endfor %}
     </table>
     {% endfor %}
 
     <footer>
-        <p><small>Generated by ts-autopilot v0.1.0</small></p>
+        <p class="meta">Generated by ts-autopilot v0.1.0 | {{ generated_at }}</p>
     </footer>
 </body>
 </html>
