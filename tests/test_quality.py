@@ -318,8 +318,10 @@ def test_retry_exhausted_raises():
     mock_runner.name = "MockModel"
     mock_runner.fit_predict.side_effect = RuntimeError("always fails")
 
-    with patch("ts_autopilot.pipeline._RETRY_BACKOFF_SEC", 0.01):
-        with pytest.raises(RuntimeError, match="failed after"):
+    with (
+        patch("ts_autopilot.pipeline._RETRY_BACKOFF_SEC", 0.01),
+        pytest.raises(RuntimeError, match="failed after"),
+    ):
             _fit_predict_with_retry(
                 runner=mock_runner,
                 train=pd.DataFrame(),

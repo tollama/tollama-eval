@@ -48,17 +48,26 @@ def callback(
     """Automated time series benchmarking."""
 
 
+_INPUT_OPTION = typer.Option(
+    ...,
+    "--input",
+    "-i",
+    help="Path to input CSV file (long or wide format).",
+    exists=True,
+    file_okay=True,
+    readable=True,
+)
+_OUTPUT_OPTION = typer.Option(
+    Path("out/"),
+    "--output",
+    "-o",
+    help="Output directory for results.json and report.html.",
+)
+
+
 @app.command()
 def run(
-    input: Path = typer.Option(
-        ...,
-        "--input",
-        "-i",
-        help="Path to input CSV file (long or wide format).",
-        exists=True,
-        file_okay=True,
-        readable=True,
-    ),
+    input: Path = _INPUT_OPTION,
     horizon: int = typer.Option(
         14,
         "--horizon",
@@ -73,12 +82,7 @@ def run(
         help="Number of cross-validation folds.",
         min=1,
     ),
-    output: Path = typer.Option(
-        Path("out/"),
-        "--output",
-        "-o",
-        help="Output directory for results.json and report.html.",
-    ),
+    output: Path = _OUTPUT_OPTION,
     models: str = typer.Option(
         None,
         "--models",
@@ -175,7 +179,7 @@ def run(
             err=True,
         )
         raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
-    except ZeroDivisionError:
+    except ZeroDivisionError as exc:
         typer.secho(
             "Error: One or more training series has zero variation "
             "(constant values).",
@@ -186,7 +190,7 @@ def run(
             "Hint: Remove constant series from your dataset.",
             err=True,
         )
-        raise typer.Exit(code=ExitCode.DATA_ERROR)
+        raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
     except Exception as exc:
         typer.secho(f"Unexpected error: {exc}", fg=typer.colors.RED, err=True)
         if verbose:

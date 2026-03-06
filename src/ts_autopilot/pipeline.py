@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 import time
@@ -31,10 +32,10 @@ from ts_autopilot.runners.statistical import AutoETSRunner, SeasonalNaiveRunner
 
 logger = get_logger("pipeline")
 
-DEFAULT_RUNNERS: list[BaseRunner] = [
+DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
     SeasonalNaiveRunner(),
     AutoETSRunner(),
-]
+)
 
 
 def _validate_dataframe(df: pd.DataFrame) -> list[str]:
@@ -377,10 +378,8 @@ def _atomic_write(path: Path, content: str) -> None:
             f.write(content)
         os.replace(tmp_path, path)
     except BaseException:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp_path)
-        except OSError:
-            pass
         raise
 
 

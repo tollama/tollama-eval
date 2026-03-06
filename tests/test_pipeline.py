@@ -157,3 +157,10 @@ def test_generate_warnings_clean_data():
 def test_result_includes_warnings(tiny_long_df):
     result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
     assert isinstance(result.warnings, list)
+
+
+def test_default_runners_is_immutable():
+    """DEFAULT_RUNNERS should be a tuple to prevent accidental mutation."""
+    from ts_autopilot.pipeline import DEFAULT_RUNNERS
+
+    assert isinstance(DEFAULT_RUNNERS, tuple)

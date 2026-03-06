@@ -58,5 +58,5 @@ def test_canonical_types(long_csv):
 
 def test_sorted_by_unique_id_and_ds(long_csv):
     df = load_csv(long_csv)
-    for uid, group in df.groupby("unique_id"):
+    for _uid, group in df.groupby("unique_id"):
         assert group["ds"].is_monotonic_increasing

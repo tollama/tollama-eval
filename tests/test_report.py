@@ -137,3 +137,18 @@ def test_report_no_warnings_section(benchmark_result):
 def test_report_print_css(benchmark_result):
     html = render_report(benchmark_result)
     assert "@media print" in html
+
+
+def test_report_version_is_dynamic(benchmark_result):
+    from ts_autopilot import __version__
+
+    html = render_report(benchmark_result)
+    assert f"v{__version__}" in html
+
+
+def test_report_empty_leaderboard(benchmark_result_with_warnings):
+    """Report renders without errors when leaderboard is empty."""
+    html = render_report(benchmark_result_with_warnings)
+    assert "Leaderboard" in html
+    # Bar chart section exists but has no bar rows
+    assert "bar-chart" in html

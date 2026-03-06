@@ -7,6 +7,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from ts_autopilot import __version__
 from ts_autopilot.contracts import BenchmarkResult
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -40,6 +41,7 @@ def render_report(result: BenchmarkResult) -> str:
         models=result.models,
         warnings=result.warnings,
         max_mase=max_mase,
+        version=__version__,
         generated_at=datetime.now(tz=timezone.utc).strftime(
             "%Y-%m-%d %H:%M UTC"
         ),

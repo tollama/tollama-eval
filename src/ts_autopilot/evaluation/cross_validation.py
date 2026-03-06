@@ -56,11 +56,11 @@ def make_expanding_splits(
         # fold_idx=0 → fold 1 (smallest train), fold_idx=n_folds-1 → fold n_folds
         steps_from_end = (n_folds - fold_idx) * horizon
 
-        train_parts = []
-        test_parts = []
-        cutoff_ts = None
+        train_parts: list[pd.DataFrame] = []
+        test_parts: list[pd.DataFrame] = []
+        cutoff_timestamps: list[pd.Timestamp] = []
 
-        for uid, group in df.groupby("unique_id"):
+        for _uid, group in df.groupby("unique_id"):
             group = group.sort_values("ds").reset_index(drop=True)
             n = len(group)
 
@@ -70,14 +70,12 @@ def make_expanding_splits(
 
             train_parts.append(train)
             test_parts.append(test)
-
-            if cutoff_ts is None:
-                cutoff_ts = group.iloc[cutoff_idx]["ds"]
+            cutoff_timestamps.append(pd.Timestamp(group.iloc[cutoff_idx]["ds"]))
 
         splits.append(
             CVSplit(
                 fold=fold_idx + 1,
-                cutoff=pd.Timestamp(cutoff_ts),
+                cutoff=max(cutoff_timestamps),
                 train=pd.concat(train_parts, ignore_index=True),
                 test=pd.concat(test_parts, ignore_index=True),
             )
