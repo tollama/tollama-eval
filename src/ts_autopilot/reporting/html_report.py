@@ -13,11 +13,15 @@ from ts_autopilot.contracts import BenchmarkResult
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
-def render_report(result: BenchmarkResult) -> str:
+def render_report(
+    result: BenchmarkResult,
+    tollama_interpretation: str | None = None,
+) -> str:
     """Render an HTML report from a BenchmarkResult.
 
     Args:
         result: Fully populated BenchmarkResult.
+        tollama_interpretation: Optional LLM-generated interpretation text.
 
     Returns:
         HTML string.
@@ -45,4 +49,5 @@ def render_report(result: BenchmarkResult) -> str:
         generated_at=datetime.now(tz=timezone.utc).strftime(
             "%Y-%m-%d %H:%M UTC"
         ),
+        tollama_interpretation=tollama_interpretation,
     )

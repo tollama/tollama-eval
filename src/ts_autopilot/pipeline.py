@@ -397,6 +397,7 @@ def run_from_csv(
     output_dir: str | Path,
     model_names: list[str] | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
+    tollama_interpretation: str | None = None,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html."""
     from ts_autopilot.reporting.html_report import render_report
@@ -430,7 +431,10 @@ def run_from_csv(
 
     # Atomic write report.html
     report_path = output_dir / "report.html"
-    _atomic_write(report_path, render_report(result))
+    _atomic_write(
+        report_path,
+        render_report(result, tollama_interpretation=tollama_interpretation),
+    )
     logger.info("Wrote %s", report_path)
 
     return result

@@ -104,12 +104,12 @@ def run(
     tollama_url: str | None = typer.Option(
         None,
         "--tollama-url",
-        help="[Reserved] URL for tollama service. Not yet implemented.",
+        help="URL for tollama LLM interpretation service.",
     ),
     no_tollama: bool = typer.Option(
         False,
         "--no-tollama",
-        help="[Reserved] Disable tollama integration. Not yet implemented.",
+        help="Disable tollama integration even if URL is provided.",
     ),
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
@@ -119,19 +119,6 @@ def run(
 
     # Initialize structured logging
     setup_logging(verbose=verbose, quiet=quiet)
-
-    if tollama_url is not None:
-        typer.secho(
-            "[WARNING] --tollama-url is reserved and not yet implemented.",
-            fg=typer.colors.YELLOW,
-            err=True,
-        )
-    if no_tollama:
-        typer.secho(
-            "[WARNING] --no-tollama is reserved and not yet implemented.",
-            fg=typer.colors.YELLOW,
-            err=True,
-        )
 
     model_names = None
     if models is not None:
@@ -203,6 +190,33 @@ def run(
 
     elapsed = time.perf_counter() - t0
 
+    # Tollama LLM interpretation
+    tollama_response = None
+    if tollama_url and not no_tollama:
+        from ts_autopilot.tollama.client import interpret
+
+        if not quiet:
+            typer.echo("  Requesting LLM interpretation...")
+        tollama_response = interpret(result, tollama_url)
+        if tollama_response is not None:
+            # Re-render report with interpretation
+            from ts_autopilot.pipeline import _atomic_write
+            from ts_autopilot.reporting.html_report import render_report
+
+            report_path = output.resolve() / "report.html"
+            _atomic_write(
+                report_path,
+                render_report(
+                    result,
+                    tollama_interpretation=tollama_response.interpretation,
+                ),
+            )
+        elif not quiet:
+            typer.secho(
+                "[WARNING] Tollama unavailable — skipping interpretation.",
+                fg=typer.colors.YELLOW,
+            )
+
     if quiet:
         return
 
@@ -250,6 +264,12 @@ def run(
         fg=typer.colors.GREEN,
     )
     typer.echo(f"Completed in {elapsed:.2f}s")
+
+    # Tollama interpretation
+    if tollama_response is not None:
+        typer.echo("")
+        typer.secho("LLM Interpretation:", bold=True)
+        typer.echo(f"  {tollama_response.interpretation}")
 
 
 if __name__ == "__main__":
