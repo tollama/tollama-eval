@@ -63,9 +63,7 @@ def rmsse(
     y_train = np.asarray(y_train, dtype=float)
 
     if season_length < 1:
-        raise ValueError(
-            f"season_length must be >= 1, got {season_length}."
-        )
+        raise ValueError(f"season_length must be >= 1, got {season_length}.")
 
     if len(y_train) < season_length + 1:
         raise ValueError(
@@ -132,9 +130,7 @@ def mase(
     y_train = np.asarray(y_train, dtype=float)
 
     if season_length < 1:
-        raise ValueError(
-            f"season_length must be >= 1, got {season_length}."
-        )
+        raise ValueError(f"season_length must be >= 1, got {season_length}.")
 
     if len(y_train) < season_length + 1:
         raise ValueError(

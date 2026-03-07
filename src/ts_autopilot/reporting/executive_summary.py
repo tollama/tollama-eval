@@ -62,8 +62,7 @@ def generate_executive_summary(result: BenchmarkResult) -> str:
             )
         else:
             lines.append(
-                f"The runner-up is {runner_up.name} "
-                f"(MASE {runner_up.mean_mase:.4f})."
+                f"The runner-up is {runner_up.name} (MASE {runner_up.mean_mase:.4f})."
             )
 
     # Stability assessment
@@ -75,8 +74,7 @@ def generate_executive_summary(result: BenchmarkResult) -> str:
             cv = 0
         if cv < 0.05:
             lines.append(
-                f"{winner.name} shows excellent stability across folds "
-                f"(CV = {cv:.1%})."
+                f"{winner.name} shows excellent stability across folds (CV = {cv:.1%})."
             )
         elif cv < 0.15:
             lines.append(
@@ -142,8 +140,7 @@ def _find_worst_series(model):
         return None
 
     avg_scores = {
-        sid: sum(scores) / len(scores)
-        for sid, scores in series_totals.items()
+        sid: sum(scores) / len(scores) for sid, scores in series_totals.items()
     }
     worst_sid = max(avg_scores, key=avg_scores.get)
     return worst_sid, avg_scores[worst_sid]

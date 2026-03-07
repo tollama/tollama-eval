@@ -328,9 +328,7 @@ def run_benchmark(
                     ds=output.ds,
                     y_hat=output.y_hat,
                     y_actual=test_sorted["y"].tolist(),
-                    ds_train_tail=[
-                        d.isoformat() for d in train_tail["ds"]
-                    ],
+                    ds_train_tail=[d.isoformat() for d in train_tail["ds"]],
                     y_train_tail=train_tail["y"].tolist(),
                 )
             )
@@ -429,9 +427,7 @@ def run_benchmark(
         all_residuals = []
         all_fitted = []
         for fd in model_forecasts:
-            residuals = [
-                a - p for a, p in zip(fd.y_actual, fd.y_hat, strict=False)
-            ]
+            residuals = [a - p for a, p in zip(fd.y_actual, fd.y_hat, strict=False)]
             all_residuals.extend(residuals)
             all_fitted.extend(fd.y_hat)
         if all_residuals:

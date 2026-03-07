@@ -17,8 +17,12 @@ def _make_enriched_result():
     """Create a BenchmarkResult with forecast data and diagnostics."""
     return BenchmarkResult(
         profile=DataProfile(
-            n_series=2, frequency="D", missing_ratio=0.0,
-            season_length_guess=7, min_length=60, max_length=60,
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
             total_rows=120,
         ),
         config=BenchmarkConfig(horizon=7, n_folds=2),
@@ -28,11 +32,15 @@ def _make_enriched_result():
                 runtime_sec=0.5,
                 folds=[
                     FoldResult(
-                        fold=1, cutoff="2020-06-01", mase=0.85,
+                        fold=1,
+                        cutoff="2020-06-01",
+                        mase=0.85,
                         series_scores={"s1": 0.75, "s2": 0.95},
                     ),
                     FoldResult(
-                        fold=2, cutoff="2020-07-01", mase=0.90,
+                        fold=2,
+                        cutoff="2020-07-01",
+                        mase=0.90,
                         series_scores={"s1": 0.80, "s2": 1.00},
                     ),
                 ],
@@ -54,13 +62,20 @@ def _make_enriched_result():
             ),
         ],
         leaderboard=[
-            LeaderboardEntry(rank=1, name="AutoETS", mean_mase=0.875,
-                             mean_smape=5.0, mean_rmsse=0.9, mean_mae=1.5),
+            LeaderboardEntry(
+                rank=1,
+                name="AutoETS",
+                mean_mase=0.875,
+                mean_smape=5.0,
+                mean_rmsse=0.9,
+                mean_mae=1.5,
+            ),
             LeaderboardEntry(rank=2, name="SeasonalNaive", mean_mase=1.0),
         ],
         forecast_data=[
             ForecastData(
-                model_name="AutoETS", fold=2,
+                model_name="AutoETS",
+                fold=2,
                 unique_id=["s1", "s1", "s2", "s2"],
                 ds=["2020-07-02", "2020-07-03", "2020-07-02", "2020-07-03"],
                 y_hat=[10.0, 11.0, 20.0, 21.0],
@@ -149,8 +164,12 @@ def test_report_no_diagnostics_without_data():
     """Report should not show diagnostics/forecast sections when no data."""
     result = BenchmarkResult(
         profile=DataProfile(
-            n_series=1, frequency="D", missing_ratio=0.0,
-            season_length_guess=7, min_length=60, max_length=60,
+            n_series=1,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
             total_rows=60,
         ),
         config=BenchmarkConfig(horizon=7, n_folds=2),

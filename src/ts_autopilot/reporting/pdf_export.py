@@ -33,8 +33,7 @@ def generate_pdf(html_path: str | Path, output_path: str | Path) -> bool:
         from weasyprint import HTML
     except ImportError:
         logger.info(
-            "weasyprint not installed. Install with: "
-            'pip install "ts-autopilot[pdf]"'
+            'weasyprint not installed. Install with: pip install "ts-autopilot[pdf]"'
         )
         return False
 

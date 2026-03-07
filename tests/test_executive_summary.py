@@ -96,8 +96,12 @@ def test_summary_warns_all_above_naive():
 def test_summary_empty_leaderboard():
     result = BenchmarkResult(
         profile=DataProfile(
-            n_series=1, frequency="D", missing_ratio=0.0,
-            season_length_guess=7, min_length=10, max_length=10,
+            n_series=1,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=10,
+            max_length=10,
             total_rows=10,
         ),
         config=BenchmarkConfig(horizon=7, n_folds=2),

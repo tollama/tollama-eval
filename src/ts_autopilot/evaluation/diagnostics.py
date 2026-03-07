@@ -33,9 +33,7 @@ def _ljung_box_p(residuals: np.ndarray, max_lag: int = 10) -> float:
     # For df=max_lag, use simple approximation
     df = max_lag
     # Wilson-Hilferty approximation for chi-squared CDF
-    z = ((q_stat / df) ** (1.0 / 3) - (1 - 2.0 / (9 * df))) / np.sqrt(
-        2.0 / (9 * df)
-    )
+    z = ((q_stat / df) ** (1.0 / 3) - (1 - 2.0 / (9 * df))) / np.sqrt(2.0 / (9 * df))
     # Standard normal CDF approximation
     p_value = 1.0 - 0.5 * (1 + np.sign(z) * (1 - np.exp(-2 * z * z / np.pi)) ** 0.5)
     return float(np.clip(p_value, 0.0, 1.0))

@@ -182,9 +182,7 @@ def _build_forecast_chart_data(result: BenchmarkResult) -> dict:
             series_data[uid]["y_actual"].append(best_fd.y_actual[i])
 
     # Find best and worst series by MASE
-    winner_model = next(
-        (m for m in result.models if m.name == best_model), None
-    )
+    winner_model = next((m for m in result.models if m.name == best_model), None)
     if not winner_model:
         return {"series": []}
 
@@ -193,9 +191,7 @@ def _build_forecast_chart_data(result: BenchmarkResult) -> dict:
         for sid, score in fold.series_scores.items():
             avg_scores.setdefault(sid, [])
             avg_scores[sid].append(score)
-    avg_scores = {
-        sid: sum(scores) / len(scores) for sid, scores in avg_scores.items()
-    }
+    avg_scores = {sid: sum(scores) / len(scores) for sid, scores in avg_scores.items()}
 
     if not avg_scores:
         return {"series": []}
@@ -214,13 +210,15 @@ def _build_forecast_chart_data(result: BenchmarkResult) -> dict:
     for sid in selected:
         if sid in series_data:
             sd = series_data[sid]
-            output_series.append({
-                "name": sid,
-                "mase": round(avg_scores.get(sid, 0), 4),
-                "ds": sd["ds_forecast"],
-                "y_hat": sd["y_hat"],
-                "y_actual": sd["y_actual"],
-            })
+            output_series.append(
+                {
+                    "name": sid,
+                    "mase": round(avg_scores.get(sid, 0), 4),
+                    "ds": sd["ds_forecast"],
+                    "y_hat": sd["y_hat"],
+                    "y_actual": sd["y_actual"],
+                }
+            )
 
     return {
         "series": output_series,
