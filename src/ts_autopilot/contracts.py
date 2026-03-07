@@ -55,13 +55,22 @@ class FoldResult:
     fold: int  # 1-indexed
     cutoff: str  # ISO 8601 string of last training date
     mase: float
+    series_scores: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        if not self.series_scores:
+            d.pop("series_scores", None)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> FoldResult:
-        return cls(**d)
+        return cls(
+            fold=d["fold"],
+            cutoff=d["cutoff"],
+            mase=d["mase"],
+            series_scores=d.get("series_scores", {}),
+        )
 
 
 @dataclass

@@ -52,26 +52,19 @@ def mase(
     return float(mae / scale)
 
 
-def mean_mase_per_fold(
+def per_series_mase(
     forecast_df: pd.DataFrame,
     actuals_df: pd.DataFrame,
     train_df: pd.DataFrame,
     season_length: int,
     model_col: str,
-) -> float:
-    """Average MASE across all series in a single fold.
-
-    Args:
-        forecast_df: DataFrame with (unique_id, ds, <model_col>) columns.
-        actuals_df: DataFrame with (unique_id, ds, y) — the test set.
-        train_df: DataFrame with (unique_id, ds, y) — the training set.
-        season_length: Seasonal period for MASE denominator.
-        model_col: Name of the forecast column in forecast_df.
+) -> dict[str, float]:
+    """Compute MASE for each series in a single fold.
 
     Returns:
-        Mean MASE across all unique_ids.
+        Dict mapping unique_id to MASE score.
     """
-    scores = []
+    scores: dict[str, float] = {}
 
     for uid in actuals_df["unique_id"].unique():
         actual_series = (
@@ -90,6 +83,22 @@ def mean_mase_per_fold(
             .values
         )
 
-        scores.append(mase(actual_series, pred_series, train_series, season_length))
+        scores[str(uid)] = mase(
+            actual_series, pred_series, train_series, season_length
+        )
 
-    return float(np.mean(scores))
+    return scores
+
+
+def mean_mase_per_fold(
+    forecast_df: pd.DataFrame,
+    actuals_df: pd.DataFrame,
+    train_df: pd.DataFrame,
+    season_length: int,
+    model_col: str,
+) -> float:
+    """Average MASE across all series in a single fold."""
+    scores = per_series_mase(
+        forecast_df, actuals_df, train_df, season_length, model_col
+    )
+    return float(np.mean(list(scores.values())))

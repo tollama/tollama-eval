@@ -23,7 +23,7 @@ from ts_autopilot.contracts import (
     ResultMetadata,
 )
 from ts_autopilot.evaluation.cross_validation import make_expanding_splits
-from ts_autopilot.evaluation.metrics import mean_mase_per_fold
+from ts_autopilot.evaluation.metrics import per_series_mase
 from ts_autopilot.ingestion.loader import load_csv
 from ts_autopilot.ingestion.profiler import profile_dataframe
 from ts_autopilot.logging_config import get_logger
@@ -309,18 +309,25 @@ def run_benchmark(
                 }
             )
 
-            fold_mase = mean_mase_per_fold(
+            series_scores = per_series_mase(
                 forecast_df=pred_df,
                 actuals_df=split.test,
                 train_df=split.train,
                 season_length=profile.season_length_guess,
                 model_col=output.model_name,
             )
+            fold_mase = float(
+                np.mean(list(series_scores.values()))
+            )
             fold_results.append(
                 FoldResult(
                     fold=split.fold,
                     cutoff=split.cutoff.isoformat(),
                     mase=round(fold_mase, 6),
+                    series_scores={
+                        k: round(v, 6)
+                        for k, v in series_scores.items()
+                    },
                 )
             )
 

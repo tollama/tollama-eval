@@ -164,3 +164,16 @@ def test_default_runners_is_immutable():
     from ts_autopilot.pipeline import DEFAULT_RUNNERS
 
     assert isinstance(DEFAULT_RUNNERS, tuple)
+
+
+def test_fold_results_contain_series_scores(tiny_long_df):
+    """Per-series MASE scores are captured in fold results."""
+    result = run_benchmark(
+        tiny_long_df, horizon=7, n_folds=2, model_names=["SeasonalNaive"]
+    )
+    for model in result.models:
+        for fold in model.folds:
+            assert isinstance(fold.series_scores, dict)
+            assert len(fold.series_scores) > 0
+            input_uids = set(tiny_long_df["unique_id"].unique())
+            assert set(fold.series_scores.keys()) == input_uids

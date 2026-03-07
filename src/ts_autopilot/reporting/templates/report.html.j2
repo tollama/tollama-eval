@@ -59,6 +59,7 @@
         }
         .bar-fill.best { background: var(--green); }
 
+        .worst-series { background: var(--red-bg); }
         .meta { color: #6c757d; font-size: 0.9rem; }
 
         @media print {
@@ -143,6 +144,31 @@
         </tr>
         {% endfor %}
     </table>
+
+    {% if model.folds and model.folds[0].series_scores %}
+    <details>
+        <summary style="cursor: pointer; font-weight: 500; margin: 0.5rem 0;">Per-Series Breakdown (averaged across folds)</summary>
+        {% set ns = namespace(avg_scores={}) %}
+        {% for fold in model.folds %}
+            {% for sid, score in fold.series_scores.items() %}
+                {% if sid in ns.avg_scores %}
+                    {% set _ = ns.avg_scores.update({sid: ns.avg_scores[sid] + score / model.folds|length}) %}
+                {% else %}
+                    {% set _ = ns.avg_scores.update({sid: score / model.folds|length}) %}
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+        <table>
+            <tr><th>Series</th><th>Avg MASE</th></tr>
+            {% for sid, score in ns.avg_scores|dictsort(by='value', reverse=true) %}
+            <tr>
+                <td>{{ sid }}</td>
+                <td class="{% if score < 1.0 %}mase-good{% elif score > 1.0 %}mase-bad{% endif %}{% if loop.index <= 3 %} worst-series{% endif %}">{{ "%.6f"|format(score) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </details>
+    {% endif %}
     {% endfor %}
 
     {% if tollama_interpretation %}
