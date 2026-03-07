@@ -500,8 +500,8 @@ def run_from_csv(
     output_dir: str | Path,
     model_names: list[str] | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
-    tollama_interpretation: str | None = None,
     tollama_url: str | None = None,
+    tollama_models: list[str] | None = None,
     n_jobs: int = 1,
     generate_pdf: bool = False,
     max_retries: int = DEFAULT_MAX_RETRIES,
@@ -509,8 +509,8 @@ def run_from_csv(
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html.
 
-    If tollama_url is provided, requests an LLM interpretation after
-    benchmarking and includes it in the HTML report.
+    If tollama_url and tollama_models are provided, creates TollamaRunners
+    to benchmark TSFM models alongside statistical models.
     """
     from ts_autopilot.reporting.html_report import render_report
 
@@ -522,10 +522,25 @@ def run_from_csv(
     df = load_csv(csv_path)
     logger.info("Loaded %d rows, %d series", len(df), df["unique_id"].nunique())
 
+    # Build extra tollama runners if configured
+    extra_runners: list[BaseRunner] | None = None
+    if tollama_url and tollama_models:
+        from ts_autopilot.runners.tollama import get_tollama_runners
+
+        tollama_runners = get_tollama_runners(tollama_url, tollama_models)
+        if tollama_runners:
+            extra_runners = list(DEFAULT_RUNNERS) + tollama_runners
+            logger.info(
+                "Added %d tollama model(s): %s",
+                len(tollama_runners),
+                [r.name for r in tollama_runners],
+            )
+
     result = run_benchmark(
         df,
         horizon=horizon,
         n_folds=n_folds,
+        runners=extra_runners,
         model_names=model_names,
         progress_callback=progress_callback,
         n_jobs=n_jobs,
@@ -538,17 +553,6 @@ def run_from_csv(
     metadata = ResultMetadata.create_now()
     metadata.total_runtime_sec = round(total_runtime, 4)
     result.metadata = metadata
-
-    # Tollama LLM interpretation
-    if tollama_url and tollama_interpretation is None:
-        from ts_autopilot.tollama.client import interpret
-
-        logger.info("Requesting LLM interpretation from %s", tollama_url)
-        response = interpret(result, tollama_url)
-        if response is not None:
-            tollama_interpretation = response.interpretation
-        else:
-            logger.warning("Tollama unavailable — skipping interpretation.")
 
     # Atomic write results.json
     results_path = output_dir / "results.json"
@@ -564,10 +568,7 @@ def run_from_csv(
 
     # Atomic write report.html
     report_path = output_dir / "report.html"
-    _atomic_write(
-        report_path,
-        render_report(result, tollama_interpretation=tollama_interpretation),
-    )
+    _atomic_write(report_path, render_report(result))
     logger.info("Wrote %s", report_path)
 
     # Optional PDF generation

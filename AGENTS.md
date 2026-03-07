@@ -21,9 +21,16 @@ If input has timezones, strip to naive. If `unique_id` is missing, use `"series_
 - No new dependencies without updating `pyproject.toml` and adding at least one test that would fail without the new dependency.
 - **Prohibited in MVP**: torch, neuralforecast, lightgbm, salesforce-merlion, stumpy, polars, plotly.
 
-## Reserved Flags (not implemented)
-- `--tollama-url`: URL for tollama service
-- `--no-tollama`: Disable tollama integration
+## Tollama Integration (TSFM)
+tollama is a **Time Series Foundation Model platform** (https://github.com/tollama/tollama),
+NOT an LLM service. It provides access to models like Chronos-2, TimesFM, Moirai, etc.
+
+- `--tollama-url`: Base URL of the tollama server (e.g. http://localhost:8000)
+- `--tollama-models`: Comma-separated TSFM models to benchmark (e.g. chronos2,timesfm)
+- `--no-tollama`: Disable tollama integration even if URL is provided
+- TollamaRunner delegates to tollama's `POST /v1/forecast` endpoint
+- Tollama models are zero-shot (no training step)
+- Graceful degradation: if tollama is unreachable, NaN values are used
 
 ## results.json Schema (frozen — do not rename fields)
 ```json

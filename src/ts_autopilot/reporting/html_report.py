@@ -16,13 +16,11 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 def render_report(
     result: BenchmarkResult,
-    tollama_interpretation: str | None = None,
 ) -> str:
     """Render an HTML report from a BenchmarkResult.
 
     Args:
         result: Fully populated BenchmarkResult.
-        tollama_interpretation: Optional LLM-generated interpretation text.
 
     Returns:
         HTML string.
@@ -40,23 +38,26 @@ def render_report(
     chart_data = _build_chart_data(result)
     executive_summary = generate_executive_summary(result)
 
-    return str(
-        template.render(
-            profile=result.profile,
-            config=result.config,
-            leaderboard=result.leaderboard,
-            models=result.models,
-            warnings=result.warnings,
-            max_mase=max_mase,
-            chart_data=chart_data,
-            version=__version__,
-            generated_at=datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-            tollama_interpretation=tollama_interpretation,
-            executive_summary=executive_summary,
-            diagnostics=result.diagnostics,
-            has_forecast_data=len(result.forecast_data) > 0,
-            has_diagnostics=len(result.diagnostics) > 0,
-        )
+    # Detect if any tollama TSFM models are in the results
+    tollama_models = [m for m in result.models if m.name.startswith("tollama/")]
+    has_tsfm = len(tollama_models) > 0
+
+    return template.render(
+        profile=result.profile,
+        config=result.config,
+        leaderboard=result.leaderboard,
+        models=result.models,
+        warnings=result.warnings,
+        max_mase=max_mase,
+        chart_data=chart_data,
+        version=__version__,
+        generated_at=datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        executive_summary=executive_summary,
+        diagnostics=result.diagnostics,
+        has_forecast_data=len(result.forecast_data) > 0,
+        has_diagnostics=len(result.diagnostics) > 0,
+        has_tsfm=has_tsfm,
+        tollama_models=tollama_models,
     )
 
 

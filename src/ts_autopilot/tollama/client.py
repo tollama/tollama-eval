@@ -1,40 +1,65 @@
-"""Tollama client for LLM-powered benchmark interpretation."""
+"""Tollama client for Time Series Foundation Model forecasting.
+
+Tollama is a unified TSFM platform (https://github.com/tollama/tollama)
+that provides access to models like Chronos-2, TimesFM, Moirai 2.0, etc.
+via a standard HTTP API.
+"""
 
 from __future__ import annotations
 
 import json
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from ts_autopilot.contracts import BenchmarkResult
 from ts_autopilot.logging_config import get_logger
 
 logger = get_logger("tollama")
 
-_DEFAULT_TIMEOUT_SEC = 30
+_DEFAULT_TIMEOUT_SEC = 120
 
 
 @dataclass
-class TollamaResponse:
-    """Interpretation returned by the tollama service."""
+class TollamaForecastResponse:
+    """Forecast response from the tollama service."""
 
-    interpretation: str
-    model_used: str
+    mean: list[float]
+    model: str
+    quantiles: dict[str, list[float]] = field(default_factory=dict)
 
 
-def interpret(
-    result: BenchmarkResult,
+def forecast(
+    target: list[float],
+    freq: str,
+    horizon: int,
+    model: str,
     tollama_url: str,
     timeout: float = _DEFAULT_TIMEOUT_SEC,
-) -> TollamaResponse | None:
-    """Send benchmark result to tollama and return an LLM interpretation.
+) -> TollamaForecastResponse:
+    """Send time series data to tollama and return TSFM forecast.
 
-    Returns None on any failure (network, timeout, bad response) so the
-    pipeline never fails due to tollama unavailability.
+    Args:
+        target: Historical values for a single series.
+        freq: Pandas-style frequency string (e.g. 'D', 'W', 'ME').
+        horizon: Number of steps to forecast.
+        model: Tollama model identifier (e.g. 'chronos2', 'timesfm').
+        tollama_url: Base URL of the tollama server.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        TollamaForecastResponse with forecasted values.
+
+    Raises:
+        TollamaError: On any failure (network, timeout, bad response).
     """
-    url = tollama_url.rstrip("/") + "/interpret"
-    payload = json.dumps({"benchmark": result.to_dict()}).encode()
+    url = tollama_url.rstrip("/") + "/v1/forecast"
+    payload = json.dumps(
+        {
+            "model": model,
+            "series": {"target": target, "freq": freq},
+            "horizon": horizon,
+        }
+    ).encode()
 
     req = urllib.request.Request(
         url,
@@ -44,19 +69,34 @@ def interpret(
     )
 
     try:
-        logger.info("Requesting interpretation from %s", url)
+        logger.debug(
+            "Requesting forecast from %s (model=%s, h=%d)",
+            url, model, horizon,
+        )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode())
-            return TollamaResponse(
-                interpretation=body["interpretation"],
-                model_used=body.get("model", "unknown"),
+            mean = body["mean"]
+            if not isinstance(mean, list) or len(mean) != horizon:
+                got = len(mean) if isinstance(mean, list) else type(mean)
+                raise TollamaError(
+                    f"Expected {horizon} forecast values, got {got}"
+                )
+            quantiles = {
+                k: [float(x) for x in v]
+                for k, v in body.get("quantiles", {}).items()
+            }
+            return TollamaForecastResponse(
+                mean=[float(v) for v in mean],
+                model=body.get("model", model),
+                quantiles=quantiles,
             )
     except urllib.error.URLError as exc:
-        logger.warning("Tollama unavailable: %s", exc)
-        return None
-    except (json.JSONDecodeError, KeyError) as exc:
-        logger.warning("Invalid tollama response: %s", exc)
-        return None
-    except TimeoutError:
-        logger.warning("Tollama request timed out after %.0fs", timeout)
-        return None
+        raise TollamaError(f"Tollama unavailable at {url}: {exc}") from exc
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise TollamaError(f"Invalid tollama response: {exc}") from exc
+    except TimeoutError as exc:
+        raise TollamaError(f"Tollama request timed out after {timeout:.0f}s") from exc
+
+
+class TollamaError(Exception):
+    """Raised when tollama communication fails."""
