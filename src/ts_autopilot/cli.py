@@ -114,6 +114,13 @@ def run(
         "--no-tollama",
         help="Disable tollama integration even if URL is provided.",
     ),
+    n_jobs: int = typer.Option(
+        1,
+        "--n-jobs",
+        "-j",
+        help="Number of parallel workers for model fitting.",
+        min=1,
+    ),
     config: Path | None = _CONFIG_OPTION,
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
@@ -143,6 +150,8 @@ def run(
             models = ",".join(file_cfg.models)
         if file_cfg.tollama_url and tollama_url is None:
             tollama_url = file_cfg.tollama_url
+        if file_cfg.n_jobs is not None and n_jobs == 1:
+            n_jobs = file_cfg.n_jobs
 
     if input is None:
         typer.secho(
@@ -192,6 +201,7 @@ def run(
             output_dir=output,
             model_names=model_names,
             progress_callback=_progress_cb,
+            n_jobs=n_jobs,
         )
     except SchemaError as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)

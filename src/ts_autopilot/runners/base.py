@@ -30,6 +30,7 @@ class BaseRunner(ABC):
         horizon: int,
         freq: str,
         season_length: int,
+        n_jobs: int = 1,
     ) -> ForecastOutput:
         """Fit on train, predict horizon steps ahead.
 
@@ -38,6 +39,7 @@ class BaseRunner(ABC):
             horizon: Steps to forecast.
             freq: pandas freq string (e.g. 'D', 'W', 'ME').
             season_length: Seasonal period.
+            n_jobs: Number of parallel workers.
 
         Returns:
             ForecastOutput with y_hat for all series.
@@ -62,6 +64,7 @@ class StatsForecastRunner(BaseRunner):
         horizon: int,
         freq: str,
         season_length: int,
+        n_jobs: int = 1,
     ) -> ForecastOutput:
         logger.debug(
             "%s.fit_predict: %d rows, horizon=%d, freq=%s, season=%d",
@@ -73,7 +76,7 @@ class StatsForecastRunner(BaseRunner):
         )
         t0 = time.perf_counter()
         model = self._make_model(season_length)
-        sf = StatsForecast(models=[model], freq=freq, n_jobs=1)
+        sf = StatsForecast(models=[model], freq=freq, n_jobs=n_jobs)
         sf.fit(train)
         preds = sf.predict(h=horizon)
         elapsed = time.perf_counter() - t0

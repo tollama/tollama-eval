@@ -161,6 +161,7 @@ def _fit_predict_with_retry(
     horizon: int,
     freq: str,
     season_length: int,
+    n_jobs: int = 1,
 ) -> ForecastOutput:
     """Call runner.fit_predict with retry on transient failures.
 
@@ -176,6 +177,7 @@ def _fit_predict_with_retry(
                 horizon=horizon,
                 freq=freq,
                 season_length=season_length,
+                n_jobs=n_jobs,
             )
         except (RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
             last_exc = exc
@@ -211,6 +213,7 @@ def run_benchmark(
     runners: list[BaseRunner] | None = None,
     model_names: list[str] | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
+    n_jobs: int = 1,
 ) -> BenchmarkResult:
     """Run the full benchmark pipeline (pure logic, no I/O).
 
@@ -293,6 +296,7 @@ def run_benchmark(
                 horizon=horizon,
                 freq=profile.frequency,
                 season_length=profile.season_length_guess,
+                n_jobs=n_jobs,
             )
             total_runtime += output.runtime_sec
 
@@ -398,6 +402,7 @@ def run_from_csv(
     model_names: list[str] | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
     tollama_interpretation: str | None = None,
+    n_jobs: int = 1,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html."""
     from ts_autopilot.reporting.html_report import render_report
@@ -416,6 +421,7 @@ def run_from_csv(
         n_folds=n_folds,
         model_names=model_names,
         progress_callback=progress_callback,
+        n_jobs=n_jobs,
     )
 
     # Attach metadata
