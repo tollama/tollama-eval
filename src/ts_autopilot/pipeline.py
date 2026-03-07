@@ -90,9 +90,7 @@ def _validate_dataframe(df: pd.DataFrame) -> list[str]:
     return warnings
 
 
-def generate_warnings(
-    profile: DataProfile, horizon: int, n_folds: int
-) -> list[str]:
+def generate_warnings(profile: DataProfile, horizon: int, n_folds: int) -> list[str]:
     """Produce user-facing warnings based on data profile and config."""
     warnings: list[str] = []
 
@@ -129,9 +127,7 @@ def _detect_date_gaps(df: pd.DataFrame, freq: str) -> list[str]:
         if len(dates) < 3:
             continue
         try:
-            expected = pd.date_range(
-                start=dates.iloc[0], end=dates.iloc[-1], freq=freq
-            )
+            expected = pd.date_range(start=dates.iloc[0], end=dates.iloc[-1], freq=freq)
             actual_set = set(dates)
             missing = set(expected) - actual_set
             if missing:
@@ -249,6 +245,9 @@ def run_benchmark(
     # Detect date gaps
     gap_warnings = _detect_date_gaps(df, profile.frequency)
     warnings.extend(gap_warnings)
+
+    # Deduplicate warnings while preserving order
+    warnings = list(dict.fromkeys(warnings))
 
     logger.info(
         "Starting benchmark: %d series, horizon=%d, n_folds=%d, models=%s",

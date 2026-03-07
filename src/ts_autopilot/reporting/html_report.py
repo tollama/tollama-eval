@@ -33,9 +33,7 @@ def render_report(
     template = env.get_template("report.html.j2")
 
     max_mase = (
-        max(e.mean_mase for e in result.leaderboard)
-        if result.leaderboard
-        else 1.0
+        max(e.mean_mase for e in result.leaderboard) if result.leaderboard else 1.0
     )
 
     return template.render(

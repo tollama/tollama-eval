@@ -186,8 +186,7 @@ def run(
 
     if not quiet:
         typer.secho(
-            f"Running benchmark: input={input}, horizon={horizon}, "
-            f"n_folds={n_folds}",
+            f"Running benchmark: input={input}, horizon={horizon}, n_folds={n_folds}",
             bold=True,
         )
 
@@ -221,8 +220,7 @@ def run(
         raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
     except ZeroDivisionError as exc:
         typer.secho(
-            "Error: One or more training series has zero variation "
-            "(constant values).",
+            "Error: One or more training series has zero variation (constant values).",
             fg=typer.colors.RED,
             err=True,
         )
@@ -236,9 +234,7 @@ def run(
         if verbose:
             traceback.print_exc(file=sys.stderr)
         else:
-            typer.echo(
-                "Hint: Use --verbose for full traceback.", err=True
-            )
+            typer.echo("Hint: Use --verbose for full traceback.", err=True)
         raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
 
     elapsed = time.perf_counter() - t0

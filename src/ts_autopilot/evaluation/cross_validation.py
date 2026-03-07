@@ -44,11 +44,12 @@ def make_expanding_splits(
 
     # Validate minimum length per series
     for uid, group in df.groupby("unique_id"):
-        if len(group) < (n_folds + 1) * horizon:
+        min_needed = (n_folds + 1) * horizon
+        if len(group) < min_needed:
             raise ValueError(
                 f"Series '{uid}' has {len(group)} rows but needs at least "
-                f"{(n_folds + 1) * horizon} for {n_folds} folds with "
-                f"horizon {horizon}."
+                f"{min_needed} for {n_folds} folds with horizon {horizon}. "
+                f"Example: {horizon} x {n_folds + 1} = {min_needed}."
             )
 
     # Build splits: fold_i goes from n_folds (oldest cutoff) to 1 (newest)

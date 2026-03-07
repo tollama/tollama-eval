@@ -55,9 +55,7 @@ def test_guess_season_length_mapping():
 
 def test_profile_weekly_data():
     dates = pd.date_range("2020-01-06", periods=60, freq="W-MON")
-    df = pd.DataFrame(
-        {"unique_id": "s1", "ds": dates, "y": range(60)}
-    )
+    df = pd.DataFrame({"unique_id": "s1", "ds": dates, "y": range(60)})
     profile = profile_dataframe(df)
     assert profile.season_length_guess == 52
 
@@ -85,6 +83,7 @@ def test_profile_single_row_series():
     assert profile.n_series == 1
     assert profile.min_length == 1
     assert profile.total_rows == 1
+
 
 
 def test_frequency_fallback_logs_warning(caplog):

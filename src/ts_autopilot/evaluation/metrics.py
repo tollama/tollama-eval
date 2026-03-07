@@ -68,9 +68,7 @@ def per_series_mase(
 
     for uid in actuals_df["unique_id"].unique():
         actual_series = (
-            actuals_df.loc[actuals_df["unique_id"] == uid]
-            .sort_values("ds")["y"]
-            .values
+            actuals_df.loc[actuals_df["unique_id"] == uid].sort_values("ds")["y"].values
         )
         pred_series = (
             forecast_df.loc[forecast_df["unique_id"] == uid]
@@ -78,9 +76,7 @@ def per_series_mase(
             .values
         )
         train_series = (
-            train_df.loc[train_df["unique_id"] == uid]
-            .sort_values("ds")["y"]
-            .values
+            train_df.loc[train_df["unique_id"] == uid].sort_values("ds")["y"].values
         )
 
         scores[str(uid)] = mase(

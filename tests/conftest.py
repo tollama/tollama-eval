@@ -51,7 +51,5 @@ def tiny_long_df():
     rows = []
     for uid in ["s1", "s2"]:
         for i, d in enumerate(dates):
-            rows.append(
-                {"unique_id": uid, "ds": d, "y": 10.0 + i + rng.normal(0, 0.5)}
-            )
+            rows.append({"unique_id": uid, "ds": d, "y": 10.0 + i + rng.normal(0, 0.5)})
     return pd.DataFrame(rows)

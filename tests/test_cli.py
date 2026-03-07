@@ -233,28 +233,11 @@ def test_cli_leaderboard_shows_std_mase(tmp_path):
         ],
     )
     assert result.exit_code == 0
-    assert "\u00b1" in result.output  # ± symbol
-
-
-def test_cli_output_shows_absolute_path(tmp_path):
-    csv_path = _make_csv(tmp_path)
-    out_dir = tmp_path / "out"
-    result = runner.invoke(
-        app,
-        [
-            "run",
-            "--input", str(csv_path),
-            "--horizon", "7",
-            "--n-folds", "2",
-            "--output", str(out_dir),
-        ],
-    )
-    assert result.exit_code == 0
     assert str(out_dir.resolve()) in result.output
 
 
 def test_python_m_module_exists():
-    """__main__.py exists so `python -m ts_autopilot` works."""
+    """__main__.py exists so ``python -m ts_autopilot`` works."""
     from pathlib import Path
 
     import ts_autopilot

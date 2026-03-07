@@ -80,6 +80,15 @@ def _parse_wide(df: pd.DataFrame, path: str | Path) -> pd.DataFrame:
             "no (ds, y) columns and first column is not parseable as dates."
         ) from e
 
+    # Sanity-check parsed dates fall in a reasonable range
+    min_year = df.index.min().year
+    max_year = df.index.max().year
+    if min_year < 1900 or max_year > 2100:
+        raise SchemaError(
+            f"Wide format dates span {min_year}-{max_year}, "
+            "which looks like a misparse. Expected years in 1900-2100."
+        )
+
     # All remaining columns must be numeric
     numeric_cols = df.select_dtypes(include="number").columns
     if len(numeric_cols) == 0:

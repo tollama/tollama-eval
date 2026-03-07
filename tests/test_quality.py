@@ -112,10 +112,12 @@ def test_detect_date_gaps_no_gaps(tiny_long_df):
 def test_detect_date_gaps_multiple_series():
     dates1 = pd.to_datetime(["2020-01-01", "2020-01-02", "2020-01-04"])
     dates2 = pd.to_datetime(["2020-01-01", "2020-01-02", "2020-01-03"])
-    df = pd.concat([
-        pd.DataFrame({"unique_id": "s1", "ds": dates1, "y": [1, 2, 4]}),
-        pd.DataFrame({"unique_id": "s2", "ds": dates2, "y": [1, 2, 3]}),
-    ])
+    df = pd.concat(
+        [
+            pd.DataFrame({"unique_id": "s1", "ds": dates1, "y": [1, 2, 4]}),
+            pd.DataFrame({"unique_id": "s2", "ds": dates2, "y": [1, 2, 3]}),
+        ]
+    )
     warnings = _detect_date_gaps(df, "D")
     assert any("1 series" in w for w in warnings)
     assert "s1" in warnings[0]
@@ -172,8 +174,13 @@ def test_result_metadata_round_trip():
 def test_benchmark_result_with_metadata_round_trip():
     result = BenchmarkResult(
         profile=DataProfile(
-            n_series=2, frequency="D", missing_ratio=0.0,
-            season_length_guess=7, min_length=60, max_length=60, total_rows=120,
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=120,
         ),
         config=BenchmarkConfig(horizon=7, n_folds=2),
         models=[],
@@ -195,8 +202,13 @@ def test_benchmark_result_with_metadata_round_trip():
 def test_benchmark_result_without_metadata():
     result = BenchmarkResult(
         profile=DataProfile(
-            n_series=2, frequency="D", missing_ratio=0.0,
-            season_length_guess=7, min_length=60, max_length=60, total_rows=120,
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=120,
         ),
         config=BenchmarkConfig(horizon=7, n_folds=2),
         models=[],
@@ -261,8 +273,12 @@ def test_get_logger_namespace():
 
 
 def test_exit_codes_are_distinct():
-    codes = [ExitCode.SUCCESS, ExitCode.SCHEMA_ERROR, ExitCode.DATA_ERROR,
-             ExitCode.UNEXPECTED_ERROR]
+    codes = [
+        ExitCode.SUCCESS,
+        ExitCode.SCHEMA_ERROR,
+        ExitCode.DATA_ERROR,
+        ExitCode.UNEXPECTED_ERROR,
+    ]
     assert len(set(codes)) == 4
 
 
@@ -287,8 +303,11 @@ def test_retry_on_runtime_error(tiny_long_df):
     mock_runner.name = "MockModel"
 
     good_output = ForecastOutput(
-        unique_id=["s1"], ds=["2020-01-01"], y_hat=[1.0],
-        model_name="MockModel", runtime_sec=0.01,
+        unique_id=["s1"],
+        ds=["2020-01-01"],
+        y_hat=[1.0],
+        model_name="MockModel",
+        runtime_sec=0.01,
     )
 
     # Fail first, succeed second
@@ -322,13 +341,13 @@ def test_retry_exhausted_raises():
         patch("ts_autopilot.pipeline._RETRY_BACKOFF_SEC", 0.01),
         pytest.raises(RuntimeError, match="failed after"),
     ):
-            _fit_predict_with_retry(
-                runner=mock_runner,
-                train=pd.DataFrame(),
-                horizon=7,
-                freq="D",
-                season_length=7,
-            )
+        _fit_predict_with_retry(
+            runner=mock_runner,
+            train=pd.DataFrame(),
+            horizon=7,
+            freq="D",
+            season_length=7,
+        )
 
 
 def test_retry_does_not_catch_value_error():
@@ -354,7 +373,7 @@ def test_retry_does_not_catch_value_error():
 
 
 def test_retry_catches_linalg_error():
-    """LinAlgError should be retried."""
+    """LinAlgError should be retried like RuntimeError."""
     from unittest.mock import MagicMock, patch
 
     from ts_autopilot.contracts import ForecastOutput
@@ -365,8 +384,11 @@ def test_retry_catches_linalg_error():
     mock_runner.name = "MockModel"
 
     good_output = ForecastOutput(
-        unique_id=["s1"], ds=["2020-01-01"], y_hat=[1.0],
-        model_name="MockModel", runtime_sec=0.01,
+        unique_id=["s1"],
+        ds=["2020-01-01"],
+        y_hat=[1.0],
+        model_name="MockModel",
+        runtime_sec=0.01,
     )
     mock_runner.fit_predict.side_effect = [
         np.linalg.LinAlgError("singular matrix"),
@@ -418,9 +440,15 @@ def test_cli_data_error_exit_code(tmp_path):
     result = CliRunner().invoke(
         app,
         [
-            "run", "--input", str(csv_path),
-            "--horizon", "7", "--n-folds", "3",
-            "--output", str(tmp_path / "out"),
+            "run",
+            "--input",
+            str(csv_path),
+            "--horizon",
+            "7",
+            "--n-folds",
+            "3",
+            "--output",
+            str(tmp_path / "out"),
         ],
     )
     assert result.exit_code == ExitCode.DATA_ERROR

@@ -22,9 +22,9 @@ def test_wide_format_melts_correctly(wide_csv):
 
 def test_missing_unique_id_defaults_to_series_1(tmp_path):
     csv = tmp_path / "no_uid.csv"
-    pd.DataFrame(
-        {"ds": ["2020-01-01", "2020-01-02"], "y": [1.0, 2.0]}
-    ).to_csv(csv, index=False)
+    pd.DataFrame({"ds": ["2020-01-01", "2020-01-02"], "y": [1.0, 2.0]}).to_csv(
+        csv, index=False
+    )
 
     df = load_csv(csv)
     assert set(df["unique_id"]) == {"series_1"}
@@ -84,4 +84,12 @@ def test_oversized_file_rejected(tmp_path):
         patch.object(type(csv), "stat", return_value=FakeStat()),
         pytest.raises(ValueError, match="exceeding"),
     ):
+        load_csv(csv)
+
+
+def test_wide_format_rejects_out_of_range_dates(tmp_path):
+    """Wide format with dates outside 1900-2100 should be rejected."""
+    csv = tmp_path / "bad_wide.csv"
+    csv.write_text("date,series_a\n1800-01-01,1.0\n1800-02-01,2.0\n1800-03-01,3.0\n")
+    with pytest.raises(SchemaError, match="misparse"):
         load_csv(csv)
