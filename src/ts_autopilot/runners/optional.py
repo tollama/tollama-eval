@@ -1,7 +1,7 @@
 """Optional model runners requiring extra dependencies.
 
 These runners gracefully degrade if their dependencies are not installed.
-Install extras: pip install ts-autopilot[prophet] or ts-autopilot[lightgbm]
+Install extras: pip install ts-autopilot[prophet], [lightgbm], or [neural]
 """
 
 from __future__ import annotations
@@ -109,6 +109,92 @@ class LightGBMRunner(BaseRunner):
         )
 
 
+class NHITSRunner(BaseRunner):
+    """N-HiTS neural model runner via neuralforecast.
+
+    Requires: pip install neuralforecast
+    """
+
+    @property
+    def name(self) -> str:
+        return "NHITS"
+
+    def fit_predict(
+        self,
+        train: pd.DataFrame,
+        horizon: int,
+        freq: str,
+        season_length: int,
+        n_jobs: int = 1,
+    ) -> ForecastOutput:
+        from neuralforecast import NeuralForecast
+        from neuralforecast.models import NHITS
+
+        t0 = time.perf_counter()
+
+        model = NHITS(
+            input_size=2 * horizon,
+            h=horizon,
+            max_steps=100,
+        )
+        nf = NeuralForecast(models=[model], freq=freq)
+        nf.fit(df=train)
+        preds = nf.predict()
+        preds = preds.reset_index() if "unique_id" not in preds.columns else preds
+
+        elapsed = time.perf_counter() - t0
+        return ForecastOutput(
+            unique_id=preds["unique_id"].astype(str).tolist(),
+            ds=preds["ds"].astype(str).tolist(),
+            y_hat=preds["NHITS"].tolist(),
+            model_name=self.name,
+            runtime_sec=round(elapsed, 4),
+        )
+
+
+class NBEATSRunner(BaseRunner):
+    """N-BEATS neural model runner via neuralforecast.
+
+    Requires: pip install neuralforecast
+    """
+
+    @property
+    def name(self) -> str:
+        return "NBEATS"
+
+    def fit_predict(
+        self,
+        train: pd.DataFrame,
+        horizon: int,
+        freq: str,
+        season_length: int,
+        n_jobs: int = 1,
+    ) -> ForecastOutput:
+        from neuralforecast import NeuralForecast
+        from neuralforecast.models import NBEATS
+
+        t0 = time.perf_counter()
+
+        model = NBEATS(
+            input_size=2 * horizon,
+            h=horizon,
+            max_steps=100,
+        )
+        nf = NeuralForecast(models=[model], freq=freq)
+        nf.fit(df=train)
+        preds = nf.predict()
+        preds = preds.reset_index() if "unique_id" not in preds.columns else preds
+
+        elapsed = time.perf_counter() - t0
+        return ForecastOutput(
+            unique_id=preds["unique_id"].astype(str).tolist(),
+            ds=preds["ds"].astype(str).tolist(),
+            y_hat=preds["NBEATS"].tolist(),
+            model_name=self.name,
+            runtime_sec=round(elapsed, 4),
+        )
+
+
 def get_optional_runners() -> list[BaseRunner]:
     """Return list of available optional runners (only if deps are installed)."""
     runners: list[BaseRunner] = []
@@ -129,5 +215,14 @@ def get_optional_runners() -> list[BaseRunner]:
         logger.debug("LightGBM runner available")
     except ImportError:
         logger.debug("LightGBM/mlforecast not installed, skipping")
+
+    try:
+        import neuralforecast  # noqa: F401
+
+        runners.append(NHITSRunner())
+        runners.append(NBEATSRunner())
+        logger.debug("NeuralForecast runners available (NHITS, NBEATS)")
+    except ImportError:
+        logger.debug("neuralforecast not installed, skipping")
 
     return runners

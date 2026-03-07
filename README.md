@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Automated time series benchmarking. Drop in a CSV, get ranked model results with cross-validated metrics.
+Automated time series benchmarking powered by the [Nixtla](https://github.com/nixtla) ecosystem (statsforecast, mlforecast, neuralforecast). Drop in a CSV, get ranked model results with cross-validated metrics.
 
 ## Quick Start
 
@@ -26,6 +26,7 @@ pip install ts-autopilot
 # With optional models
 pip install "ts-autopilot[prophet]"    # Facebook Prophet
 pip install "ts-autopilot[lightgbm]"   # LightGBM via mlforecast
+pip install "ts-autopilot[neural]"     # NHITS + NBEATS via neuralforecast
 pip install "ts-autopilot[all]"        # Everything
 
 # Development
@@ -88,6 +89,8 @@ python -m ts_autopilot run -i data.csv
 | AutoCES       | Statistical | Complex exponential smoothing       | Built-in         |
 | Prophet       | Statistical | Facebook Prophet                    | `ts-autopilot[prophet]`  |
 | LightGBM      | ML          | Gradient boosting via mlforecast    | `ts-autopilot[lightgbm]` |
+| NHITS         | Neural      | N-HiTS deep learning model          | `ts-autopilot[neural]`   |
+| NBEATS        | Neural      | N-BEATS deep learning model         | `ts-autopilot[neural]`   |
 
 Run specific models with `-m`:
 

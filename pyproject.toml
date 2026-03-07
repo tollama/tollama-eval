@@ -71,9 +71,13 @@ lightgbm = [
     "lightgbm>=4.0",
     "mlforecast>=0.10",
 ]
+neural = [
+    "neuralforecast>=1.6",
+]
 all = [
     "ts-autopilot[prophet]",
     "ts-autopilot[lightgbm]",
+    "ts-autopilot[neural]",
 ]
 
 [dependency-groups]
