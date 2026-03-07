@@ -297,8 +297,7 @@ def run(
     for entry in result.leaderboard:
         std = std_by_name.get(entry.name, 0.0)
         line = (
-            f"  #{entry.rank} {entry.name}: "
-            f"MASE={entry.mean_mase:.4f} \u00b1 {std:.4f}"
+            f"  #{entry.rank} {entry.name}: MASE={entry.mean_mase:.4f} \u00b1 {std:.4f}"
         )
         if entry.rank == 1:
             typer.secho(line, fg=typer.colors.GREEN, bold=True)

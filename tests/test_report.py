@@ -158,8 +158,12 @@ def test_report_per_series_breakdown():
     """Report shows per-series breakdown when series_scores present."""
     result = BenchmarkResult(
         profile=DataProfile(
-            n_series=2, frequency="D", missing_ratio=0.0,
-            season_length_guess=7, min_length=60, max_length=60,
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
             total_rows=120,
         ),
         config=BenchmarkConfig(horizon=7, n_folds=2),
@@ -169,11 +173,15 @@ def test_report_per_series_breakdown():
                 runtime_sec=0.5,
                 folds=[
                     FoldResult(
-                        fold=1, cutoff="2020-06-01", mase=0.91,
+                        fold=1,
+                        cutoff="2020-06-01",
+                        mase=0.91,
                         series_scores={"s1": 0.85, "s2": 0.97},
                     ),
                     FoldResult(
-                        fold=2, cutoff="2020-07-01", mase=0.95,
+                        fold=2,
+                        cutoff="2020-07-01",
+                        mase=0.95,
                         series_scores={"s1": 0.90, "s2": 1.00},
                     ),
                 ],
@@ -201,16 +209,18 @@ def test_report_tollama_interpretation():
     """Report includes tollama interpretation when provided."""
     result = BenchmarkResult(
         profile=DataProfile(
-            n_series=1, frequency="D", missing_ratio=0.0,
-            season_length_guess=7, min_length=60, max_length=60,
+            n_series=1,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
             total_rows=60,
         ),
         config=BenchmarkConfig(horizon=7, n_folds=2),
         models=[],
         leaderboard=[],
     )
-    html = render_report(
-        result, tollama_interpretation="Test interpretation."
-    )
+    html = render_report(result, tollama_interpretation="Test interpretation.")
     assert "LLM Interpretation" in html
     assert "Test interpretation." in html

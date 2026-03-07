@@ -226,10 +226,14 @@ def test_cli_leaderboard_shows_std_mase(tmp_path):
         app,
         [
             "run",
-            "--input", str(csv_path),
-            "--horizon", "7",
-            "--n-folds", "2",
-            "--output", str(out_dir),
+            "--input",
+            str(csv_path),
+            "--horizon",
+            "7",
+            "--n-folds",
+            "2",
+            "--output",
+            str(out_dir),
         ],
     )
     assert result.exit_code == 0

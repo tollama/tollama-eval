@@ -79,9 +79,7 @@ def per_series_mase(
             train_df.loc[train_df["unique_id"] == uid].sort_values("ds")["y"].values
         )
 
-        scores[str(uid)] = mase(
-            actual_series, pred_series, train_series, season_length
-        )
+        scores[str(uid)] = mase(actual_series, pred_series, train_series, season_length)
 
     return scores
 

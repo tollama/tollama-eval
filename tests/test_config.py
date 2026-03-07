@@ -132,10 +132,7 @@ def test_cli_flags_override_config(tmp_path):
     cfg_path = tmp_path / "config.yml"
     out_dir = tmp_path / "results"
     cfg_path.write_text(
-        f"input: {csv_path}\n"
-        f"output: {out_dir}\n"
-        "horizon: 14\n"
-        "n_folds: 3\n"
+        f"input: {csv_path}\noutput: {out_dir}\nhorizon: 14\nn_folds: 3\n"
     )
 
     # Override horizon and n_folds via CLI
@@ -145,11 +142,16 @@ def test_cli_flags_override_config(tmp_path):
         app,
         [
             "run",
-            "--config", str(cfg_path),
-            "-H", "7",
-            "-k", "2",
-            "-o", str(cli_out_dir),
-            "-m", "SeasonalNaive",
+            "--config",
+            str(cfg_path),
+            "-H",
+            "7",
+            "-k",
+            "2",
+            "-o",
+            str(cli_out_dir),
+            "-m",
+            "SeasonalNaive",
         ],
     )
     assert result.exit_code == 0

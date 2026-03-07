@@ -74,16 +74,17 @@ def test_profile_infers_fallback_freq_when_irregular():
 
 
 def test_profile_single_row_series():
-    df = pd.DataFrame({
-        "unique_id": ["s1"],
-        "ds": pd.to_datetime(["2020-01-01"]),
-        "y": [1.0],
-    })
+    df = pd.DataFrame(
+        {
+            "unique_id": ["s1"],
+            "ds": pd.to_datetime(["2020-01-01"]),
+            "y": [1.0],
+        }
+    )
     profile = profile_dataframe(df)
     assert profile.n_series == 1
     assert profile.min_length == 1
     assert profile.total_rows == 1
-
 
 
 def test_frequency_fallback_logs_warning(caplog):
