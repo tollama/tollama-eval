@@ -44,8 +44,6 @@ def render_report(
         warnings=result.warnings,
         max_mase=max_mase,
         version=__version__,
-        generated_at=datetime.now(tz=timezone.utc).strftime(
-            "%Y-%m-%d %H:%M UTC"
-        ),
+        generated_at=datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         tollama_interpretation=tollama_interpretation,
     )

@@ -9,8 +9,13 @@ from pathlib import Path
 import yaml
 
 _VALID_KEYS = {
-    "input", "output", "horizon", "n_folds",
-    "models", "tollama_url", "n_jobs",
+    "input",
+    "output",
+    "horizon",
+    "n_folds",
+    "models",
+    "tollama_url",
+    "n_jobs",
 }
 
 
@@ -101,9 +106,7 @@ def load_config(path: str | Path) -> FileConfig:
     if "n_jobs" in data:
         val = data["n_jobs"]
         if not isinstance(val, int) or val < 1:
-            raise ValueError(
-                f"n_jobs must be a positive integer, got {val!r}"
-            )
+            raise ValueError(f"n_jobs must be a positive integer, got {val!r}")
         config.n_jobs = val
 
     return config

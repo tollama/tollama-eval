@@ -315,18 +315,13 @@ def run_benchmark(
                 season_length=profile.season_length_guess,
                 model_col=output.model_name,
             )
-            fold_mase = float(
-                np.mean(list(series_scores.values()))
-            )
+            fold_mase = float(np.mean(list(series_scores.values())))
             fold_results.append(
                 FoldResult(
                     fold=split.fold,
                     cutoff=split.cutoff.isoformat(),
                     mase=round(fold_mase, 6),
-                    series_scores={
-                        k: round(v, 6)
-                        for k, v in series_scores.items()
-                    },
+                    series_scores={k: round(v, 6) for k, v in series_scores.items()},
                 )
             )
 

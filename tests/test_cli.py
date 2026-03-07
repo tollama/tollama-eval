@@ -68,10 +68,15 @@ def test_cli_missing_input_fails():
     assert result.exit_code != 0
 
 
-def test_cli_help_shows_reserved_flags():
+def test_cli_help_shows_reserved_flags(monkeypatch):
+    import re
+    import shutil
+
+    monkeypatch.setattr(shutil, "get_terminal_size", lambda *a, **kw: (200, 50))
     result = runner.invoke(app, ["run", "--help"])
-    assert "--tollama-url" in result.output
-    assert "--no-tollama" in result.output
+    clean = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert "--tollama-url" in clean
+    assert "--no-tollama" in clean
 
 
 def test_cli_version_flag():
@@ -212,11 +217,16 @@ def test_cli_summary_shows_best_model(tmp_path):
     assert "Completed in" in result.output
 
 
-def test_cli_help_shows_models_flag():
+def test_cli_help_shows_models_flag(monkeypatch):
+    import re
+    import shutil
+
+    monkeypatch.setattr(shutil, "get_terminal_size", lambda *a, **kw: (200, 50))
     result = runner.invoke(app, ["run", "--help"])
-    assert "--models" in result.output
-    assert "--verbose" in result.output
-    assert "--quiet" in result.output
+    clean = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert "--models" in clean
+    assert "--verbose" in clean
+    assert "--quiet" in clean
 
 
 def test_cli_leaderboard_shows_std_mase(tmp_path):
@@ -226,10 +236,14 @@ def test_cli_leaderboard_shows_std_mase(tmp_path):
         app,
         [
             "run",
-            "--input", str(csv_path),
-            "--horizon", "7",
-            "--n-folds", "2",
-            "--output", str(out_dir),
+            "--input",
+            str(csv_path),
+            "--horizon",
+            "7",
+            "--n-folds",
+            "2",
+            "--output",
+            str(out_dir),
         ],
     )
     assert result.exit_code == 0
