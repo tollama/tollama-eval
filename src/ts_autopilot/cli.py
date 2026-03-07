@@ -107,7 +107,12 @@ def run(
     tollama_url: str | None = typer.Option(
         None,
         "--tollama-url",
-        help="URL for tollama LLM interpretation service.",
+        help="URL for tollama TSFM server (e.g. http://localhost:8000).",
+    ),
+    tollama_models: str | None = typer.Option(
+        None,
+        "--tollama-models",
+        help="Comma-separated tollama models to benchmark (e.g. chronos2,timesfm).",
     ),
     no_tollama: bool = typer.Option(
         False,
@@ -160,6 +165,8 @@ def run(
             models = ",".join(file_cfg.models)
         if file_cfg.tollama_url and tollama_url is None:
             tollama_url = file_cfg.tollama_url
+        if file_cfg.tollama_models and tollama_models is None:
+            tollama_models = ",".join(file_cfg.tollama_models)
         if file_cfg.n_jobs is not None and n_jobs == 1:
             n_jobs = file_cfg.n_jobs
 
@@ -203,6 +210,11 @@ def run(
     t0 = time.perf_counter()
 
     effective_tollama_url = tollama_url if not no_tollama else None
+    effective_tollama_models: list[str] | None = None
+    if tollama_models and effective_tollama_url:
+        effective_tollama_models = [
+            m.strip() for m in tollama_models.split(",") if m.strip()
+        ]
 
     try:
         result = run_from_csv(
@@ -213,6 +225,7 @@ def run(
             model_names=model_names,
             progress_callback=_progress_cb,
             tollama_url=effective_tollama_url,
+            tollama_models=effective_tollama_models,
             n_jobs=n_jobs,
             generate_pdf=pdf,
         )

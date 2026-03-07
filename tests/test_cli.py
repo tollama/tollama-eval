@@ -76,6 +76,7 @@ def test_cli_help_shows_reserved_flags(monkeypatch):
     result = runner.invoke(app, ["run", "--help"])
     clean = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     assert "--tollama-url" in clean
+    assert "--tollama-models" in clean
     assert "--no-tollama" in clean
 
 

@@ -298,15 +298,21 @@
 
         .worst-series { background: var(--danger-bg) !important; }
 
-        /* LLM interpretation */
-        .llm-box {
+        /* TSFM models section */
+        .tsfm-box {
             background: var(--primary-bg);
             border: 1px solid #bfdbfe;
             border-radius: var(--radius);
             padding: 1rem 1.25rem;
-            white-space: pre-wrap;
             font-size: 0.9rem;
             line-height: 1.6;
+        }
+        .tsfm-box ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+        .tsfm-note {
+            margin-top: 0.75rem;
+            font-size: 0.82rem;
+            color: var(--gray-600);
+            font-style: italic;
         }
 
         /* Methodology */
@@ -360,7 +366,7 @@
             {% if has_diagnostics %}<a href="#diagnostics">Diagnostics</a>{% endif %}
             <a href="#model-details">Details</a>
             <a href="#methodology">Methodology</a>
-            {% if tollama_interpretation %}<a href="#llm">LLM Insights</a>{% endif %}
+            {% if has_tsfm %}<a href="#tsfm">TSFM Models</a>{% endif %}
         </div>
     </nav>
 
@@ -620,11 +626,19 @@
             </dl>
         </div>
 
-        <!-- 12. LLM Interpretation -->
-        {% if tollama_interpretation %}
-        <div id="llm" class="card">
-            <h2>LLM Interpretation</h2>
-            <div class="llm-box">{{ tollama_interpretation }}</div>
+        <!-- 12. TSFM Models (via tollama) -->
+        {% if has_tsfm %}
+        <div id="tsfm" class="card">
+            <h2>Foundation Models (tollama)</h2>
+            <div class="tsfm-box">
+                <p>This benchmark includes <strong>{{ tollama_models|length }}</strong> Time Series Foundation Model(s) via <a href="https://github.com/tollama/tollama" target="_blank">tollama</a>:</p>
+                <ul>
+                {% for m in tollama_models %}
+                    <li><strong>{{ m.name }}</strong> &mdash; MASE={{ m.mean_mase|round(4) }}, SMAPE={{ m.mean_smape|round(2) }}%, runtime={{ m.runtime_sec|round(2) }}s</li>
+                {% endfor %}
+                </ul>
+                <p class="tsfm-note">TSFM models are zero-shot (no training on your data). They leverage pre-trained knowledge from large-scale time series corpora.</p>
+            </div>
         </div>
         {% endif %}
     </div>

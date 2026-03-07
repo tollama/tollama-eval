@@ -15,6 +15,7 @@ _VALID_KEYS = {
     "n_folds",
     "models",
     "tollama_url",
+    "tollama_models",
     "n_jobs",
 }
 
@@ -29,6 +30,7 @@ class FileConfig:
     n_folds: int | None = None
     models: list[str] = field(default_factory=list)
     tollama_url: str | None = None
+    tollama_models: list[str] = field(default_factory=list)
     n_jobs: int | None = None
 
 
@@ -102,6 +104,18 @@ def load_config(path: str | Path) -> FileConfig:
 
     if "tollama_url" in data:
         config.tollama_url = str(data["tollama_url"])
+
+    if "tollama_models" in data:
+        val = data["tollama_models"]
+        if isinstance(val, str):
+            config.tollama_models = [m.strip() for m in val.split(",") if m.strip()]
+        elif isinstance(val, list):
+            config.tollama_models = [str(m) for m in val]
+        else:
+            raise ValueError(
+                "tollama_models must be a list or comma-separated "
+                f"string, got {type(val).__name__}"
+            )
 
     if "n_jobs" in data:
         val = data["n_jobs"]
