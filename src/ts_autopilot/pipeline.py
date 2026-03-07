@@ -28,8 +28,10 @@ from ts_autopilot.ingestion.loader import load_csv
 from ts_autopilot.ingestion.profiler import profile_dataframe
 from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
+from ts_autopilot.runners.optional import get_optional_runners
 from ts_autopilot.runners.statistical import (
     AutoARIMARunner,
+    AutoCESRunner,
     AutoETSRunner,
     AutoThetaRunner,
     SeasonalNaiveRunner,
@@ -42,6 +44,8 @@ DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
     AutoETSRunner(),
     AutoARIMARunner(),
     AutoThetaRunner(),
+    AutoCESRunner(),
+    *get_optional_runners(),
 )
 
 

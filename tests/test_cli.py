@@ -83,7 +83,7 @@ def test_cli_version_flag():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
     assert "ts-autopilot" in result.output
-    assert "0.1.0" in result.output
+    assert "0.2.0" in result.output
 
 
 def test_cli_version_short_flag():

@@ -9,8 +9,8 @@ from ts_autopilot.pipeline import generate_warnings, run_benchmark, run_from_csv
 def test_run_benchmark_returns_result(tiny_long_df):
     result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
     assert isinstance(result, BenchmarkResult)
-    assert len(result.models) == 4
-    assert len(result.leaderboard) == 4
+    assert len(result.models) >= 5  # 5 core + optional runners
+    assert len(result.leaderboard) >= 5
 
 
 def test_leaderboard_sorted_by_mase(tiny_long_df):
@@ -22,13 +22,13 @@ def test_leaderboard_sorted_by_mase(tiny_long_df):
 def test_leaderboard_ranks_correct(tiny_long_df):
     result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
     ranks = [e.rank for e in result.leaderboard]
-    assert ranks == [1, 2, 3, 4]
+    assert ranks == list(range(1, len(ranks) + 1))
 
 
 def test_model_names_are_known(tiny_long_df):
     result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
     names = {m.name for m in result.models}
-    assert names == {"SeasonalNaive", "AutoETS", "AutoARIMA", "AutoTheta"}
+    assert {"SeasonalNaive", "AutoETS", "AutoARIMA", "AutoTheta", "CES"} <= names
 
 
 def test_each_model_has_correct_folds(tiny_long_df):
@@ -77,8 +77,8 @@ def test_results_json_schema(tmp_path):
     assert {"profile", "config", "models", "leaderboard"} <= set(data.keys())
     assert data["config"]["horizon"] == 7
     assert data["config"]["n_folds"] == 2
-    assert len(data["models"]) == 4
-    assert len(data["leaderboard"]) == 4
+    assert len(data["models"]) >= 5
+    assert len(data["leaderboard"]) >= 5
 
 
 def test_model_names_filter(tiny_long_df):
@@ -109,8 +109,8 @@ def test_progress_callback_called(tiny_long_df):
     run_benchmark(tiny_long_df, horizon=7, n_folds=2, progress_callback=cb)
     model_calls = [c for c in calls if c[0] == "model"]
     fold_calls = [c for c in calls if c[0] == "fold"]
-    assert len(model_calls) == 4  # 4 runners
-    assert len(fold_calls) == 8  # 2 folds x 4 runners
+    assert len(model_calls) >= 5  # 5+ runners
+    assert len(fold_calls) >= 10  # 2 folds x 5+ runners
 
 
 def test_generate_warnings_short_series():
