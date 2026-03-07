@@ -134,9 +134,13 @@ def run(
     config: Path | None = _CONFIG_OPTION,
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
-    from ts_autopilot.ingestion.loader import SchemaError
+    from ts_autopilot.exceptions import ConfigError, ModelFitError, SchemaError
     from ts_autopilot.logging_config import setup_logging
-    from ts_autopilot.pipeline import run_from_csv
+    from ts_autopilot.pipeline import (
+        DEFAULT_MAX_RETRIES,
+        DEFAULT_RETRY_BACKOFF_SEC,
+        run_from_csv,
+    )
 
     # Load config file and merge with CLI flags (CLI wins)
     if config is not None:
@@ -144,7 +148,7 @@ def run(
 
         try:
             file_cfg = load_config(config)
-        except (FileNotFoundError, ValueError) as exc:
+        except (FileNotFoundError, ConfigError, ValueError) as exc:
             typer.secho(f"Config error: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
 
@@ -162,6 +166,15 @@ def run(
             tollama_url = file_cfg.tollama_url
         if file_cfg.n_jobs is not None and n_jobs == 1:
             n_jobs = file_cfg.n_jobs
+
+    # Retry settings (config file only, no CLI flags needed)
+    max_retries = DEFAULT_MAX_RETRIES
+    retry_backoff = DEFAULT_RETRY_BACKOFF_SEC
+    if config is not None:
+        if file_cfg.max_retries is not None:
+            max_retries = file_cfg.max_retries
+        if file_cfg.retry_backoff is not None:
+            retry_backoff = file_cfg.retry_backoff
 
     if input is None:
         typer.secho(
@@ -215,7 +228,17 @@ def run(
             tollama_url=effective_tollama_url,
             n_jobs=n_jobs,
             generate_pdf=pdf,
+            max_retries=max_retries,
+            retry_backoff=retry_backoff,
         )
+    except ModelFitError as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+        typer.echo(
+            "Hint: The model failed repeatedly. Try increasing max_retries "
+            "in the config file or removing the problematic model.",
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
     except SchemaError as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
         typer.echo(

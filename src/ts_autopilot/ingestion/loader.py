@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pandas as pd
 
+from ts_autopilot.exceptions import SchemaError
 from ts_autopilot.logging_config import get_logger
 
 REQUIRED_LONG_COLS = {"unique_id", "ds", "y"}
 
 logger = get_logger("loader")
 
-
-class SchemaError(ValueError):
-    """Raised when the CSV cannot be coerced to canonical long format."""
+# Re-export for backward compatibility
+__all__ = ["SchemaError", "load_csv"]
 
 
 _MAX_CSV_BYTES = 500 * 1024 * 1024  # 500 MB

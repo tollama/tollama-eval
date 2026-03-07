@@ -31,6 +31,7 @@ from ts_autopilot.evaluation.metrics import (
     per_series_rmsse,
     per_series_smape,
 )
+from ts_autopilot.exceptions import ModelFitError
 from ts_autopilot.ingestion.loader import load_csv
 from ts_autopilot.ingestion.profiler import profile_dataframe
 from ts_autopilot.logging_config import get_logger
@@ -158,8 +159,8 @@ def _detect_date_gaps(df: pd.DataFrame, freq: str) -> list[str]:
     return warnings
 
 
-_MAX_RETRIES = 2
-_RETRY_BACKOFF_SEC = 1.0
+DEFAULT_MAX_RETRIES = 2
+DEFAULT_RETRY_BACKOFF_SEC = 1.0
 
 
 def _fit_predict_with_retry(
@@ -169,15 +170,17 @@ def _fit_predict_with_retry(
     freq: str,
     season_length: int,
     n_jobs: int = 1,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    retry_backoff: float = DEFAULT_RETRY_BACKOFF_SEC,
 ) -> ForecastOutput:
     """Call runner.fit_predict with retry on transient failures.
 
-    Retries up to _MAX_RETRIES times with exponential backoff.
+    Retries up to *max_retries* times with exponential backoff.
     Only retries on RuntimeError (e.g. numerical convergence issues);
     ValueError and similar are raised immediately.
     """
     last_exc: Exception | None = None
-    for attempt in range(_MAX_RETRIES + 1):
+    for attempt in range(max_retries + 1):
         try:
             return runner.fit_predict(
                 train=train,
@@ -188,13 +191,13 @@ def _fit_predict_with_retry(
             )
         except (RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
             last_exc = exc
-            if attempt < _MAX_RETRIES:
-                wait = _RETRY_BACKOFF_SEC * (2**attempt)
+            if attempt < max_retries:
+                wait = retry_backoff * (2**attempt)
                 logger.warning(
                     "Model %s failed (attempt %d/%d): %s. Retrying in %.1fs...",
                     runner.name,
                     attempt + 1,
-                    _MAX_RETRIES + 1,
+                    max_retries + 1,
                     exc,
                     wait,
                 )
@@ -203,14 +206,12 @@ def _fit_predict_with_retry(
                 logger.error(
                     "Model %s failed after %d attempts: %s",
                     runner.name,
-                    _MAX_RETRIES + 1,
+                    max_retries + 1,
                     exc,
                 )
         except Exception:
             raise
-    raise RuntimeError(
-        f"Model {runner.name} failed after {_MAX_RETRIES + 1} attempts"
-    ) from last_exc
+    raise ModelFitError(runner.name, max_retries + 1, last_exc)
 
 
 def run_benchmark(
@@ -221,6 +222,8 @@ def run_benchmark(
     model_names: list[str] | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
     n_jobs: int = 1,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    retry_backoff: float = DEFAULT_RETRY_BACKOFF_SEC,
 ) -> BenchmarkResult:
     """Run the full benchmark pipeline (pure logic, no I/O).
 
@@ -308,6 +311,8 @@ def run_benchmark(
                 freq=profile.frequency,
                 season_length=profile.season_length_guess,
                 n_jobs=n_jobs,
+                max_retries=max_retries,
+                retry_backoff=retry_backoff,
             )
             total_runtime += output.runtime_sec
 
@@ -499,6 +504,8 @@ def run_from_csv(
     tollama_url: str | None = None,
     n_jobs: int = 1,
     generate_pdf: bool = False,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    retry_backoff: float = DEFAULT_RETRY_BACKOFF_SEC,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html.
 
@@ -522,6 +529,8 @@ def run_from_csv(
         model_names=model_names,
         progress_callback=progress_callback,
         n_jobs=n_jobs,
+        max_retries=max_retries,
+        retry_backoff=retry_backoff,
     )
 
     # Attach metadata

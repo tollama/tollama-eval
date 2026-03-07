@@ -1,4 +1,4 @@
-.PHONY: install lint format test coverage clean help
+.PHONY: install lint format typecheck test coverage clean help
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -12,6 +12,9 @@ lint:  ## Run ruff linter
 
 format:  ## Auto-format code
 	ruff format src/ tests/
+
+typecheck:  ## Run mypy type checker
+	mypy src/ts_autopilot/
 
 format-check:  ## Check formatting without changes
 	ruff format --check --diff src/ tests/
