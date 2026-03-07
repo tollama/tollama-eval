@@ -76,8 +76,8 @@ def benchmark_result_with_warnings():
 
 def test_report_contains_dataset_summary(benchmark_result):
     html = render_report(benchmark_result)
-    assert "Dataset Summary" in html
-    assert "Number of Series" in html
+    assert "Dataset Profile" in html
+    assert "Series" in html
 
 
 def test_report_contains_leaderboard(benchmark_result):
@@ -90,7 +90,7 @@ def test_report_contains_leaderboard(benchmark_result):
 def test_report_contains_model_details(benchmark_result):
     html = render_report(benchmark_result)
     assert "Model Details" in html
-    assert "Mean MASE" in html
+    assert "MASE" in html
 
 
 def test_report_is_valid_html(benchmark_result):
@@ -106,8 +106,8 @@ def test_report_rank1_highlighted(benchmark_result):
 
 def test_report_mase_color_coding(benchmark_result):
     html = render_report(benchmark_result)
-    assert "mase-good" in html
-    assert "mase-bad" in html
+    assert "metric-good" in html
+    assert "metric-bad" in html
 
 
 def test_report_plotly_charts(benchmark_result):

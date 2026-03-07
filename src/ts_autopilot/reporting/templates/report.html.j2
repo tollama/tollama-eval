@@ -3,236 +3,918 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ts-autopilot Report</title>
+    <title>ts-autopilot Benchmark Report</title>
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
     <style>
         :root {
-            --green: #28a745;
-            --green-bg: #d4edda;
-            --red: #dc3545;
-            --red-bg: #f8d7da;
-            --yellow: #856404;
-            --yellow-bg: #fff3cd;
-            --yellow-border: #ffc107;
-            --gold: #ffc107;
-            --silver: #adb5bd;
-            --bronze: #cd7f32;
+            --primary: #1e40af;
+            --primary-light: #3b82f6;
+            --primary-bg: #eff6ff;
+            --success: #059669;
+            --success-bg: #ecfdf5;
+            --danger: #dc2626;
+            --danger-bg: #fef2f2;
+            --warning: #d97706;
+            --warning-bg: #fffbeb;
+            --warning-border: #fbbf24;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --gold: #eab308;
+            --silver: #9ca3af;
+            --bronze: #b45309;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+            --radius: 8px;
         }
+
+        * { box-sizing: border-box; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            max-width: 1060px; margin: 2rem auto; padding: 0 1.5rem;
-            color: #212529; line-height: 1.5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                         "Helvetica Neue", Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0;
+            color: var(--gray-800);
+            line-height: 1.6;
+            background: var(--gray-50);
         }
-        h1 { border-bottom: 2px solid #dee2e6; padding-bottom: 0.5rem; }
-        h2 { margin-top: 2rem; color: #495057; }
-        h3 { color: #495057; }
-        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-        th, td { border: 1px solid #dee2e6; padding: 0.5rem 1rem; text-align: left; }
-        th { background: #f8f9fa; font-weight: 600; }
-        tr:nth-child(even) { background: #f8f9fa; }
 
-        .rank-1 { font-weight: bold; }
-        .rank-1 td:first-child { color: var(--gold); }
-        .rank-2 td:first-child { color: var(--silver); }
-        .rank-3 td:first-child { color: var(--bronze); }
+        /* Header */
+        .report-header {
+            background: linear-gradient(135deg, var(--primary) 0%, #1e3a8a 100%);
+            color: white;
+            padding: 2.5rem 2rem;
+            border-radius: 0 0 var(--radius) var(--radius);
+            margin-bottom: 1.5rem;
+        }
+        .report-header h1 {
+            margin: 0 0 0.25rem 0;
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+        .report-header .subtitle {
+            opacity: 0.85;
+            font-size: 0.9rem;
+        }
 
-        .mase-good { color: var(--green); font-weight: 600; }
-        .mase-bad { color: var(--red); font-weight: 600; }
+        /* Navigation / TOC */
+        .toc {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 1rem 1.5rem;
+            margin: 0 1rem 1.5rem 1rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .toc-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--gray-500);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .toc-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .toc-links a {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            text-decoration: none;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: background 0.15s, color 0.15s;
+        }
+        .toc-links a:hover {
+            background: var(--primary);
+            color: white;
+        }
 
+        /* Content wrapper */
+        .content { padding: 0 1rem; }
+
+        /* Cards */
+        .card {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .card h2 {
+            margin: 0 0 1rem 0;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--gray-100);
+        }
+        .card h3 {
+            margin: 1.25rem 0 0.5rem 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+
+        /* Executive Summary */
+        .exec-summary {
+            background: var(--primary-bg);
+            border-left: 4px solid var(--primary);
+            padding: 1.25rem 1.5rem;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--gray-700);
+        }
+
+        /* Warnings */
         .warnings-box {
-            background: var(--yellow-bg); border: 1px solid var(--yellow-border);
-            border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0;
-            color: var(--yellow);
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            border-left: 4px solid var(--warning);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
         }
-        .warnings-box ul { margin: 0.25rem 0 0 0; padding-left: 1.25rem; }
+        .warnings-box .warnings-title {
+            font-weight: 600;
+            color: var(--warning);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .warnings-box ul {
+            margin: 0.25rem 0 0 0;
+            padding-left: 1.25rem;
+            color: var(--gray-700);
+            font-size: 0.9rem;
+        }
 
-        .worst-series { background: var(--red-bg); }
-        .meta { color: #6c757d; font-size: 0.9rem; }
+        /* Tables */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 0.75rem 0;
+            font-size: 0.875rem;
+        }
+        th, td {
+            border: 1px solid var(--gray-200);
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+        }
+        th {
+            background: var(--gray-50);
+            font-weight: 600;
+            color: var(--gray-600);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        tr:nth-child(even) { background: var(--gray-50); }
+        tr:hover { background: var(--primary-bg); }
 
-        .chart-container { margin: 1.5rem 0; }
+        /* Leaderboard */
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+        .rank-1 .rank-badge { background: #fef9c3; color: #854d0e; border: 2px solid var(--gold); }
+        .rank-2 .rank-badge { background: var(--gray-100); color: var(--gray-600); border: 2px solid var(--silver); }
+        .rank-3 .rank-badge { background: #fef3c7; color: var(--bronze); border: 2px solid var(--bronze); }
+        .rank-1 { font-weight: 600; }
 
+        .metric-good { color: var(--success); font-weight: 600; }
+        .metric-bad { color: var(--danger); font-weight: 600; }
+
+        /* Stats grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 0.75rem;
+            margin: 0.75rem 0;
+        }
+        .stat-card {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 0.75rem 1rem;
+            text-align: center;
+        }
+        .stat-card .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .stat-card .stat-label {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.15rem;
+        }
+
+        /* Chart containers */
+        .chart-container {
+            margin: 1rem 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        @media (max-width: 768px) {
+            .chart-row { grid-template-columns: 1fr; }
+        }
+
+        /* Diagnostics stats */
+        .diag-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.5rem;
+            margin: 0.75rem 0;
+        }
+        .diag-stat {
+            text-align: center;
+            padding: 0.5rem;
+            background: var(--gray-50);
+            border-radius: var(--radius);
+            border: 1px solid var(--gray-200);
+        }
+        .diag-stat .value { font-weight: 700; font-size: 1rem; color: var(--gray-800); }
+        .diag-stat .label { font-size: 0.7rem; color: var(--gray-500); text-transform: uppercase; }
+
+        /* Model detail summary line */
+        .model-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 0.5rem 0;
+            font-size: 0.85rem;
+        }
+        .model-summary .metric {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 0.25rem 0.75rem;
+        }
+        .model-summary .metric .label { color: var(--gray-500); font-size: 0.75rem; }
+        .model-summary .metric .value { font-weight: 600; }
+
+        /* Collapsible details */
+        details { margin: 0.5rem 0; }
+        details summary {
+            cursor: pointer;
+            font-weight: 500;
+            padding: 0.5rem 0;
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+        details summary:hover { text-decoration: underline; }
+
+        .worst-series { background: var(--danger-bg) !important; }
+
+        /* LLM interpretation */
+        .llm-box {
+            background: var(--primary-bg);
+            border: 1px solid #bfdbfe;
+            border-radius: var(--radius);
+            padding: 1rem 1.25rem;
+            white-space: pre-wrap;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        /* Methodology */
+        .methodology {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            line-height: 1.7;
+        }
+        .methodology dt { font-weight: 600; color: var(--gray-700); margin-top: 0.5rem; }
+        .methodology dd { margin-left: 1rem; margin-bottom: 0.25rem; }
+
+        /* Footer */
+        .report-footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--gray-400);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--gray-200);
+            margin-top: 1rem;
+        }
+
+        /* Print styles */
         @media print {
-            body { max-width: 100%; margin: 0; }
+            body { max-width: 100%; margin: 0; background: white; }
+            .report-header { background: var(--primary) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .toc { display: none; }
+            .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
             tr:nth-child(even) { background: transparent !important; }
             th { background: transparent !important; border-bottom: 2px solid #000; }
+            .chart-row { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-    <h1>ts-autopilot Benchmark Report</h1>
-
-    {% if warnings %}
-    <div class="warnings-box">
-        <strong>Warnings:</strong>
-        <ul>
-        {% for w in warnings %}
-            <li>{{ w }}</li>
-        {% endfor %}
-        </ul>
+    <!-- 1. Header -->
+    <div class="report-header">
+        <h1>Benchmark Report</h1>
+        <div class="subtitle">Generated by ts-autopilot v{{ version }} | {{ generated_at }}</div>
     </div>
-    {% endif %}
 
-    <h2>Dataset Summary</h2>
-    <table>
-        <tr><th>Metric</th><th>Value</th></tr>
-        <tr><td>Number of Series</td><td>{{ profile.n_series }}</td></tr>
-        <tr><td>Frequency</td><td>{{ profile.frequency }}</td></tr>
-        <tr><td>Season Length Guess</td><td>{{ profile.season_length_guess }}</td></tr>
-        <tr><td>Missing Ratio</td><td>{{ "%.4f"|format(profile.missing_ratio) }}</td></tr>
-        <tr><td>Min Series Length</td><td>{{ profile.min_length }}</td></tr>
-        <tr><td>Max Series Length</td><td>{{ profile.max_length }}</td></tr>
-        <tr><td>Total Rows</td><td>{{ profile.total_rows }}</td></tr>
-        <tr><td>Forecast Horizon</td><td>{{ config.horizon }}</td></tr>
-        <tr><td>CV Folds</td><td>{{ config.n_folds }}</td></tr>
-    </table>
+    <!-- 2. Table of Contents -->
+    <nav class="toc">
+        <div class="toc-title">Navigate</div>
+        <div class="toc-links">
+            <a href="#executive-summary">Summary</a>
+            <a href="#data-profile">Data Profile</a>
+            {% if warnings %}<a href="#data-quality">Data Quality</a>{% endif %}
+            <a href="#leaderboard">Leaderboard</a>
+            <a href="#model-comparison">Comparison</a>
+            {% if has_forecast_data %}<a href="#forecasts">Forecasts</a>{% endif %}
+            {% if has_diagnostics %}<a href="#diagnostics">Diagnostics</a>{% endif %}
+            <a href="#model-details">Details</a>
+            <a href="#methodology">Methodology</a>
+            {% if tollama_interpretation %}<a href="#llm">LLM Insights</a>{% endif %}
+        </div>
+    </nav>
 
-    <h2>Leaderboard</h2>
+    <div class="content">
+        <!-- 3. Executive Summary -->
+        <div id="executive-summary" class="card">
+            <h2>Executive Summary</h2>
+            <div class="exec-summary">{{ executive_summary }}</div>
+        </div>
 
-    <div id="chart-mase" class="chart-container"></div>
+        <!-- 4. Data Profile -->
+        <div id="data-profile" class="card">
+            <h2>Dataset Profile</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{{ profile.n_series }}</div>
+                    <div class="stat-label">Series</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "{:,}".format(profile.total_rows) }}</div>
+                    <div class="stat-label">Total Rows</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ profile.frequency }}</div>
+                    <div class="stat-label">Frequency</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ profile.season_length_guess }}</div>
+                    <div class="stat-label">Season Length</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ profile.min_length }}&ndash;{{ profile.max_length }}</div>
+                    <div class="stat-label">Series Length Range</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.2f"|format(profile.missing_ratio * 100) }}%</div>
+                    <div class="stat-label">Missing Ratio</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ config.horizon }}</div>
+                    <div class="stat-label">Forecast Horizon</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ config.n_folds }}</div>
+                    <div class="stat-label">CV Folds</div>
+                </div>
+            </div>
+        </div>
 
-    <table>
-        <tr>
-            <th>Rank</th>
-            <th>Model</th>
-            <th>MASE</th>
-            <th>SMAPE</th>
-            <th>RMSSE</th>
-            <th>MAE</th>
-        </tr>
-        {% for entry in leaderboard %}
-        <tr class="{% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% endif %}">
-            <td>{{ entry.rank }}</td>
-            <td>{{ entry.name }}</td>
-            <td class="{% if entry.mean_mase < 1.0 %}mase-good{% elif entry.mean_mase > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(entry.mean_mase) }}</td>
-            <td>{{ "%.2f"|format(entry.mean_smape) }}%</td>
-            <td class="{% if entry.mean_rmsse < 1.0 %}mase-good{% elif entry.mean_rmsse > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(entry.mean_rmsse) }}</td>
-            <td>{{ "%.4f"|format(entry.mean_mae) }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+        <!-- 5. Data Quality Warnings -->
+        {% if warnings %}
+        <div id="data-quality" class="card">
+            <h2>Data Quality</h2>
+            <div class="warnings-box">
+                <div class="warnings-title">Warnings</div>
+                <ul>
+                {% for w in warnings %}
+                    <li>{{ w }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
 
-    <h2>MASE by Fold</h2>
-    <div id="chart-heatmap" class="chart-container"></div>
+        <!-- 6. Leaderboard -->
+        <div id="leaderboard" class="card">
+            <h2>Leaderboard</h2>
+            <div id="chart-mase" class="chart-container"></div>
+            <table>
+                <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Model</th>
+                    <th>MASE</th>
+                    <th>SMAPE</th>
+                    <th>RMSSE</th>
+                    <th>MAE</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for entry in leaderboard %}
+                <tr class="{% if entry.rank <= 3 %}rank-{{ entry.rank }}{% endif %}">
+                    <td><span class="rank-badge">{{ entry.rank }}</span></td>
+                    <td>{{ entry.name }}</td>
+                    <td class="{% if entry.mean_mase < 1.0 %}metric-good{% elif entry.mean_mase > 1.0 %}metric-bad{% endif %}">{{ "%.4f"|format(entry.mean_mase) }}</td>
+                    <td>{{ "%.2f"|format(entry.mean_smape) }}%</td>
+                    <td class="{% if entry.mean_rmsse < 1.0 %}metric-good{% elif entry.mean_rmsse > 1.0 %}metric-bad{% endif %}">{{ "%.4f"|format(entry.mean_rmsse) }}</td>
+                    <td>{{ "%.4f"|format(entry.mean_mae) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-    <h2>Model Details</h2>
-    {% for model in models %}
-    <h3>{{ model.name }}</h3>
-    <p>Runtime: {{ "%.4f"|format(model.runtime_sec) }}s |
-       Mean MASE: <span class="{% if model.mean_mase < 1.0 %}mase-good{% elif model.mean_mase > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(model.mean_mase) }}</span> |
-       Std MASE: {{ "%.4f"|format(model.std_mase) }} |
-       SMAPE: {{ "%.2f"|format(model.mean_smape) }}% |
-       RMSSE: {{ "%.4f"|format(model.mean_rmsse) }} |
-       MAE: {{ "%.4f"|format(model.mean_mae) }}</p>
-    <table>
-        <tr><th>Fold</th><th>Cutoff</th><th>MASE</th><th>SMAPE</th><th>RMSSE</th><th>MAE</th></tr>
-        {% for fold in model.folds %}
-        <tr>
-            <td>{{ fold.fold }}</td>
-            <td>{{ fold.cutoff }}</td>
-            <td class="{% if fold.mase < 1.0 %}mase-good{% elif fold.mase > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(fold.mase) }}</td>
-            <td>{{ "%.2f"|format(fold.smape) }}%</td>
-            <td class="{% if fold.rmsse < 1.0 %}mase-good{% elif fold.rmsse > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(fold.rmsse) }}</td>
-            <td>{{ "%.4f"|format(fold.mae) }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+        <!-- 7. Model Comparison -->
+        <div id="model-comparison" class="card">
+            <h2>Model Comparison</h2>
+            <div class="chart-row">
+                <div id="chart-radar" class="chart-container"></div>
+                <div id="chart-fold-stability" class="chart-container"></div>
+            </div>
+            <h3>MASE Heatmap by Fold</h3>
+            <div id="chart-heatmap" class="chart-container"></div>
+            {% if chart_data.box_plot %}
+            <h3>Error Distribution (Per-Series MASE)</h3>
+            <div id="chart-boxplot" class="chart-container"></div>
+            {% endif %}
+        </div>
 
-    {% if model.folds and model.folds[0].series_scores %}
-    <details>
-        <summary style="cursor: pointer; font-weight: 500; margin: 0.5rem 0;">Per-Series Breakdown (averaged across folds)</summary>
-        {% set ns = namespace(avg_scores={}) %}
-        {% for fold in model.folds %}
-            {% for sid, score in fold.series_scores.items() %}
-                {% if sid in ns.avg_scores %}
-                    {% set _ = ns.avg_scores.update({sid: ns.avg_scores[sid] + score / model.folds|length}) %}
-                {% else %}
-                    {% set _ = ns.avg_scores.update({sid: score / model.folds|length}) %}
-                {% endif %}
+        <!-- 8. Forecast Visualization -->
+        {% if has_forecast_data and chart_data.forecast.series %}
+        <div id="forecasts" class="card">
+            <h2>Forecast vs Actual</h2>
+            <p style="color: var(--gray-500); font-size: 0.85rem;">
+                Best model ({{ chart_data.forecast.model_name }}) predictions on fold {{ chart_data.forecast.fold }}.
+                Showing selected series by MASE ranking.
+            </p>
+            {% for s in chart_data.forecast.series %}
+            <div id="chart-forecast-{{ loop.index }}" class="chart-container"></div>
             {% endfor %}
-        {% endfor %}
-        <table>
-            <tr><th>Series</th><th>Avg MASE</th></tr>
-            {% for sid, score in ns.avg_scores|dictsort(by='value', reverse=true) %}
-            <tr>
-                <td>{{ sid }}</td>
-                <td class="{% if score < 1.0 %}mase-good{% elif score > 1.0 %}mase-bad{% endif %}{% if loop.index <= 3 %} worst-series{% endif %}">{{ "%.6f"|format(score) }}</td>
-            </tr>
+        </div>
+        {% endif %}
+
+        <!-- 9. Residual Diagnostics -->
+        {% if has_diagnostics and chart_data.diagnostics %}
+        <div id="diagnostics" class="card">
+            <h2>Residual Diagnostics</h2>
+            <p style="color: var(--gray-500); font-size: 0.85rem;">
+                Analysis of residuals for the best model: {{ chart_data.diagnostics.model_name }}
+            </p>
+            <div class="diag-stats">
+                <div class="diag-stat">
+                    <div class="value">{{ "%.4f"|format(chart_data.diagnostics.residual_mean) }}</div>
+                    <div class="label">Mean</div>
+                </div>
+                <div class="diag-stat">
+                    <div class="value">{{ "%.4f"|format(chart_data.diagnostics.residual_std) }}</div>
+                    <div class="label">Std Dev</div>
+                </div>
+                <div class="diag-stat">
+                    <div class="value">{{ "%.4f"|format(chart_data.diagnostics.residual_skew) }}</div>
+                    <div class="label">Skewness</div>
+                </div>
+                <div class="diag-stat">
+                    <div class="value">{{ "%.4f"|format(chart_data.diagnostics.residual_kurtosis) }}</div>
+                    <div class="label">Kurtosis</div>
+                </div>
+                <div class="diag-stat">
+                    <div class="value {% if chart_data.diagnostics.ljung_box_p > 0.05 %}metric-good{% else %}metric-bad{% endif %}">
+                        {{ "%.4f"|format(chart_data.diagnostics.ljung_box_p) }}
+                    </div>
+                    <div class="label">Ljung-Box p</div>
+                </div>
+            </div>
+            <div class="chart-row">
+                <div id="chart-resid-hist" class="chart-container"></div>
+                <div id="chart-resid-acf" class="chart-container"></div>
+            </div>
+            <div id="chart-resid-scatter" class="chart-container"></div>
+        </div>
+        {% endif %}
+
+        <!-- 10. Model Details -->
+        <div id="model-details" class="card">
+            <h2>Model Details</h2>
+            {% for model in models %}
+            <h3>{{ model.name }}</h3>
+            <div class="model-summary">
+                <div class="metric">
+                    <span class="label">Runtime</span>
+                    <span class="value">{{ "%.2f"|format(model.runtime_sec) }}s</span>
+                </div>
+                <div class="metric">
+                    <span class="label">MASE</span>
+                    <span class="value {% if model.mean_mase < 1.0 %}metric-good{% elif model.mean_mase > 1.0 %}metric-bad{% endif %}">{{ "%.4f"|format(model.mean_mase) }} &plusmn; {{ "%.4f"|format(model.std_mase) }}</span>
+                </div>
+                <div class="metric">
+                    <span class="label">SMAPE</span>
+                    <span class="value">{{ "%.2f"|format(model.mean_smape) }}%</span>
+                </div>
+                <div class="metric">
+                    <span class="label">RMSSE</span>
+                    <span class="value">{{ "%.4f"|format(model.mean_rmsse) }}</span>
+                </div>
+                <div class="metric">
+                    <span class="label">MAE</span>
+                    <span class="value">{{ "%.4f"|format(model.mean_mae) }}</span>
+                </div>
+            </div>
+            <table>
+                <thead>
+                <tr><th>Fold</th><th>Cutoff</th><th>MASE</th><th>SMAPE</th><th>RMSSE</th><th>MAE</th></tr>
+                </thead>
+                <tbody>
+                {% for fold in model.folds %}
+                <tr>
+                    <td>{{ fold.fold }}</td>
+                    <td>{{ fold.cutoff }}</td>
+                    <td class="{% if fold.mase < 1.0 %}metric-good{% elif fold.mase > 1.0 %}metric-bad{% endif %}">{{ "%.4f"|format(fold.mase) }}</td>
+                    <td>{{ "%.2f"|format(fold.smape) }}%</td>
+                    <td class="{% if fold.rmsse < 1.0 %}metric-good{% elif fold.rmsse > 1.0 %}metric-bad{% endif %}">{{ "%.4f"|format(fold.rmsse) }}</td>
+                    <td>{{ "%.4f"|format(fold.mae) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            {% if model.folds and model.folds[0].series_scores %}
+            <details>
+                <summary>Per-Series Breakdown (averaged across folds)</summary>
+                {% set ns = namespace(avg_scores={}) %}
+                {% for fold in model.folds %}
+                    {% for sid, score in fold.series_scores.items() %}
+                        {% if sid in ns.avg_scores %}
+                            {% set _ = ns.avg_scores.update({sid: ns.avg_scores[sid] + score / model.folds|length}) %}
+                        {% else %}
+                            {% set _ = ns.avg_scores.update({sid: score / model.folds|length}) %}
+                        {% endif %}
+                    {% endfor %}
+                {% endfor %}
+                <table>
+                    <thead>
+                    <tr><th>Series</th><th>Avg MASE</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for sid, score in ns.avg_scores|dictsort(by='value', reverse=true) %}
+                    <tr>
+                        <td>{{ sid }}</td>
+                        <td class="{% if score < 1.0 %}metric-good{% elif score > 1.0 %}metric-bad{% endif %}{% if loop.index <= 3 %} worst-series{% endif %}">{{ "%.6f"|format(score) }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </details>
+            {% endif %}
             {% endfor %}
-        </table>
-    </details>
-    {% endif %}
-    {% endfor %}
+        </div>
 
-    {% if tollama_interpretation %}
-    <h2>LLM Interpretation</h2>
-    <div style="background: #f0f7ff; border: 1px solid #b3d7ff; border-radius: 6px; padding: 1rem 1.25rem; margin: 1rem 0; white-space: pre-wrap;">{{ tollama_interpretation }}</div>
-    {% endif %}
+        <!-- 11. Methodology -->
+        <div id="methodology" class="card">
+            <h2>Methodology</h2>
+            <dl class="methodology">
+                <dt>Cross-Validation Strategy</dt>
+                <dd>Expanding-window (time-aware): each fold grows the training set while keeping a fixed {{ config.horizon }}-step test window. {{ config.n_folds }} folds were used, ordered by increasing training size.</dd>
 
-    <footer>
-        <p class="meta">Generated by ts-autopilot v{{ version }} | {{ generated_at }}</p>
-    </footer>
+                <dt>Primary Metric: MASE</dt>
+                <dd>Mean Absolute Scaled Error. Scaled by seasonal naive baseline (season_length={{ profile.season_length_guess }}). MASE &lt; 1.0 beats naive; MASE &gt; 1.0 loses to naive.</dd>
+
+                <dt>SMAPE</dt>
+                <dd>Symmetric Mean Absolute Percentage Error. Scale: 0% (perfect) to 200% (worst). Symmetric treatment of over- and under-prediction.</dd>
+
+                <dt>RMSSE</dt>
+                <dd>Root Mean Squared Scaled Error. Like MASE but penalizes large errors more heavily (squared differences).</dd>
+
+                <dt>MAE</dt>
+                <dd>Mean Absolute Error. Raw unscaled error in original units.</dd>
+            </dl>
+        </div>
+
+        <!-- 12. LLM Interpretation -->
+        {% if tollama_interpretation %}
+        <div id="llm" class="card">
+            <h2>LLM Interpretation</h2>
+            <div class="llm-box">{{ tollama_interpretation }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <div class="report-footer">
+        Generated by ts-autopilot v{{ version }} | {{ generated_at }}
+    </div>
 
     <script>
     (function() {
         var chartData = {{ chart_data | tojson }};
+        var plotlyConfig = { responsive: true, displayModeBar: false };
+        var fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        var layoutDefaults = {
+            font: { family: fontFamily, size: 12 },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            margin: { l: 60, r: 30, t: 40, b: 40 }
+        };
 
-        // MASE Comparison Bar Chart
+        function mergeLayout(extra) {
+            var result = {};
+            for (var k in layoutDefaults) result[k] = layoutDefaults[k];
+            for (var k in extra) {
+                if (k === 'font') {
+                    result.font = {};
+                    for (var fk in layoutDefaults.font) result.font[fk] = layoutDefaults.font[fk];
+                    for (var fk in extra.font) result.font[fk] = extra.font[fk];
+                } else if (k === 'margin') {
+                    result.margin = {};
+                    for (var mk in layoutDefaults.margin) result.margin[mk] = layoutDefaults.margin[mk];
+                    for (var mk in extra.margin) result.margin[mk] = extra.margin[mk];
+                } else {
+                    result[k] = extra[k];
+                }
+            }
+            return result;
+        }
+
+        var colors = ['#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed', '#db2777', '#0891b2', '#65a30d', '#c2410c'];
+
+        // 1. MASE Comparison Bar Chart
         if (chartData.bar_names.length > 0) {
-            var barTrace = {
+            Plotly.newPlot('chart-mase', [{
                 type: 'bar',
                 orientation: 'h',
                 y: chartData.bar_names.slice().reverse(),
                 x: chartData.bar_mase.slice().reverse(),
-                marker: { color: chartData.bar_colors.slice().reverse() },
+                marker: { color: chartData.bar_colors.slice().reverse(), line: { width: 0 } },
                 text: chartData.bar_mase.slice().reverse().map(function(v) { return v.toFixed(4); }),
                 textposition: 'outside',
                 hovertemplate: '%{y}: MASE=%{x:.4f}<extra></extra>'
-            };
-            Plotly.newPlot('chart-mase', [barTrace], {
-                title: { text: 'Model Comparison (MASE)', font: { size: 16 } },
-                xaxis: { title: 'MASE (lower is better)', zeroline: true },
+            }], mergeLayout({
+                title: { text: 'Model Comparison (MASE)', font: { size: 14 } },
+                xaxis: { title: 'MASE (lower is better)', gridcolor: '#f3f4f6', zeroline: true },
                 yaxis: { automargin: true },
                 shapes: [{
                     type: 'line', x0: 1, x1: 1, y0: -0.5, y1: chartData.bar_names.length - 0.5,
-                    line: { color: '#6c757d', width: 2, dash: 'dash' }
+                    line: { color: '#9ca3af', width: 2, dash: 'dash' }
                 }],
                 annotations: [{
                     x: 1, y: chartData.bar_names.length - 0.5,
                     text: 'Naive baseline', showarrow: false,
-                    font: { size: 11, color: '#6c757d' }, xanchor: 'left', xshift: 4
+                    font: { size: 10, color: '#9ca3af' }, xanchor: 'left', xshift: 4
                 }],
                 margin: { l: 120, r: 60, t: 50, b: 40 },
                 height: Math.max(250, chartData.bar_names.length * 45 + 100)
-            }, { responsive: true });
+            }), plotlyConfig);
         }
 
-        // MASE by Fold Heatmap
+        // 2. Radar Chart
+        if (chartData.radar && chartData.radar.categories.length > 0) {
+            var radarTraces = [];
+            var modelNames = Object.keys(chartData.radar.models);
+            modelNames.forEach(function(name, i) {
+                var vals = chartData.radar.models[name].slice();
+                vals.push(vals[0]);
+                var cats = chartData.radar.categories.slice();
+                cats.push(cats[0]);
+                radarTraces.push({
+                    type: 'scatterpolar',
+                    r: vals,
+                    theta: cats,
+                    name: name,
+                    fill: 'toself',
+                    fillcolor: colors[i % colors.length] + '15',
+                    line: { color: colors[i % colors.length], width: 2 },
+                    marker: { size: 4 }
+                });
+            });
+            Plotly.newPlot('chart-radar', radarTraces, mergeLayout({
+                title: { text: 'Multi-Metric Profile', font: { size: 14 } },
+                polar: {
+                    radialaxis: { visible: true, range: [0, 1.1], tickfont: { size: 10 } },
+                    bgcolor: 'transparent'
+                },
+                showlegend: true,
+                legend: { font: { size: 10 }, orientation: 'h', y: -0.15 },
+                height: 350,
+                margin: { l: 40, r: 40, t: 50, b: 60 }
+            }), plotlyConfig);
+        }
+
+        // 3. Fold Stability Line Chart
+        if (chartData.fold_labels && chartData.fold_labels.length > 1) {
+            var stabilityTraces = [];
+            var modelNames = Object.keys(chartData.fold_stability);
+            modelNames.forEach(function(name, i) {
+                stabilityTraces.push({
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    x: chartData.fold_labels,
+                    y: chartData.fold_stability[name],
+                    name: name,
+                    line: { color: colors[i % colors.length], width: 2 },
+                    marker: { size: 6 }
+                });
+            });
+            Plotly.newPlot('chart-fold-stability', stabilityTraces, mergeLayout({
+                title: { text: 'MASE Stability Across Folds', font: { size: 14 } },
+                xaxis: { title: '' },
+                yaxis: { title: 'MASE', gridcolor: '#f3f4f6' },
+                shapes: [{
+                    type: 'line', x0: chartData.fold_labels[0], x1: chartData.fold_labels[chartData.fold_labels.length - 1],
+                    y0: 1, y1: 1, line: { color: '#9ca3af', width: 1, dash: 'dash' }
+                }],
+                showlegend: true,
+                legend: { font: { size: 10 }, orientation: 'h', y: -0.2 },
+                height: 350,
+                margin: { l: 50, r: 20, t: 50, b: 60 }
+            }), plotlyConfig);
+        }
+
+        // 4. Heatmap
         if (chartData.heatmap_z.length > 0) {
-            var heatTrace = {
+            Plotly.newPlot('chart-heatmap', [{
                 type: 'heatmap',
                 z: chartData.heatmap_z,
                 x: chartData.heatmap_folds,
                 y: chartData.heatmap_models,
-                colorscale: [
-                    [0, '#28a745'],
-                    [0.5, '#ffc107'],
-                    [1, '#dc3545']
-                ],
-                colorbar: { title: 'MASE' },
+                colorscale: [[0, '#059669'], [0.5, '#fbbf24'], [1, '#dc2626']],
+                colorbar: { title: 'MASE', titlefont: { size: 11 } },
                 hovertemplate: '%{y} | %{x}<br>MASE: %{z:.4f}<extra></extra>',
-                text: chartData.heatmap_z.map(function(row) {
-                    return row.map(function(v) { return v.toFixed(4); });
-                }),
+                text: chartData.heatmap_z.map(function(row) { return row.map(function(v) { return v.toFixed(4); }); }),
                 texttemplate: '%{text}',
-                textfont: { size: 12 }
-            };
-            Plotly.newPlot('chart-heatmap', [heatTrace], {
-                title: { text: 'MASE by Model and Fold', font: { size: 16 } },
-                xaxis: { title: '' },
+                textfont: { size: 11 }
+            }], mergeLayout({
+                title: { text: '', font: { size: 14 } },
+                xaxis: { title: '', side: 'bottom' },
                 yaxis: { automargin: true },
-                margin: { l: 120, r: 40, t: 50, b: 40 },
-                height: Math.max(250, chartData.heatmap_models.length * 50 + 100)
-            }, { responsive: true });
+                margin: { l: 120, r: 40, t: 20, b: 40 },
+                height: Math.max(200, chartData.heatmap_models.length * 45 + 80)
+            }), plotlyConfig);
+        }
+
+        // 5. Box Plot (Error Distribution)
+        if (chartData.box_plot && Object.keys(chartData.box_plot).length > 0) {
+            var boxTraces = [];
+            var bpNames = Object.keys(chartData.box_plot);
+            bpNames.forEach(function(name, i) {
+                boxTraces.push({
+                    type: 'box',
+                    y: chartData.box_plot[name],
+                    name: name,
+                    marker: { color: colors[i % colors.length] },
+                    boxmean: 'sd'
+                });
+            });
+            Plotly.newPlot('chart-boxplot', boxTraces, mergeLayout({
+                title: { text: '', font: { size: 14 } },
+                yaxis: { title: 'MASE', gridcolor: '#f3f4f6' },
+                showlegend: false,
+                shapes: [{
+                    type: 'line', x0: -0.5, x1: bpNames.length - 0.5,
+                    y0: 1, y1: 1, line: { color: '#9ca3af', width: 1, dash: 'dash' }
+                }],
+                height: 350,
+                margin: { l: 50, r: 20, t: 20, b: 60 }
+            }), plotlyConfig);
+        }
+
+        // 6. Forecast vs Actual Charts
+        if (chartData.forecast && chartData.forecast.series) {
+            chartData.forecast.series.forEach(function(s, idx) {
+                var traces = [];
+                if (s.y_actual && s.y_actual.length > 0) {
+                    traces.push({
+                        type: 'scatter', mode: 'lines+markers',
+                        x: s.ds, y: s.y_actual,
+                        name: 'Actual',
+                        line: { color: '#2563eb', width: 2 },
+                        marker: { size: 4 }
+                    });
+                }
+                traces.push({
+                    type: 'scatter', mode: 'lines+markers',
+                    x: s.ds, y: s.y_hat,
+                    name: 'Forecast',
+                    line: { color: '#dc2626', width: 2, dash: 'dash' },
+                    marker: { size: 4 }
+                });
+                var elId = 'chart-forecast-' + (idx + 1);
+                Plotly.newPlot(elId, traces, mergeLayout({
+                    title: { text: s.name + ' (MASE: ' + s.mase.toFixed(4) + ')', font: { size: 13 } },
+                    xaxis: { title: '' },
+                    yaxis: { title: 'Value', gridcolor: '#f3f4f6' },
+                    showlegend: true,
+                    legend: { font: { size: 10 }, orientation: 'h', y: -0.2 },
+                    height: 280,
+                    margin: { l: 50, r: 20, t: 40, b: 50 }
+                }), plotlyConfig);
+            });
+        }
+
+        // 7. Residual Diagnostics Charts
+        if (chartData.diagnostics && chartData.diagnostics.histogram_bins) {
+            var diag = chartData.diagnostics;
+
+            // Histogram
+            if (diag.histogram_bins.length > 0) {
+                var histX = [];
+                for (var i = 0; i < diag.histogram_counts.length; i++) {
+                    histX.push((diag.histogram_bins[i] + diag.histogram_bins[i + 1]) / 2);
+                }
+                Plotly.newPlot('chart-resid-hist', [{
+                    type: 'bar',
+                    x: histX,
+                    y: diag.histogram_counts,
+                    marker: { color: '#2563eb', opacity: 0.7, line: { color: '#1e40af', width: 1 } },
+                    hovertemplate: 'Residual: %{x:.3f}<br>Count: %{y}<extra></extra>'
+                }], mergeLayout({
+                    title: { text: 'Residual Distribution', font: { size: 13 } },
+                    xaxis: { title: 'Residual', gridcolor: '#f3f4f6' },
+                    yaxis: { title: 'Frequency', gridcolor: '#f3f4f6' },
+                    bargap: 0.05,
+                    height: 300,
+                    margin: { l: 50, r: 20, t: 40, b: 40 }
+                }), plotlyConfig);
+            }
+
+            // ACF Plot
+            if (diag.acf_lags.length > 0) {
+                var acfShapes = [];
+                var ci = 1.96 / Math.sqrt(diag.residuals.length || 1);
+                acfShapes.push({
+                    type: 'line', x0: 0, x1: diag.acf_lags[diag.acf_lags.length - 1] + 1,
+                    y0: ci, y1: ci, line: { color: '#dc2626', width: 1, dash: 'dash' }
+                });
+                acfShapes.push({
+                    type: 'line', x0: 0, x1: diag.acf_lags[diag.acf_lags.length - 1] + 1,
+                    y0: -ci, y1: -ci, line: { color: '#dc2626', width: 1, dash: 'dash' }
+                });
+                Plotly.newPlot('chart-resid-acf', [{
+                    type: 'bar',
+                    x: diag.acf_lags,
+                    y: diag.acf_values,
+                    marker: { color: '#059669', opacity: 0.8 },
+                    hovertemplate: 'Lag %{x}<br>ACF: %{y:.4f}<extra></extra>'
+                }], mergeLayout({
+                    title: { text: 'Autocorrelation (ACF)', font: { size: 13 } },
+                    xaxis: { title: 'Lag', dtick: 1 },
+                    yaxis: { title: 'ACF', gridcolor: '#f3f4f6', range: [-1, 1] },
+                    shapes: acfShapes,
+                    height: 300,
+                    margin: { l: 50, r: 20, t: 40, b: 40 }
+                }), plotlyConfig);
+            }
+
+            // Residuals vs Fitted Scatter
+            if (diag.residuals.length > 0 && diag.fitted.length > 0) {
+                Plotly.newPlot('chart-resid-scatter', [{
+                    type: 'scatter',
+                    mode: 'markers',
+                    x: diag.fitted,
+                    y: diag.residuals,
+                    marker: { color: '#2563eb', size: 4, opacity: 0.5 },
+                    hovertemplate: 'Fitted: %{x:.3f}<br>Residual: %{y:.3f}<extra></extra>'
+                }], mergeLayout({
+                    title: { text: 'Residuals vs Fitted', font: { size: 13 } },
+                    xaxis: { title: 'Fitted Value', gridcolor: '#f3f4f6' },
+                    yaxis: { title: 'Residual', gridcolor: '#f3f4f6' },
+                    shapes: [{
+                        type: 'line', x0: Math.min.apply(null, diag.fitted), x1: Math.max.apply(null, diag.fitted),
+                        y0: 0, y1: 0, line: { color: '#9ca3af', width: 1, dash: 'dash' }
+                    }],
+                    height: 350,
+                    margin: { l: 60, r: 20, t: 40, b: 40 }
+                }), plotlyConfig);
+            }
         }
     })();
     </script>

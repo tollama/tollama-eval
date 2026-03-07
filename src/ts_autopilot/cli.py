@@ -121,6 +121,11 @@ def run(
         help="Number of parallel workers for model fitting.",
         min=1,
     ),
+    pdf: bool = typer.Option(
+        False,
+        "--pdf",
+        help="Generate PDF report (requires weasyprint).",
+    ),
     config: Path | None = _CONFIG_OPTION,
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
@@ -204,6 +209,7 @@ def run(
             progress_callback=_progress_cb,
             tollama_url=effective_tollama_url,
             n_jobs=n_jobs,
+            generate_pdf=pdf,
         )
     except SchemaError as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)

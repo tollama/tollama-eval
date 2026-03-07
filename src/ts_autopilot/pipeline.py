@@ -16,7 +16,9 @@ from ts_autopilot.contracts import (
     BenchmarkConfig,
     BenchmarkResult,
     DataProfile,
+    DiagnosticsResult,
     FoldResult,
+    ForecastData,
     ForecastOutput,
     LeaderboardEntry,
     ModelResult,
@@ -269,6 +271,7 @@ def run_benchmark(
     splits = make_expanding_splits(df, horizon=horizon, n_folds=n_folds)
 
     model_results: list[ModelResult] = []
+    all_forecast_data: list[ForecastData] = []
     pipeline_t0 = time.perf_counter()
 
     for runner_idx, runner in enumerate(runners):
@@ -307,6 +310,30 @@ def run_benchmark(
                 n_jobs=n_jobs,
             )
             total_runtime += output.runtime_sec
+
+            # Capture forecast vs actual data for report visualizations
+            test_sorted = split.test.sort_values(["unique_id", "ds"])
+            tail_len = min(2 * horizon, len(split.train))
+            train_tail = (
+                split.train.sort_values(["unique_id", "ds"])
+                .groupby("unique_id")
+                .tail(tail_len)
+                .sort_values(["unique_id", "ds"])
+            )
+            all_forecast_data.append(
+                ForecastData(
+                    model_name=runner.name,
+                    fold=split.fold,
+                    unique_id=output.unique_id,
+                    ds=output.ds,
+                    y_hat=output.y_hat,
+                    y_actual=test_sorted["y"].tolist(),
+                    ds_train_tail=[
+                        d.isoformat() for d in train_tail["ds"]
+                    ],
+                    y_train_tail=train_tail["y"].tolist(),
+                )
+            )
 
             # Convert ForecastOutput to DataFrame for metric computation
             pred_df = pd.DataFrame(
@@ -393,6 +420,28 @@ def run_benchmark(
 
     pipeline_elapsed = time.perf_counter() - pipeline_t0
 
+    # Compute residual diagnostics for each model
+    all_diagnostics: list[DiagnosticsResult] = []
+    for model in model_results:
+        model_forecasts = [
+            fd for fd in all_forecast_data if fd.model_name == model.name
+        ]
+        all_residuals = []
+        all_fitted = []
+        for fd in model_forecasts:
+            residuals = [
+                a - p for a, p in zip(fd.y_actual, fd.y_hat, strict=False)
+            ]
+            all_residuals.extend(residuals)
+            all_fitted.extend(fd.y_hat)
+        if all_residuals:
+            from ts_autopilot.evaluation.diagnostics import compute_diagnostics
+
+            diag = compute_diagnostics(
+                model.name, np.array(all_residuals), np.array(all_fitted)
+            )
+            all_diagnostics.append(diag)
+
     # Build leaderboard: rank by mean_mase ascending
     sorted_models = sorted(model_results, key=lambda m: m.mean_mase)
     leaderboard = [
@@ -420,6 +469,8 @@ def run_benchmark(
         models=model_results,
         leaderboard=leaderboard,
         warnings=warnings,
+        forecast_data=all_forecast_data,
+        diagnostics=all_diagnostics,
     )
 
 
@@ -451,6 +502,7 @@ def run_from_csv(
     tollama_interpretation: str | None = None,
     tollama_url: str | None = None,
     n_jobs: int = 1,
+    generate_pdf: bool = False,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html.
 
@@ -505,5 +557,20 @@ def run_from_csv(
         render_report(result, tollama_interpretation=tollama_interpretation),
     )
     logger.info("Wrote %s", report_path)
+
+    # Optional PDF generation
+    if generate_pdf:
+        from ts_autopilot.reporting.pdf_export import generate_pdf as make_pdf
+        from ts_autopilot.reporting.pdf_export import is_available
+
+        if is_available():
+            pdf_path = output_dir / "report.pdf"
+            if make_pdf(report_path, pdf_path):
+                logger.info("Wrote %s", pdf_path)
+        else:
+            logger.info(
+                "PDF export requested but weasyprint not installed. "
+                'Install with: pip install "ts-autopilot[pdf]"'
+            )
 
     return result

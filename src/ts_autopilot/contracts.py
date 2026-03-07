@@ -41,13 +41,30 @@ class ForecastOutput:
     y_hat: list[float]
     model_name: str
     runtime_sec: float
+    y_actual: list[float] = field(default_factory=list)
+    ds_train_tail: list[str] = field(default_factory=list)
+    y_train_tail: list[float] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        # Omit empty optional fields for backward compat
+        for k in ("y_actual", "ds_train_tail", "y_train_tail"):
+            if not d.get(k):
+                d.pop(k, None)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ForecastOutput:
-        return cls(**d)
+        return cls(
+            unique_id=d["unique_id"],
+            ds=d["ds"],
+            y_hat=d["y_hat"],
+            model_name=d["model_name"],
+            runtime_sec=d["runtime_sec"],
+            y_actual=d.get("y_actual", []),
+            ds_train_tail=d.get("ds_train_tail", []),
+            y_train_tail=d.get("y_train_tail", []),
+        )
 
 
 @dataclass
@@ -141,6 +158,52 @@ class LeaderboardEntry:
 
 
 @dataclass
+class ForecastData:
+    """Captured forecast vs actual data for report visualizations."""
+
+    model_name: str
+    fold: int
+    unique_id: list[str]
+    ds: list[str]
+    y_hat: list[float]
+    y_actual: list[float]
+    ds_train_tail: list[str]
+    y_train_tail: list[float]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> ForecastData:
+        return cls(**d)
+
+
+@dataclass
+class DiagnosticsResult:
+    """Residual diagnostics for a model."""
+
+    model_name: str
+    residual_mean: float
+    residual_std: float
+    residual_skew: float
+    residual_kurtosis: float
+    ljung_box_p: float  # p-value; > 0.05 = residuals are white noise
+    histogram_bins: list[float] = field(default_factory=list)
+    histogram_counts: list[int] = field(default_factory=list)
+    acf_lags: list[int] = field(default_factory=list)
+    acf_values: list[float] = field(default_factory=list)
+    residuals: list[float] = field(default_factory=list)
+    fitted: list[float] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> DiagnosticsResult:
+        return cls(**d)
+
+
+@dataclass
 class BenchmarkConfig:
     horizon: int
     n_folds: int
@@ -184,6 +247,8 @@ class BenchmarkResult:
     leaderboard: list[LeaderboardEntry]
     warnings: list[str] = field(default_factory=list)
     metadata: ResultMetadata | None = None
+    forecast_data: list[ForecastData] = field(default_factory=list)
+    diagnostics: list[DiagnosticsResult] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {}
@@ -195,6 +260,8 @@ class BenchmarkResult:
         d["leaderboard"] = [e.to_dict() for e in self.leaderboard]
         if self.warnings:
             d["warnings"] = self.warnings
+        # forecast_data and diagnostics are NOT written to results.json
+        # (they're for report rendering only, keeping schema frozen)
         return d
 
     def to_json(self, indent: int = 2) -> str:
