@@ -157,14 +157,14 @@ def test_atomic_write_no_leftover_tmp(tmp_path):
 
 def test_result_metadata_create_now():
     meta = ResultMetadata.create_now()
-    assert meta.version == "0.1.0"
+    assert meta.version == "0.2.0"
     assert "T" in meta.generated_at  # ISO format
     assert meta.total_runtime_sec == 0.0
 
 
 def test_result_metadata_round_trip():
     meta = ResultMetadata(
-        version="0.1.0",
+        version="0.2.0",
         generated_at="2024-01-01T00:00:00+00:00",
         total_runtime_sec=1.234,
     )
@@ -186,16 +186,16 @@ def test_benchmark_result_with_metadata_round_trip():
         models=[],
         leaderboard=[],
         metadata=ResultMetadata(
-            version="0.1.0",
+            version="0.2.0",
             generated_at="2024-01-01T00:00:00+00:00",
             total_runtime_sec=5.0,
         ),
     )
     d = result.to_dict()
     assert "metadata" in d
-    assert d["metadata"]["version"] == "0.1.0"
+    assert d["metadata"]["version"] == "0.2.0"
     restored = BenchmarkResult.from_dict(d)
-    assert restored.metadata.version == "0.1.0"
+    assert restored.metadata.version == "0.2.0"
     assert restored.metadata.total_runtime_sec == 5.0
 
 
@@ -235,7 +235,7 @@ def test_run_from_csv_includes_metadata(tmp_path):
 
     data = json.loads((out_dir / "results.json").read_text())
     assert "metadata" in data
-    assert data["metadata"]["version"] == "0.1.0"
+    assert data["metadata"]["version"] == "0.2.0"
     assert data["metadata"]["total_runtime_sec"] > 0
 
 

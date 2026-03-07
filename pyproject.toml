@@ -4,10 +4,28 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ts-autopilot"
-version = "0.1.0"
-description = "Automated time series benchmarking"
+version = "0.2.0"
+description = "Automated time series benchmarking — drop in a CSV, get ranked model results"
+readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
+authors = [
+    {name = "ts-autopilot contributors"},
+]
+keywords = ["time-series", "forecasting", "benchmarking", "automl"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
 dependencies = [
     "pandas>=2.0,<3",
     "numpy>=1.24,<3",
@@ -17,6 +35,11 @@ dependencies = [
     "httpx>=0.25,<1",
     "pyyaml>=6.0,<7",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ychoi-atop/ts-autopilot"
+Repository = "https://github.com/ychoi-atop/ts-autopilot"
+Issues = "https://github.com/ychoi-atop/ts-autopilot/issues"
 
 [project.scripts]
 ts-autopilot = "ts_autopilot.cli:app"
@@ -40,6 +63,21 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 dev = [
     "pytest>=7.0",
     "ruff>=0.1",
+]
+prophet = [
+    "prophet>=1.1",
+]
+lightgbm = [
+    "lightgbm>=4.0",
+    "mlforecast>=0.10",
+]
+neural = [
+    "neuralforecast>=1.6",
+]
+all = [
+    "ts-autopilot[prophet]",
+    "ts-autopilot[lightgbm]",
+    "ts-autopilot[neural]",
 ]
 
 [dependency-groups]

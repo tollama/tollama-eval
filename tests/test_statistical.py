@@ -2,6 +2,7 @@
 
 from ts_autopilot.runners.statistical import (
     AutoARIMARunner,
+    AutoCESRunner,
     AutoETSRunner,
     AutoThetaRunner,
     SeasonalNaiveRunner,
@@ -93,3 +94,24 @@ def test_runner_inherits_stats_forecast_runner_all():
 
     assert isinstance(AutoARIMARunner(), StatsForecastRunner)
     assert isinstance(AutoThetaRunner(), StatsForecastRunner)
+    assert isinstance(AutoCESRunner(), StatsForecastRunner)
+
+
+def test_auto_ces_row_count(tiny_long_df):
+    runner = AutoCESRunner()
+    result = runner.fit_predict(tiny_long_df, horizon=14, freq="D", season_length=7)
+    n_series = tiny_long_df["unique_id"].nunique()
+    assert len(result.y_hat) == n_series * 14
+
+
+def test_auto_ces_model_name(tiny_long_df):
+    runner = AutoCESRunner()
+    result = runner.fit_predict(tiny_long_df, horizon=7, freq="D", season_length=7)
+    assert result.model_name == "CES"
+
+
+def test_make_model_auto_ces():
+    from statsforecast.models import AutoCES
+
+    runner = AutoCESRunner()
+    assert isinstance(runner._make_model(7), AutoCES)

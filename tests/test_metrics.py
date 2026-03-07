@@ -1,9 +1,9 @@
-"""Tests for MASE metric — hand-checkable values."""
+"""Tests for evaluation metrics — hand-checkable values."""
 
 import numpy as np
 import pytest
 
-from ts_autopilot.evaluation.metrics import mase, per_series_mase
+from ts_autopilot.evaluation.metrics import mae, mase, per_series_mase, rmsse, smape
 
 
 def test_mase_perfect_forecast():
@@ -107,3 +107,95 @@ def test_per_series_mase_returns_dict():
     assert set(scores.keys()) == {"s1", "s2"}
     assert scores["s1"] == pytest.approx(0.0)
     assert scores["s2"] == pytest.approx(0.0)
+
+
+# --- SMAPE tests ---
+
+
+def test_smape_perfect_forecast():
+    """Perfect predictions → SMAPE = 0."""
+    y_true = np.array([6.0, 7.0])
+    y_pred = np.array([6.0, 7.0])
+    assert smape(y_true, y_pred) == 0.0
+
+
+def test_smape_known_value():
+    """Hand-check: y_true=[100], y_pred=[110].
+
+    SMAPE = 2 * |100-110| / (100+110) * 100 = 2*10/210*100 ≈ 9.524%
+    """
+    y_true = np.array([100.0])
+    y_pred = np.array([110.0])
+    assert smape(y_true, y_pred) == pytest.approx(9.5238, rel=1e-3)
+
+
+def test_smape_symmetric():
+    """SMAPE is symmetric: swapping true/pred gives same result."""
+    y_true = np.array([1.0, 2.0, 3.0])
+    y_pred = np.array([1.5, 2.5, 2.0])
+    assert smape(y_true, y_pred) == pytest.approx(smape(y_pred, y_true))
+
+
+def test_smape_both_zero():
+    """Both actual and predicted are zero → SMAPE should be 0 (not NaN)."""
+    y_true = np.array([0.0, 1.0])
+    y_pred = np.array([0.0, 1.0])
+    assert smape(y_true, y_pred) == 0.0
+
+
+# --- RMSSE tests ---
+
+
+def test_rmsse_perfect_forecast():
+    """Perfect predictions → RMSSE = 0."""
+    y_train = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    y_true = np.array([6.0, 7.0])
+    y_pred = np.array([6.0, 7.0])
+    assert rmsse(y_true, y_pred, y_train) == 0.0
+
+
+def test_rmsse_known_value():
+    """Hand-check with linear series.
+
+    y_train = [0, 1, 2, 3], diffs (m=1) = [1,1,1], scale = sqrt(mean([1,1,1])) = 1.0
+    y_true = [4, 5], y_pred = [3, 6] → RMSE = sqrt((1+1)/2) = 1.0 → RMSSE = 1.0
+    """
+    y_train = np.array([0.0, 1.0, 2.0, 3.0])
+    y_true = np.array([4.0, 5.0])
+    y_pred = np.array([3.0, 6.0])
+    assert rmsse(y_true, y_pred, y_train) == pytest.approx(1.0)
+
+
+def test_rmsse_zero_scale_raises():
+    """Constant training series → ZeroDivisionError."""
+    y_train = np.array([5.0, 5.0, 5.0, 5.0])
+    y_true = np.array([6.0])
+    y_pred = np.array([5.0])
+    with pytest.raises(ZeroDivisionError):
+        rmsse(y_true, y_pred, y_train)
+
+
+def test_rmsse_short_train_raises():
+    """Too-short training series raises ValueError."""
+    y_train = np.array([1.0])
+    y_true = np.array([2.0])
+    y_pred = np.array([2.0])
+    with pytest.raises(ValueError, match="needs at least"):
+        rmsse(y_true, y_pred, y_train)
+
+
+# --- MAE tests ---
+
+
+def test_mae_perfect_forecast():
+    """Perfect predictions → MAE = 0."""
+    y_true = np.array([1.0, 2.0, 3.0])
+    y_pred = np.array([1.0, 2.0, 3.0])
+    assert mae(y_true, y_pred) == 0.0
+
+
+def test_mae_known_value():
+    """MAE([4,5], [3,6]) = (1+1)/2 = 1.0."""
+    y_true = np.array([4.0, 5.0])
+    y_pred = np.array([3.0, 6.0])
+    assert mae(y_true, y_pred) == pytest.approx(1.0)
