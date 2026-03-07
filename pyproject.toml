@@ -74,10 +74,14 @@ lightgbm = [
 neural = [
     "neuralforecast>=1.6",
 ]
+pdf = [
+    "weasyprint>=60.0",
+]
 all = [
     "ts-autopilot[prophet]",
     "ts-autopilot[lightgbm]",
     "ts-autopilot[neural]",
+    "ts-autopilot[pdf]",
 ]
 
 [dependency-groups]
