@@ -137,3 +137,80 @@ def test_report_no_warnings_section(benchmark_result):
 def test_report_print_css(benchmark_result):
     html = render_report(benchmark_result)
     assert "@media print" in html
+
+
+def test_report_version_is_dynamic(benchmark_result):
+    from ts_autopilot import __version__
+
+    html = render_report(benchmark_result)
+    assert f"v{__version__}" in html
+
+
+def test_report_empty_leaderboard(benchmark_result_with_warnings):
+    """Report renders without errors when leaderboard is empty."""
+    html = render_report(benchmark_result_with_warnings)
+    assert "Leaderboard" in html
+    # Bar chart section exists but has no bar rows
+    assert "bar-chart" in html
+
+
+def test_report_per_series_breakdown():
+    """Report shows per-series breakdown when series_scores present."""
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=2, frequency="D", missing_ratio=0.0,
+            season_length_guess=7, min_length=60, max_length=60,
+            total_rows=120,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[
+            ModelResult(
+                name="AutoETS",
+                runtime_sec=0.5,
+                folds=[
+                    FoldResult(
+                        fold=1, cutoff="2020-06-01", mase=0.91,
+                        series_scores={"s1": 0.85, "s2": 0.97},
+                    ),
+                    FoldResult(
+                        fold=2, cutoff="2020-07-01", mase=0.95,
+                        series_scores={"s1": 0.90, "s2": 1.00},
+                    ),
+                ],
+                mean_mase=0.93,
+                std_mase=0.02,
+            ),
+        ],
+        leaderboard=[
+            LeaderboardEntry(rank=1, name="AutoETS", mean_mase=0.93),
+        ],
+    )
+    html = render_report(result)
+    assert "Per-Series Breakdown" in html
+    assert "s1" in html
+    assert "s2" in html
+
+
+def test_report_no_per_series_without_scores(benchmark_result):
+    """Report omits per-series section when series_scores are empty."""
+    html = render_report(benchmark_result)
+    assert "Per-Series Breakdown" not in html
+
+
+def test_report_tollama_interpretation():
+    """Report includes tollama interpretation when provided."""
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=1, frequency="D", missing_ratio=0.0,
+            season_length_guess=7, min_length=60, max_length=60,
+            total_rows=60,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[],
+        leaderboard=[],
+    )
+    html = render_report(
+        result, tollama_interpretation="Test interpretation."
+    )
+    assert "LLM Interpretation" in html
+    assert "Test interpretation." in html

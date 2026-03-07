@@ -23,18 +23,25 @@ from ts_autopilot.contracts import (
     ResultMetadata,
 )
 from ts_autopilot.evaluation.cross_validation import make_expanding_splits
-from ts_autopilot.evaluation.metrics import mean_mase_per_fold
+from ts_autopilot.evaluation.metrics import per_series_mase
 from ts_autopilot.ingestion.loader import load_csv
 from ts_autopilot.ingestion.profiler import profile_dataframe
 from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
-from ts_autopilot.runners.statistical import AutoETSRunner, SeasonalNaiveRunner
+from ts_autopilot.runners.statistical import (
+    AutoARIMARunner,
+    AutoETSRunner,
+    AutoThetaRunner,
+    SeasonalNaiveRunner,
+)
 
 logger = get_logger("pipeline")
 
 DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
     SeasonalNaiveRunner(),
     AutoETSRunner(),
+    AutoARIMARunner(),
+    AutoThetaRunner(),
 )
 
 
@@ -150,6 +157,7 @@ def _fit_predict_with_retry(
     horizon: int,
     freq: str,
     season_length: int,
+    n_jobs: int = 1,
 ) -> ForecastOutput:
     """Call runner.fit_predict with retry on transient failures.
 
@@ -165,6 +173,7 @@ def _fit_predict_with_retry(
                 horizon=horizon,
                 freq=freq,
                 season_length=season_length,
+                n_jobs=n_jobs,
             )
         except (RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
             last_exc = exc
@@ -200,6 +209,7 @@ def run_benchmark(
     runners: list[BaseRunner] | None = None,
     model_names: list[str] | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
+    n_jobs: int = 1,
 ) -> BenchmarkResult:
     """Run the full benchmark pipeline (pure logic, no I/O).
 
@@ -285,6 +295,7 @@ def run_benchmark(
                 horizon=horizon,
                 freq=profile.frequency,
                 season_length=profile.season_length_guess,
+                n_jobs=n_jobs,
             )
             total_runtime += output.runtime_sec
 
@@ -297,18 +308,25 @@ def run_benchmark(
                 }
             )
 
-            fold_mase = mean_mase_per_fold(
+            series_scores = per_series_mase(
                 forecast_df=pred_df,
                 actuals_df=split.test,
                 train_df=split.train,
                 season_length=profile.season_length_guess,
                 model_col=output.model_name,
             )
+            fold_mase = float(
+                np.mean(list(series_scores.values()))
+            )
             fold_results.append(
                 FoldResult(
                     fold=split.fold,
                     cutoff=split.cutoff.isoformat(),
                     mase=round(fold_mase, 6),
+                    series_scores={
+                        k: round(v, 6)
+                        for k, v in series_scores.items()
+                    },
                 )
             )
 
@@ -389,6 +407,8 @@ def run_from_csv(
     output_dir: str | Path,
     model_names: list[str] | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
+    tollama_interpretation: str | None = None,
+    n_jobs: int = 1,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html."""
     from ts_autopilot.reporting.html_report import render_report
@@ -407,6 +427,7 @@ def run_from_csv(
         n_folds=n_folds,
         model_names=model_names,
         progress_callback=progress_callback,
+        n_jobs=n_jobs,
     )
 
     # Attach metadata
@@ -422,7 +443,10 @@ def run_from_csv(
 
     # Atomic write report.html
     report_path = output_dir / "report.html"
-    _atomic_write(report_path, render_report(result))
+    _atomic_write(
+        report_path,
+        render_report(result, tollama_interpretation=tollama_interpretation),
+    )
     logger.info("Wrote %s", report_path)
 
     return result

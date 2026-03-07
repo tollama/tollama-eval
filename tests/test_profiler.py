@@ -60,6 +60,32 @@ def test_profile_weekly_data():
     assert profile.season_length_guess == 52
 
 
+def test_guess_season_length_unknown_freq_falls_back():
+    assert _guess_season_length("XYZ") == 1
+    assert _guess_season_length("") == 1
+
+
+def test_profile_infers_fallback_freq_when_irregular():
+    """Irregular dates should fall back to 'D'."""
+    dates = pd.to_datetime(["2020-01-01", "2020-01-05", "2020-01-20"])
+    df = pd.DataFrame({"unique_id": "s1", "ds": dates, "y": [1.0, 2.0, 3.0]})
+    profile = profile_dataframe(df)
+    assert profile.frequency == "D"  # fallback
+
+
+def test_profile_single_row_series():
+    df = pd.DataFrame({
+        "unique_id": ["s1"],
+        "ds": pd.to_datetime(["2020-01-01"]),
+        "y": [1.0],
+    })
+    profile = profile_dataframe(df)
+    assert profile.n_series == 1
+    assert profile.min_length == 1
+    assert profile.total_rows == 1
+
+
+
 def test_frequency_fallback_logs_warning(caplog):
     """When frequency can't be inferred, a warning should be logged."""
     import logging

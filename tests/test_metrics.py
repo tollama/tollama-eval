@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from ts_autopilot.evaluation.metrics import mase
+from ts_autopilot.evaluation.metrics import mase, per_series_mase
 
 
 def test_mase_perfect_forecast():
@@ -75,3 +75,29 @@ def test_mase_short_train_raises():
     y_pred = np.array([2.0])
     with pytest.raises(ValueError, match="needs at least"):
         mase(y_true, y_pred, y_train)
+
+
+def test_per_series_mase_returns_dict():
+    """per_series_mase returns dict keyed by unique_id."""
+    import pandas as pd
+
+    train = pd.DataFrame({
+        "unique_id": ["s1"] * 10 + ["s2"] * 10,
+        "ds": list(pd.date_range("2020-01-01", periods=10, freq="D")) * 2,
+        "y": list(range(10)) + list(range(0, 20, 2)),
+    })
+    actuals = pd.DataFrame({
+        "unique_id": ["s1", "s2"],
+        "ds": [pd.Timestamp("2020-01-11")] * 2,
+        "y": [10.0, 20.0],
+    })
+    forecast = pd.DataFrame({
+        "unique_id": ["s1", "s2"],
+        "ds": [pd.Timestamp("2020-01-11")] * 2,
+        "model": [10.0, 20.0],
+    })
+    scores = per_series_mase(forecast, actuals, train, 1, "model")
+    assert isinstance(scores, dict)
+    assert set(scores.keys()) == {"s1", "s2"}
+    assert scores["s1"] == pytest.approx(0.0)
+    assert scores["s2"] == pytest.approx(0.0)

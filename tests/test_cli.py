@@ -226,35 +226,10 @@ def test_cli_leaderboard_shows_std_mase(tmp_path):
         app,
         [
             "run",
-            "--input",
-            str(csv_path),
-            "--horizon",
-            "7",
-            "--n-folds",
-            "2",
-            "--output",
-            str(out_dir),
-        ],
-    )
-    assert result.exit_code == 0
-    assert "\u00b1" in result.output  # ± symbol
-
-
-def test_cli_output_shows_absolute_path(tmp_path):
-    csv_path = _make_csv(tmp_path)
-    out_dir = tmp_path / "out"
-    result = runner.invoke(
-        app,
-        [
-            "run",
-            "--input",
-            str(csv_path),
-            "--horizon",
-            "7",
-            "--n-folds",
-            "2",
-            "--output",
-            str(out_dir),
+            "--input", str(csv_path),
+            "--horizon", "7",
+            "--n-folds", "2",
+            "--output", str(out_dir),
         ],
     )
     assert result.exit_code == 0

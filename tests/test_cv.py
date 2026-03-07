@@ -64,3 +64,23 @@ def test_single_series():
     assert len(splits) == 3
     for split in splits:
         assert set(split.test["unique_id"]) == {"only"}
+
+
+def test_cutoff_uses_max_across_series():
+    """When series have different date ranges, cutoff should be the max."""
+    # s1 starts earlier, s2 starts later but both have 30 rows
+    s1_dates = pd.date_range("2020-01-01", periods=30, freq="D")
+    s2_dates = pd.date_range("2020-02-01", periods=30, freq="D")
+    rows = []
+    for d in s1_dates:
+        rows.append({"unique_id": "s1", "ds": d, "y": 1.0})
+    for d in s2_dates:
+        rows.append({"unique_id": "s2", "ds": d, "y": 2.0})
+    df = pd.DataFrame(rows)
+
+    splits = make_expanding_splits(df, horizon=7, n_folds=3)
+    s2_dates = set(df[df["unique_id"] == "s2"]["ds"])
+    for split in splits:
+        # Cutoff should be from the later series (s2)
+        assert isinstance(split.cutoff, pd.Timestamp)
+        assert split.cutoff in s2_dates

@@ -71,6 +71,7 @@ def test_oversized_file_rejected(tmp_path):
     csv = tmp_path / "big.csv"
     csv.write_text("unique_id,ds,y\ns1,2020-01-01,1.0\n")
 
+    # Patch stat to report a huge file
     real_stat = csv.stat
 
     class FakeStat:

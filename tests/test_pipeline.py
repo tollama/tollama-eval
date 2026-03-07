@@ -9,8 +9,8 @@ from ts_autopilot.pipeline import generate_warnings, run_benchmark, run_from_csv
 def test_run_benchmark_returns_result(tiny_long_df):
     result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
     assert isinstance(result, BenchmarkResult)
-    assert len(result.models) == 2
-    assert len(result.leaderboard) == 2
+    assert len(result.models) == 4
+    assert len(result.leaderboard) == 4
 
 
 def test_leaderboard_sorted_by_mase(tiny_long_df):
@@ -22,13 +22,13 @@ def test_leaderboard_sorted_by_mase(tiny_long_df):
 def test_leaderboard_ranks_correct(tiny_long_df):
     result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
     ranks = [e.rank for e in result.leaderboard]
-    assert ranks == [1, 2]
+    assert ranks == [1, 2, 3, 4]
 
 
 def test_model_names_are_known(tiny_long_df):
     result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
     names = {m.name for m in result.models}
-    assert names == {"SeasonalNaive", "AutoETS"}
+    assert names == {"SeasonalNaive", "AutoETS", "AutoARIMA", "AutoTheta"}
 
 
 def test_each_model_has_correct_folds(tiny_long_df):
@@ -77,8 +77,8 @@ def test_results_json_schema(tmp_path):
     assert {"profile", "config", "models", "leaderboard"} <= set(data.keys())
     assert data["config"]["horizon"] == 7
     assert data["config"]["n_folds"] == 2
-    assert len(data["models"]) == 2
-    assert len(data["leaderboard"]) == 2
+    assert len(data["models"]) == 4
+    assert len(data["leaderboard"]) == 4
 
 
 def test_model_names_filter(tiny_long_df):
@@ -109,8 +109,8 @@ def test_progress_callback_called(tiny_long_df):
     run_benchmark(tiny_long_df, horizon=7, n_folds=2, progress_callback=cb)
     model_calls = [c for c in calls if c[0] == "model"]
     fold_calls = [c for c in calls if c[0] == "fold"]
-    assert len(model_calls) == 2  # 2 runners
-    assert len(fold_calls) == 4  # 2 folds x 2 runners
+    assert len(model_calls) == 4  # 4 runners
+    assert len(fold_calls) == 8  # 2 folds x 4 runners
 
 
 def test_generate_warnings_short_series():
@@ -173,6 +173,26 @@ def test_generate_warnings_clean_data():
 def test_result_includes_warnings(tiny_long_df):
     result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
     assert isinstance(result.warnings, list)
+
+
+def test_default_runners_is_immutable():
+    """DEFAULT_RUNNERS should be a tuple to prevent accidental mutation."""
+    from ts_autopilot.pipeline import DEFAULT_RUNNERS
+
+    assert isinstance(DEFAULT_RUNNERS, tuple)
+
+
+def test_fold_results_contain_series_scores(tiny_long_df):
+    """Per-series MASE scores are captured in fold results."""
+    result = run_benchmark(
+        tiny_long_df, horizon=7, n_folds=2, model_names=["SeasonalNaive"]
+    )
+    for model in result.models:
+        for fold in model.folds:
+            assert isinstance(fold.series_scores, dict)
+            assert len(fold.series_scores) > 0
+            input_uids = set(tiny_long_df["unique_id"].unique())
+            assert set(fold.series_scores.keys()) == input_uids
 
 
 def test_warnings_are_deduplicated(tiny_long_df):
