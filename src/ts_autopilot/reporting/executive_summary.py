@@ -126,7 +126,84 @@ def generate_executive_summary(result: BenchmarkResult) -> str:
             f"a SMAPE of {winner.mean_smape:.2f}%."
         )
 
+    # Model comparison narrative
+    if len(lb) >= 3:
+        lines.append(_model_comparison_narrative(result))
+
+    # Ensemble recommendation hint
+    if len(models) >= 2 and _has_per_series_scores(result):
+        ensemble_hint = _ensemble_hint(result)
+        if ensemble_hint:
+            lines.append(ensemble_hint)
+
     return " ".join(lines)
+
+
+def _has_per_series_scores(result: BenchmarkResult) -> bool:
+    """Check if any model has per-series breakdown scores."""
+    for model in result.models:
+        for fold in model.folds:
+            if fold.series_scores:
+                return True
+    return False
+
+
+def _model_comparison_narrative(result: BenchmarkResult) -> str:
+    """Generate a comparative narrative when 3+ models are present."""
+    lb = result.leaderboard
+    models = result.models
+
+    # Group by performance tiers
+    beats_naive = [e for e in lb if e.mean_mase < 1.0]
+    worse_than = [e for e in lb if e.mean_mase > 1.0]
+
+    parts: list[str] = []
+    if beats_naive:
+        names = ", ".join(e.name for e in beats_naive)
+        parts.append(
+            f"{len(beats_naive)} model{'s' if len(beats_naive) != 1 else ''} "
+            f"({names}) beat the naive baseline."
+        )
+    if worse_than:
+        parts.append(
+            f"{len(worse_than)} model{'s' if len(worse_than) != 1 else ''} "
+            f"scored worse than naive."
+        )
+
+    # Speed vs accuracy trade-off
+    if len(models) >= 2:
+        fastest = min(models, key=lambda m: m.runtime_sec)
+        best = next((m for m in models if m.name == lb[0].name), None)
+        if best and fastest.name != best.name:
+            speedup = (best.runtime_sec / fastest.runtime_sec
+                       if fastest.runtime_sec > 0 else 0)
+            if speedup > 2:
+                parts.append(
+                    f"{fastest.name} runs {speedup:.1f}x faster than "
+                    f"{best.name}, offering a speed-accuracy trade-off."
+                )
+
+    return " ".join(parts) if parts else ""
+
+
+def _ensemble_hint(result: BenchmarkResult) -> str:
+    """Hint about potential ensemble improvement."""
+    from ts_autopilot.evaluation.ensemble import recommend_ensemble
+
+    rec = recommend_ensemble(result)
+    if rec.n_series < 2 or len(rec.model_win_counts) < 2:
+        return ""
+
+    # Only mention if virtual ensemble is materially better than winner
+    winner_mase = result.leaderboard[0].mean_mase if result.leaderboard else 0
+    if winner_mase > 0 and rec.avg_ensemble_mase < winner_mase * 0.95:
+        improvement = (1 - rec.avg_ensemble_mase / winner_mase) * 100
+        return (
+            f"A per-series ensemble (selecting the best model for each "
+            f"series) could improve MASE by ~{improvement:.1f}% "
+            f"to {rec.avg_ensemble_mase:.4f}."
+        )
+    return ""
 
 
 def _find_worst_series(model: ModelResult) -> tuple[str, float] | None:

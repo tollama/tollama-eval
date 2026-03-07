@@ -48,6 +48,12 @@ def callback(
     """Automated time series benchmarking."""
 
 
+_INPUT_DIR_OPTION = typer.Option(
+    ...,
+    "--input-dir",
+    "-d",
+    help="Directory containing CSV files to benchmark.",
+)
 _INPUT_OPTION = typer.Option(
     None,
     "--input",
@@ -437,6 +443,110 @@ def run(
             fg=typer.colors.GREEN,
         )
     typer.echo(f"Completed in {elapsed:.2f}s")
+
+
+@app.command()
+def campaign(
+    input_dir: Path = _INPUT_DIR_OPTION,
+    output: Path = _OUTPUT_OPTION,
+    horizon: int = typer.Option(
+        14, "--horizon", "-H", help="Forecast horizon.", min=1,
+    ),
+    n_folds: int = typer.Option(
+        3, "--n-folds", "-k", help="Number of CV folds.", min=1,
+    ),
+    models: str | None = typer.Option(
+        None, "--models", "-m",
+        help="Comma-separated list of models.",
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Suppress output.",
+    ),
+) -> None:
+    """Run benchmarks across multiple CSV files in a directory."""
+    from ts_autopilot.pipeline import run_from_csv
+
+    csv_files = sorted(input_dir.glob("*.csv"))
+    if not csv_files:
+        typer.secho(
+            f"No CSV files found in {input_dir}",
+            fg=typer.colors.RED, err=True,
+        )
+        raise typer.Exit(code=ExitCode.DATA_ERROR)
+
+    model_names = None
+    if models is not None:
+        model_names = [m.strip() for m in models.split(",") if m.strip()]
+
+    if not quiet:
+        typer.secho(
+            f"Campaign: {len(csv_files)} datasets in {input_dir}",
+            bold=True,
+        )
+
+    results_summary: list[dict] = []
+    t0 = time.perf_counter()
+
+    for i, csv_path in enumerate(csv_files, 1):
+        dataset_name = csv_path.stem
+        dataset_out = output / dataset_name
+
+        if not quiet:
+            typer.echo(f"\n[{i}/{len(csv_files)}] {csv_path.name}")
+
+        try:
+            result = run_from_csv(
+                csv_path=csv_path,
+                horizon=horizon,
+                n_folds=n_folds,
+                output_dir=dataset_out,
+                model_names=model_names,
+            )
+            winner = result.leaderboard[0] if result.leaderboard else None
+            entry = {
+                "dataset": dataset_name,
+                "status": "ok",
+                "n_series": result.profile.n_series,
+                "best_model": winner.name if winner else "N/A",
+                "best_mase": winner.mean_mase if winner else None,
+            }
+            results_summary.append(entry)
+            if not quiet and winner:
+                typer.secho(
+                    f"  Best: {winner.name} "
+                    f"(MASE={winner.mean_mase:.4f})",
+                    fg=typer.colors.GREEN,
+                )
+        except Exception as exc:
+            results_summary.append({
+                "dataset": dataset_name,
+                "status": f"error: {exc}",
+                "n_series": 0,
+                "best_model": "N/A",
+                "best_mase": None,
+            })
+            if not quiet:
+                typer.secho(
+                    f"  Error: {exc}", fg=typer.colors.RED,
+                )
+
+    elapsed = time.perf_counter() - t0
+
+    # Write campaign summary CSV
+    import pandas as pd
+
+    summary_df = pd.DataFrame(results_summary)
+    output.mkdir(parents=True, exist_ok=True)
+    summary_path = output / "campaign_summary.csv"
+    summary_df.to_csv(summary_path, index=False)
+
+    if not quiet:
+        typer.echo("")
+        typer.secho("Campaign Summary:", bold=True)
+        ok = sum(1 for r in results_summary if r["status"] == "ok")
+        typer.echo(f"  {ok}/{len(csv_files)} datasets succeeded")
+        typer.echo(f"  Results: {summary_path.resolve()}")
+        typer.echo(f"  Completed in {elapsed:.2f}s")
 
 
 if __name__ == "__main__":
