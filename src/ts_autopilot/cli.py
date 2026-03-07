@@ -49,13 +49,10 @@ def callback(
 
 
 _INPUT_OPTION = typer.Option(
-    ...,
+    None,
     "--input",
     "-i",
     help="Path to input CSV file (long or wide format).",
-    exists=True,
-    file_okay=True,
-    readable=True,
 )
 _OUTPUT_OPTION = typer.Option(
     Path("out/"),
@@ -63,11 +60,17 @@ _OUTPUT_OPTION = typer.Option(
     "-o",
     help="Output directory for results.json and report.html.",
 )
+_CONFIG_OPTION = typer.Option(
+    None,
+    "--config",
+    "-c",
+    help="Path to YAML or JSON config file.",
+)
 
 
 @app.command()
 def run(
-    input: Path = _INPUT_OPTION,
+    input: Path | None = _INPUT_OPTION,
     horizon: int = typer.Option(
         14,
         "--horizon",
@@ -83,7 +86,7 @@ def run(
         min=1,
     ),
     output: Path = _OUTPUT_OPTION,
-    models: str = typer.Option(
+    models: str | None = typer.Option(
         None,
         "--models",
         "-m",
@@ -111,11 +114,51 @@ def run(
         "--no-tollama",
         help="Disable tollama integration even if URL is provided.",
     ),
+    config: Path | None = _CONFIG_OPTION,
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
     from ts_autopilot.ingestion.loader import SchemaError
     from ts_autopilot.logging_config import setup_logging
     from ts_autopilot.pipeline import run_from_csv
+
+    # Load config file and merge with CLI flags (CLI wins)
+    if config is not None:
+        from ts_autopilot.config import load_config
+
+        try:
+            file_cfg = load_config(config)
+        except (FileNotFoundError, ValueError) as exc:
+            typer.secho(f"Config error: {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
+
+        if input is None and file_cfg.input:
+            input = Path(file_cfg.input)
+        if file_cfg.output and output == Path("out/"):
+            output = Path(file_cfg.output)
+        if file_cfg.horizon is not None and horizon == 14:
+            horizon = file_cfg.horizon
+        if file_cfg.n_folds is not None and n_folds == 3:
+            n_folds = file_cfg.n_folds
+        if file_cfg.models and models is None:
+            models = ",".join(file_cfg.models)
+        if file_cfg.tollama_url and tollama_url is None:
+            tollama_url = file_cfg.tollama_url
+
+    if input is None:
+        typer.secho(
+            "Error: --input is required (via CLI flag or config file).",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.DATA_ERROR)
+
+    if not input.exists():
+        typer.secho(
+            f"Error: Input file not found: {input}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.DATA_ERROR)
 
     # Initialize structured logging
     setup_logging(verbose=verbose, quiet=quiet)
