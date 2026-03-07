@@ -126,6 +126,11 @@ def run(
         "--pdf",
         help="Generate PDF report (requires weasyprint).",
     ),
+    log_json: bool = typer.Option(
+        False,
+        "--log-json",
+        help="Emit structured JSON logs to stderr.",
+    ),
     config: Path | None = _CONFIG_OPTION,
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
@@ -175,7 +180,7 @@ def run(
         raise typer.Exit(code=ExitCode.DATA_ERROR)
 
     # Initialize structured logging
-    setup_logging(verbose=verbose, quiet=quiet)
+    setup_logging(verbose=verbose, quiet=quiet, log_json=log_json)
 
     model_names = None
     if models is not None:

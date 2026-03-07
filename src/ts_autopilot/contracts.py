@@ -267,6 +267,21 @@ class BenchmarkResult:
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent)
 
+    def to_details_dict(self) -> dict[str, Any]:
+        """Serialize forecast_data and diagnostics for report reproducibility.
+
+        Kept separate from results.json to honour the frozen schema.
+        """
+        d: dict[str, Any] = {}
+        if self.forecast_data:
+            d["forecast_data"] = [fd.to_dict() for fd in self.forecast_data]
+        if self.diagnostics:
+            d["diagnostics"] = [diag.to_dict() for diag in self.diagnostics]
+        return d
+
+    def to_details_json(self, indent: int = 2) -> str:
+        return json.dumps(self.to_details_dict(), indent=indent)
+
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> BenchmarkResult:
         metadata = None
@@ -279,6 +294,12 @@ class BenchmarkResult:
             leaderboard=[LeaderboardEntry.from_dict(e) for e in d["leaderboard"]],
             warnings=d.get("warnings", []),
             metadata=metadata,
+            forecast_data=[
+                ForecastData.from_dict(fd) for fd in d.get("forecast_data", [])
+            ],
+            diagnostics=[
+                DiagnosticsResult.from_dict(diag) for diag in d.get("diagnostics", [])
+            ],
         )
 
     @classmethod

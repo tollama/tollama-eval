@@ -31,5 +31,5 @@ jobs:
         run: pip install uv
       - name: Install deps
         run: uv pip install -e ".[dev]" --system
-      - name: Run tests
-        run: python -m pytest tests/
+      - name: Run tests with coverage
+        run: python -m pytest tests/ --cov=ts_autopilot --cov-report=term-missing --cov-fail-under=80

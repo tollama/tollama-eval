@@ -546,6 +546,13 @@ def run_from_csv(
     _atomic_write(results_path, result.to_json(indent=2))
     logger.info("Wrote %s", results_path)
 
+    # Atomic write details.json (forecast data + diagnostics for report reproducibility)
+    details = result.to_details_dict()
+    if details:
+        details_path = output_dir / "details.json"
+        _atomic_write(details_path, result.to_details_json(indent=2))
+        logger.info("Wrote %s", details_path)
+
     # Atomic write report.html
     report_path = output_dir / "report.html"
     _atomic_write(
