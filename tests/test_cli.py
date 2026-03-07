@@ -68,7 +68,8 @@ def test_cli_missing_input_fails():
     assert result.exit_code != 0
 
 
-def test_cli_help_shows_reserved_flags():
+def test_cli_help_shows_reserved_flags(monkeypatch):
+    monkeypatch.setenv("COLUMNS", "200")
     result = runner.invoke(app, ["run", "--help"])
     assert "--tollama-url" in result.output
     assert "--no-tollama" in result.output
@@ -212,7 +213,8 @@ def test_cli_summary_shows_best_model(tmp_path):
     assert "Completed in" in result.output
 
 
-def test_cli_help_shows_models_flag():
+def test_cli_help_shows_models_flag(monkeypatch):
+    monkeypatch.setenv("COLUMNS", "200")
     result = runner.invoke(app, ["run", "--help"])
     assert "--models" in result.output
     assert "--verbose" in result.output
