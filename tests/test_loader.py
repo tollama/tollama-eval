@@ -84,3 +84,11 @@ def test_oversized_file_rejected(tmp_path):
         pytest.raises(ValueError, match="exceeding"),
     ):
         load_csv(csv)
+
+
+def test_wide_format_rejects_out_of_range_dates(tmp_path):
+    """Wide format with dates outside 1900-2100 should be rejected."""
+    csv = tmp_path / "bad_wide.csv"
+    csv.write_text("date,series_a\n1800-01-01,1.0\n1800-02-01,2.0\n1800-03-01,3.0\n")
+    with pytest.raises(SchemaError, match="misparse"):
+        load_csv(csv)

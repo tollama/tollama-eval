@@ -173,3 +173,9 @@ def test_generate_warnings_clean_data():
 def test_result_includes_warnings(tiny_long_df):
     result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
     assert isinstance(result.warnings, list)
+
+
+def test_warnings_are_deduplicated(tiny_long_df):
+    """Duplicate warnings should be removed from benchmark results."""
+    result = run_benchmark(tiny_long_df, horizon=7, n_folds=2)
+    assert len(result.warnings) == len(set(result.warnings))
