@@ -55,6 +55,9 @@ class FoldResult:
     fold: int  # 1-indexed
     cutoff: str  # ISO 8601 string of last training date
     mase: float
+    smape: float = 0.0
+    rmsse: float = 0.0
+    mae: float = 0.0
     series_scores: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,6 +72,9 @@ class FoldResult:
             fold=d["fold"],
             cutoff=d["cutoff"],
             mase=d["mase"],
+            smape=d.get("smape", 0.0),
+            rmsse=d.get("rmsse", 0.0),
+            mae=d.get("mae", 0.0),
             series_scores=d.get("series_scores", {}),
         )
 
@@ -80,6 +86,9 @@ class ModelResult:
     folds: list[FoldResult]
     mean_mase: float
     std_mase: float
+    mean_smape: float = 0.0
+    mean_rmsse: float = 0.0
+    mean_mae: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -88,13 +97,23 @@ class ModelResult:
             "folds": [f.to_dict() for f in self.folds],
             "mean_mase": self.mean_mase,
             "std_mase": self.std_mase,
+            "mean_smape": self.mean_smape,
+            "mean_rmsse": self.mean_rmsse,
+            "mean_mae": self.mean_mae,
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ModelResult:
-        d = dict(d)
-        d["folds"] = [FoldResult.from_dict(f) for f in d["folds"]]
-        return cls(**d)
+        return cls(
+            name=d["name"],
+            runtime_sec=d["runtime_sec"],
+            folds=[FoldResult.from_dict(f) for f in d["folds"]],
+            mean_mase=d["mean_mase"],
+            std_mase=d["std_mase"],
+            mean_smape=d.get("mean_smape", 0.0),
+            mean_rmsse=d.get("mean_rmsse", 0.0),
+            mean_mae=d.get("mean_mae", 0.0),
+        )
 
 
 @dataclass
@@ -102,13 +121,23 @@ class LeaderboardEntry:
     rank: int
     name: str
     mean_mase: float
+    mean_smape: float = 0.0
+    mean_rmsse: float = 0.0
+    mean_mae: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> LeaderboardEntry:
-        return cls(**d)
+        return cls(
+            rank=d["rank"],
+            name=d["name"],
+            mean_mase=d["mean_mase"],
+            mean_smape=d.get("mean_smape", 0.0),
+            mean_rmsse=d.get("mean_rmsse", 0.0),
+            mean_mae=d.get("mean_mae", 0.0),
+        )
 
 
 @dataclass

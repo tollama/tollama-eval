@@ -3,7 +3,16 @@
 import numpy as np
 import pytest
 
-from ts_autopilot.evaluation.metrics import mae, mase, per_series_mase, rmsse, smape
+from ts_autopilot.evaluation.metrics import (
+    mae,
+    mase,
+    per_series_mae,
+    per_series_mase,
+    per_series_rmsse,
+    per_series_smape,
+    rmsse,
+    smape,
+)
 
 
 def test_mase_perfect_forecast():
@@ -199,3 +208,79 @@ def test_mae_known_value():
     y_true = np.array([4.0, 5.0])
     y_pred = np.array([3.0, 6.0])
     assert mae(y_true, y_pred) == pytest.approx(1.0)
+
+
+# --- season_length=0 validation ---
+
+
+def test_mase_season_length_zero_raises():
+    """season_length=0 must raise ValueError."""
+    y_train = np.array([1.0, 2.0, 3.0])
+    y_true = np.array([4.0])
+    y_pred = np.array([4.0])
+    with pytest.raises(ValueError, match="season_length must be >= 1"):
+        mase(y_true, y_pred, y_train, season_length=0)
+
+
+def test_rmsse_season_length_zero_raises():
+    """season_length=0 must raise ValueError."""
+    y_train = np.array([1.0, 2.0, 3.0])
+    y_true = np.array([4.0])
+    y_pred = np.array([4.0])
+    with pytest.raises(ValueError, match="season_length must be >= 1"):
+        rmsse(y_true, y_pred, y_train, season_length=0)
+
+
+# --- per_series_smape / per_series_rmsse / per_series_mae ---
+
+
+def _make_fold_dfs():
+    """Helper: create train/actuals/forecast DataFrames for 2 series."""
+    import pandas as pd
+
+    train = pd.DataFrame(
+        {
+            "unique_id": ["s1"] * 10 + ["s2"] * 10,
+            "ds": list(pd.date_range("2020-01-01", periods=10, freq="D")) * 2,
+            "y": list(range(10)) + list(range(0, 20, 2)),
+        }
+    )
+    actuals = pd.DataFrame(
+        {
+            "unique_id": ["s1", "s2"],
+            "ds": [pd.Timestamp("2020-01-11")] * 2,
+            "y": [10.0, 20.0],
+        }
+    )
+    forecast = pd.DataFrame(
+        {
+            "unique_id": ["s1", "s2"],
+            "ds": [pd.Timestamp("2020-01-11")] * 2,
+            "model": [10.0, 20.0],  # perfect predictions
+        }
+    )
+    return train, actuals, forecast
+
+
+def test_per_series_smape_perfect():
+    _train, actuals, forecast = _make_fold_dfs()
+    scores = per_series_smape(forecast, actuals, "model")
+    assert set(scores.keys()) == {"s1", "s2"}
+    assert scores["s1"] == pytest.approx(0.0)
+    assert scores["s2"] == pytest.approx(0.0)
+
+
+def test_per_series_rmsse_perfect():
+    train, actuals, forecast = _make_fold_dfs()
+    scores = per_series_rmsse(forecast, actuals, train, 1, "model")
+    assert set(scores.keys()) == {"s1", "s2"}
+    assert scores["s1"] == pytest.approx(0.0)
+    assert scores["s2"] == pytest.approx(0.0)
+
+
+def test_per_series_mae_perfect():
+    _train, actuals, forecast = _make_fold_dfs()
+    scores = per_series_mae(forecast, actuals, "model")
+    assert set(scores.keys()) == {"s1", "s2"}
+    assert scores["s1"] == pytest.approx(0.0)
+    assert scores["s2"] == pytest.approx(0.0)

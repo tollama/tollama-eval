@@ -62,6 +62,11 @@ def rmsse(
     y_pred = np.asarray(y_pred, dtype=float)
     y_train = np.asarray(y_train, dtype=float)
 
+    if season_length < 1:
+        raise ValueError(
+            f"season_length must be >= 1, got {season_length}."
+        )
+
     if len(y_train) < season_length + 1:
         raise ValueError(
             f"y_train has {len(y_train)} observations, needs at least "
@@ -126,6 +131,11 @@ def mase(
     y_pred = np.asarray(y_pred, dtype=float)
     y_train = np.asarray(y_train, dtype=float)
 
+    if season_length < 1:
+        raise ValueError(
+            f"season_length must be >= 1, got {season_length}."
+        )
+
     if len(y_train) < season_length + 1:
         raise ValueError(
             f"y_train has {len(y_train)} observations, needs at least "
@@ -173,6 +183,73 @@ def per_series_mase(
 
         scores[str(uid)] = mase(actual_series, pred_series, train_series, season_length)
 
+    return scores
+
+
+def per_series_smape(
+    forecast_df: pd.DataFrame,
+    actuals_df: pd.DataFrame,
+    model_col: str,
+) -> dict[str, float]:
+    """Compute SMAPE for each series in a single fold."""
+    scores: dict[str, float] = {}
+    for uid in actuals_df["unique_id"].unique():
+        actual_series = (
+            actuals_df.loc[actuals_df["unique_id"] == uid].sort_values("ds")["y"].values
+        )
+        pred_series = (
+            forecast_df.loc[forecast_df["unique_id"] == uid]
+            .sort_values("ds")[model_col]
+            .values
+        )
+        scores[str(uid)] = smape(actual_series, pred_series)
+    return scores
+
+
+def per_series_rmsse(
+    forecast_df: pd.DataFrame,
+    actuals_df: pd.DataFrame,
+    train_df: pd.DataFrame,
+    season_length: int,
+    model_col: str,
+) -> dict[str, float]:
+    """Compute RMSSE for each series in a single fold."""
+    scores: dict[str, float] = {}
+    for uid in actuals_df["unique_id"].unique():
+        actual_series = (
+            actuals_df.loc[actuals_df["unique_id"] == uid].sort_values("ds")["y"].values
+        )
+        pred_series = (
+            forecast_df.loc[forecast_df["unique_id"] == uid]
+            .sort_values("ds")[model_col]
+            .values
+        )
+        train_series = (
+            train_df.loc[train_df["unique_id"] == uid].sort_values("ds")["y"].values
+        )
+        scores[str(uid)] = rmsse(
+            actual_series, pred_series, train_series, season_length
+        )
+    return scores
+
+
+def per_series_mae(
+    forecast_df: pd.DataFrame,
+    actuals_df: pd.DataFrame,
+    model_col: str,
+) -> dict[str, float]:
+    """Compute MAE for each series in a single fold."""
+    scores: dict[str, float] = {}
+    for uid in actuals_df["unique_id"].unique():
+        actual_series = (
+            actuals_df.loc[actuals_df["unique_id"] == uid].sort_values("ds")["y"].values
+        )
+        pred_series = (
+            forecast_df.loc[forecast_df["unique_id"] == uid]
+            .sort_values("ds")[model_col]
+            .values
+        )
+        scores[str(uid)] = mae(actual_series, pred_series)
     return scores
 
 

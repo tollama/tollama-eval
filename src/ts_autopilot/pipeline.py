@@ -23,7 +23,12 @@ from ts_autopilot.contracts import (
     ResultMetadata,
 )
 from ts_autopilot.evaluation.cross_validation import make_expanding_splits
-from ts_autopilot.evaluation.metrics import per_series_mase
+from ts_autopilot.evaluation.metrics import (
+    per_series_mae,
+    per_series_mase,
+    per_series_rmsse,
+    per_series_smape,
+)
 from ts_autopilot.ingestion.loader import load_csv
 from ts_autopilot.ingestion.profiler import profile_dataframe
 from ts_autopilot.logging_config import get_logger
@@ -320,11 +325,38 @@ def run_benchmark(
                 model_col=output.model_name,
             )
             fold_mase = float(np.mean(list(series_scores.values())))
+
+            smape_scores = per_series_smape(
+                forecast_df=pred_df,
+                actuals_df=split.test,
+                model_col=output.model_name,
+            )
+            fold_smape = float(np.mean(list(smape_scores.values())))
+
+            rmsse_scores = per_series_rmsse(
+                forecast_df=pred_df,
+                actuals_df=split.test,
+                train_df=split.train,
+                season_length=profile.season_length_guess,
+                model_col=output.model_name,
+            )
+            fold_rmsse = float(np.mean(list(rmsse_scores.values())))
+
+            mae_scores = per_series_mae(
+                forecast_df=pred_df,
+                actuals_df=split.test,
+                model_col=output.model_name,
+            )
+            fold_mae = float(np.mean(list(mae_scores.values())))
+
             fold_results.append(
                 FoldResult(
                     fold=split.fold,
                     cutoff=split.cutoff.isoformat(),
                     mase=round(fold_mase, 6),
+                    smape=round(fold_smape, 4),
+                    rmsse=round(fold_rmsse, 6),
+                    mae=round(fold_mae, 6),
                     series_scores={k: round(v, 6) for k, v in series_scores.items()},
                 )
             )
@@ -346,6 +378,9 @@ def run_benchmark(
                 folds=fold_results,
                 mean_mase=mean_val,
                 std_mase=round(float(np.std(mase_values)), 6),
+                mean_smape=round(float(np.mean([f.smape for f in fold_results])), 4),
+                mean_rmsse=round(float(np.mean([f.rmsse for f in fold_results])), 6),
+                mean_mae=round(float(np.mean([f.mae for f in fold_results])), 6),
             )
         )
 
@@ -361,7 +396,14 @@ def run_benchmark(
     # Build leaderboard: rank by mean_mase ascending
     sorted_models = sorted(model_results, key=lambda m: m.mean_mase)
     leaderboard = [
-        LeaderboardEntry(rank=i + 1, name=m.name, mean_mase=m.mean_mase)
+        LeaderboardEntry(
+            rank=i + 1,
+            name=m.name,
+            mean_mase=m.mean_mase,
+            mean_smape=m.mean_smape,
+            mean_rmsse=m.mean_rmsse,
+            mean_mae=m.mean_mae,
+        )
         for i, m in enumerate(sorted_models)
     ]
 
@@ -407,9 +449,14 @@ def run_from_csv(
     model_names: list[str] | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
     tollama_interpretation: str | None = None,
+    tollama_url: str | None = None,
     n_jobs: int = 1,
 ) -> BenchmarkResult:
-    """Full end-to-end pipeline: CSV → results.json + report.html."""
+    """Full end-to-end pipeline: CSV → results.json + report.html.
+
+    If tollama_url is provided, requests an LLM interpretation after
+    benchmarking and includes it in the HTML report.
+    """
     from ts_autopilot.reporting.html_report import render_report
 
     output_dir = Path(output_dir)
@@ -434,6 +481,17 @@ def run_from_csv(
     metadata = ResultMetadata.create_now()
     metadata.total_runtime_sec = round(total_runtime, 4)
     result.metadata = metadata
+
+    # Tollama LLM interpretation
+    if tollama_url and tollama_interpretation is None:
+        from ts_autopilot.tollama.client import interpret
+
+        logger.info("Requesting LLM interpretation from %s", tollama_url)
+        response = interpret(result, tollama_url)
+        if response is not None:
+            tollama_interpretation = response.interpretation
+        else:
+            logger.warning("Tollama unavailable — skipping interpretation.")
 
     # Atomic write results.json
     results_path = output_dir / "results.json"

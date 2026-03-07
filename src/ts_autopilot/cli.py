@@ -192,6 +192,8 @@ def run(
 
     t0 = time.perf_counter()
 
+    effective_tollama_url = tollama_url if not no_tollama else None
+
     try:
         result = run_from_csv(
             csv_path=input,
@@ -200,6 +202,7 @@ def run(
             output_dir=output,
             model_names=model_names,
             progress_callback=_progress_cb,
+            tollama_url=effective_tollama_url,
             n_jobs=n_jobs,
         )
     except SchemaError as exc:
@@ -238,33 +241,6 @@ def run(
         raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
 
     elapsed = time.perf_counter() - t0
-
-    # Tollama LLM interpretation
-    tollama_response = None
-    if tollama_url and not no_tollama:
-        from ts_autopilot.tollama.client import interpret
-
-        if not quiet:
-            typer.echo("  Requesting LLM interpretation...")
-        tollama_response = interpret(result, tollama_url)
-        if tollama_response is not None:
-            # Re-render report with interpretation
-            from ts_autopilot.pipeline import _atomic_write
-            from ts_autopilot.reporting.html_report import render_report
-
-            report_path = output.resolve() / "report.html"
-            _atomic_write(
-                report_path,
-                render_report(
-                    result,
-                    tollama_interpretation=tollama_response.interpretation,
-                ),
-            )
-        elif not quiet:
-            typer.secho(
-                "[WARNING] Tollama unavailable — skipping interpretation.",
-                fg=typer.colors.YELLOW,
-            )
 
     if quiet:
         return
@@ -306,18 +282,13 @@ def run(
 
     # Summary
     typer.echo("")
-    winner = result.leaderboard[0]
-    typer.secho(
-        f"Best model: {winner.name} (MASE={winner.mean_mase:.4f})",
-        fg=typer.colors.GREEN,
-    )
+    if result.leaderboard:
+        winner = result.leaderboard[0]
+        typer.secho(
+            f"Best model: {winner.name} (MASE={winner.mean_mase:.4f})",
+            fg=typer.colors.GREEN,
+        )
     typer.echo(f"Completed in {elapsed:.2f}s")
-
-    # Tollama interpretation
-    if tollama_response is not None:
-        typer.echo("")
-        typer.secho("LLM Interpretation:", bold=True)
-        typer.echo(f"  {tollama_response.interpretation}")
 
 
 if __name__ == "__main__":

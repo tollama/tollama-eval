@@ -117,6 +117,16 @@ def test_benchmark_result_schema_keys():
         "folds",
         "mean_mase",
         "std_mase",
+        "mean_smape",
+        "mean_rmsse",
+        "mean_mae",
     }
-    assert set(d["leaderboard"][0].keys()) == {"rank", "name", "mean_mase"}
+    assert set(d["leaderboard"][0].keys()) == {
+        "rank",
+        "name",
+        "mean_mase",
+        "mean_smape",
+        "mean_rmsse",
+        "mean_mae",
+    }
     assert set(d["config"].keys()) == {"horizon", "n_folds"}
