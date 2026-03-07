@@ -529,7 +529,9 @@ def run_from_csv(
 
         tollama_runners = get_tollama_runners(tollama_url, tollama_models)
         if tollama_runners:
-            extra_runners = list(DEFAULT_RUNNERS) + tollama_runners
+            base: list[BaseRunner] = list(DEFAULT_RUNNERS)
+            base.extend(tollama_runners)
+            extra_runners = base
             logger.info(
                 "Added %d tollama model(s): %s",
                 len(tollama_runners),
