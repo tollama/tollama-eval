@@ -68,6 +68,72 @@ _CONFIG_OPTION = typer.Option(
 )
 
 
+def _try_rich() -> bool:
+    """Check if rich is available."""
+    try:
+        import rich  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+def _make_rich_progress_cb(
+    quiet: bool, verbose: bool
+) -> tuple[object | None, object | None, object | None, object]:
+    """Create rich-based progress tracking.
+
+    Returns (progress, model_task_id, fold_task_id, callback_fn).
+    """
+    if quiet:
+        return None, None, None, lambda step, current, total: None
+
+    try:
+        from rich.progress import (
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
+
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(bar_width=30),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            transient=False,
+        )
+        model_task = progress.add_task("Models", total=None)
+        fold_task = progress.add_task("  Folds", total=None, visible=verbose)
+
+        def cb(step: str, current: int, total: int) -> None:
+            if step == "model":
+                progress.update(model_task, completed=current - 1, total=total)
+            elif step == "fold" and verbose:
+                progress.update(fold_task, completed=current - 1, total=total)
+
+        return progress, model_task, fold_task, cb
+    except ImportError:
+        return None, None, None, _make_plain_progress_cb(quiet, verbose)
+
+
+def _make_plain_progress_cb(quiet: bool, verbose: bool) -> object:
+    """Create plain text progress callback (fallback)."""
+
+    def cb(step: str, current: int, total: int) -> None:
+        if quiet:
+            return
+        if step == "model":
+            typer.echo(f"  Running model {current}/{total}...")
+        elif step == "fold" and verbose:
+            typer.echo(f"    Fold {current}/{total}")
+
+    return cb
+
+
 @app.command()
 def run(
     input: Path | None = _INPUT_OPTION,
@@ -148,6 +214,8 @@ def run(
     )
 
     # Load config file and merge with CLI flags (CLI wins)
+    report_title: str | None = None
+    report_lang: str | None = None
     if config is not None:
         from ts_autopilot.config import load_config
 
@@ -173,6 +241,8 @@ def run(
             tollama_models = ",".join(file_cfg.tollama_models)
         if file_cfg.n_jobs is not None and n_jobs == 1:
             n_jobs = file_cfg.n_jobs
+        report_title = file_cfg.report_title
+        report_lang = file_cfg.report_lang
 
     # Retry settings (config file only, no CLI flags needed)
     max_retries = DEFAULT_MAX_RETRIES
@@ -206,19 +276,40 @@ def run(
     if models is not None:
         model_names = [m.strip() for m in models.split(",") if m.strip()]
 
-    def _progress_cb(step: str, current: int, total: int) -> None:
-        if quiet:
-            return
-        if step == "model":
-            typer.echo(f"  Running model {current}/{total}...")
-        elif step == "fold" and verbose:
-            typer.echo(f"    Fold {current}/{total}")
+    # Set up progress display (rich if available, plain text otherwise)
+    use_rich = _try_rich() and not log_json
+    if use_rich:
+        progress, _mtask, _ftask, progress_cb = _make_rich_progress_cb(
+            quiet, verbose
+        )
+    else:
+        progress = None
+        progress_cb = _make_plain_progress_cb(quiet, verbose)
 
     if not quiet:
-        typer.secho(
-            f"Running benchmark: input={input}, horizon={horizon}, n_folds={n_folds}",
-            bold=True,
-        )
+        if use_rich:
+            try:
+                from rich.console import Console
+                from rich.panel import Panel
+
+                console = Console()
+                console.print(
+                    Panel(
+                        f"[bold]input[/bold]={input}  "
+                        f"[bold]horizon[/bold]={horizon}  "
+                        f"[bold]n_folds[/bold]={n_folds}",
+                        title="[bold blue]ts-autopilot benchmark[/bold blue]",
+                        border_style="blue",
+                    )
+                )
+            except ImportError:
+                msg = f"Running benchmark: input={input}, "
+                msg += f"horizon={horizon}, n_folds={n_folds}"
+                typer.secho(msg, bold=True)
+        else:
+            msg = f"Running benchmark: input={input}, "
+            msg += f"horizon={horizon}, n_folds={n_folds}"
+            typer.secho(msg, bold=True)
 
     t0 = time.perf_counter()
 
@@ -230,20 +321,30 @@ def run(
         ]
 
     try:
-        result = run_from_csv(
-            csv_path=input,
-            horizon=horizon,
-            n_folds=n_folds,
-            output_dir=output,
-            model_names=model_names,
-            progress_callback=_progress_cb,
-            tollama_url=effective_tollama_url,
-            tollama_models=effective_tollama_models,
-            n_jobs=n_jobs,
-            generate_pdf=pdf,
-            max_retries=max_retries,
-            retry_backoff=retry_backoff,
-        )
+        if progress is not None:
+            progress.start()
+
+        try:
+            result = run_from_csv(
+                csv_path=input,
+                horizon=horizon,
+                n_folds=n_folds,
+                output_dir=output,
+                model_names=model_names,
+                progress_callback=progress_cb,
+                tollama_url=effective_tollama_url,
+                tollama_models=effective_tollama_models,
+                n_jobs=n_jobs,
+                generate_pdf=pdf,
+                max_retries=max_retries,
+                retry_backoff=retry_backoff,
+                report_title=report_title,
+                report_lang=report_lang,
+            )
+        finally:
+            if progress is not None:
+                progress.stop()
+
     except ModelFitError as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
         typer.echo(

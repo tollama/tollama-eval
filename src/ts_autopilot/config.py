@@ -21,6 +21,8 @@ _VALID_KEYS = {
     "n_jobs",
     "max_retries",
     "retry_backoff",
+    "report_title",
+    "report_lang",
 }
 
 
@@ -38,6 +40,8 @@ class FileConfig:
     n_jobs: int | None = None
     max_retries: int | None = None
     retry_backoff: float | None = None
+    report_title: str | None = None
+    report_lang: str | None = None
 
 
 def load_config(path: str | Path) -> FileConfig:
@@ -142,5 +146,11 @@ def load_config(path: str | Path) -> FileConfig:
         if not isinstance(val, int | float) or val <= 0:
             raise ConfigError(f"retry_backoff must be a positive number, got {val!r}")
         config.retry_backoff = float(val)
+
+    if "report_title" in data:
+        config.report_title = str(data["report_title"])
+
+    if "report_lang" in data:
+        config.report_lang = str(data["report_lang"])
 
     return config
