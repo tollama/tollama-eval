@@ -32,10 +32,10 @@ from ts_autopilot.runners.statistical import AutoETSRunner, SeasonalNaiveRunner
 
 logger = get_logger("pipeline")
 
-DEFAULT_RUNNERS: list[BaseRunner] = [
+DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
     SeasonalNaiveRunner(),
     AutoETSRunner(),
-]
+)
 
 
 def _validate_dataframe(df: pd.DataFrame) -> list[str]:
@@ -235,6 +235,9 @@ def run_benchmark(
     # Detect date gaps
     gap_warnings = _detect_date_gaps(df, profile.frequency)
     warnings.extend(gap_warnings)
+
+    # Deduplicate warnings while preserving order
+    warnings = list(dict.fromkeys(warnings))
 
     logger.info(
         "Starting benchmark: %d series, horizon=%d, n_folds=%d, models=%s",
