@@ -214,8 +214,38 @@ def test_report_multi_metric_leaderboard(benchmark_result):
     assert "MAE" in html
 
 
-def test_report_tollama_interpretation():
-    """Report includes tollama interpretation when provided."""
+def test_report_tsfm_section():
+    """Report includes TSFM section when tollama models are present."""
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=1,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=60,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[
+            ModelResult(
+                name="tollama/chronos2",
+                runtime_sec=1.0,
+                folds=[],
+                mean_mase=0.85,
+                std_mase=0.1,
+                mean_smape=12.5,
+            ),
+        ],
+        leaderboard=[],
+    )
+    html = render_report(result)
+    assert "Foundation Models" in html
+    assert "tollama/chronos2" in html
+
+
+def test_report_no_tsfm_section_without_tollama():
+    """Report omits TSFM section when no tollama models are present."""
     result = BenchmarkResult(
         profile=DataProfile(
             n_series=1,
@@ -230,6 +260,5 @@ def test_report_tollama_interpretation():
         models=[],
         leaderboard=[],
     )
-    html = render_report(result, tollama_interpretation="Test interpretation.")
-    assert "LLM Interpretation" in html
-    assert "Test interpretation." in html
+    html = render_report(result)
+    assert "Foundation Models" not in html

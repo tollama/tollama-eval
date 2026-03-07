@@ -80,6 +80,20 @@ def test_tollama_url_in_config(tmp_path):
     assert cfg.tollama_url == "http://localhost:8000"
 
 
+def test_tollama_models_in_config(tmp_path):
+    cfg_path = tmp_path / "config.yml"
+    cfg_path.write_text("tollama_models: [chronos2, timesfm]\n")
+    cfg = load_config(cfg_path)
+    assert cfg.tollama_models == ["chronos2", "timesfm"]
+
+
+def test_tollama_models_as_string(tmp_path):
+    cfg_path = tmp_path / "config.yml"
+    cfg_path.write_text("tollama_models: chronos2,timesfm\n")
+    cfg = load_config(cfg_path)
+    assert cfg.tollama_models == ["chronos2", "timesfm"]
+
+
 def test_cli_config_flag(tmp_path):
     """Integration: --config loads settings and runs benchmark."""
     import pandas as pd
