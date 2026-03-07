@@ -63,9 +63,7 @@ def test_tollama_runner_name(tollama_server):
 
 def test_tollama_runner_fit_predict(tollama_server, train_df):
     runner = TollamaRunner(model="chronos2", tollama_url=tollama_server)
-    output = runner.fit_predict(
-        train=train_df, horizon=7, freq="D", season_length=7
-    )
+    output = runner.fit_predict(train=train_df, horizon=7, freq="D", season_length=7)
     assert output.model_name == "tollama/chronos2"
     # 2 series x 7 horizon = 14 predictions
     assert len(output.y_hat) == 14
@@ -78,9 +76,7 @@ def test_tollama_runner_fit_predict(tollama_server, train_df):
 
 def test_tollama_runner_forecast_dates(tollama_server, train_df):
     runner = TollamaRunner(model="timesfm", tollama_url=tollama_server)
-    output = runner.fit_predict(
-        train=train_df, horizon=3, freq="D", season_length=7
-    )
+    output = runner.fit_predict(train=train_df, horizon=3, freq="D", season_length=7)
     # Verify forecast dates start after the last training date
     last_train = train_df.groupby("unique_id")["ds"].max()
     for uid in ["s1", "s2"]:
@@ -95,9 +91,7 @@ def test_tollama_runner_forecast_dates(tollama_server, train_df):
 
 def test_tollama_runner_unreachable(train_df):
     runner = TollamaRunner(model="chronos2", tollama_url="http://127.0.0.1:1")
-    output = runner.fit_predict(
-        train=train_df, horizon=3, freq="D", season_length=7
-    )
+    output = runner.fit_predict(train=train_df, horizon=3, freq="D", season_length=7)
     # Should produce NaN values but not crash
     assert len(output.y_hat) == 6  # 2 series x 3
     assert all(np.isnan(v) for v in output.y_hat)
@@ -109,9 +103,7 @@ def test_get_tollama_runners_empty():
 
 
 def test_get_tollama_runners_creates_instances():
-    runners = get_tollama_runners(
-        "http://localhost:8000", ["chronos2", "timesfm"]
-    )
+    runners = get_tollama_runners("http://localhost:8000", ["chronos2", "timesfm"])
     assert len(runners) == 2
     assert runners[0].name == "tollama/chronos2"
     assert runners[1].name == "tollama/timesfm"
