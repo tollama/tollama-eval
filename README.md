@@ -1,39 +1,76 @@
-# ts-autopilot
+<p align="center">
+  <h1 align="center">ts-autopilot</h1>
+  <p align="center">
+    <strong>Stop guessing which forecasting model to use. Let the data decide.</strong>
+  </p>
+  <p align="center">
+    <a href="https://pypi.org/project/ts-autopilot/"><img src="https://img.shields.io/pypi/v/ts-autopilot.svg" alt="PyPI version"></a>
+    <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
+    <a href="https://github.com/ychoi-atop/ts-autopilot/actions"><img src="https://img.shields.io/github/actions/workflow/status/ychoi-atop/ts-autopilot/ci.yml?label=CI" alt="CI"></a>
+  </p>
+</p>
 
-[![PyPI version](https://img.shields.io/pypi/v/ts-autopilot.svg)](https://pypi.org/project/ts-autopilot/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+---
 
-Automated time series benchmarking powered by the [Nixtla](https://github.com/nixtla) ecosystem (statsforecast, mlforecast, neuralforecast). Drop in a CSV, get ranked model results with cross-validated metrics.
+**ts-autopilot** is a zero-config time series benchmarking tool. Drop in a CSV, get a ranked leaderboard of forecasting models — complete with cross-validated metrics and a visual report. No boilerplate. No notebook spaghetti. One command.
+
+```bash
+pip install ts-autopilot
+ts-autopilot run -i sales.csv
+```
+
+That's it. Open `out/report.html` and see which model wins.
+
+---
+
+## Why ts-autopilot?
+
+Forecasting teams waste weeks on the same loop: load data, wrangle formats, fit models one at a time, compute metrics manually, copy results into slides. **ts-autopilot collapses that entire workflow into a single command.**
+
+| The old way | With ts-autopilot |
+|---|---|
+| Write custom ingestion for every dataset | Auto-detects long & wide CSV formats |
+| Manually split train/test, hope it's fair | Expanding-window cross-validation, configurable folds |
+| Fit models one at a time in notebooks | 9 models run automatically, from naive baselines to deep learning |
+| Compute MAPE and call it a day | 4 metrics (MASE, SMAPE, RMSSE, MAE) with per-series breakdowns |
+| Paste results into a spreadsheet | Structured JSON + interactive HTML report, generated instantly |
+
+### Who is this for?
+
+- **Data scientists** who want a fast baseline before investing in custom models
+- **ML engineers** evaluating which forecasting approach fits a new dataset
+- **Analysts** who need defensible model comparisons without writing Python
+- **Teams** standardizing how they benchmark across projects
+
+---
 
 ## Quick Start
 
-```bash
-pip install ts-autopilot
-ts-autopilot run -i data.csv -o results/
-```
-
-That's it. You get:
-- **results.json** — structured benchmark results (frozen schema)
-- **report.html** — visual report with leaderboard, fold details, and per-series breakdown
-
-## Installation
+### 1. Install
 
 ```bash
-# Basic install
 pip install ts-autopilot
-
-# With optional models
-pip install "ts-autopilot[prophet]"    # Facebook Prophet
-pip install "ts-autopilot[lightgbm]"   # LightGBM via mlforecast
-pip install "ts-autopilot[neural]"     # NHITS + NBEATS via neuralforecast
-pip install "ts-autopilot[all]"        # Everything
-
-# Development
-pip install -e ".[dev]"
 ```
+
+### 2. Run
+
+```bash
+ts-autopilot run -i your_data.csv
+```
+
+### 3. Read the results
+
+Two files appear in `out/`:
+
+- **`results.json`** — Machine-readable benchmark results (schema is frozen across versions, safe to build on)
+- **`report.html`** — Interactive visual report with leaderboard, per-fold breakdown, and per-series scores
+
+---
 
 ## Input Formats
+
+ts-autopilot auto-detects your CSV format. No configuration needed.
 
 **Long format** (recommended):
 
@@ -50,7 +87,50 @@ pip install -e ".[dev]"
 | 2020-01-01 | 42.0    | 10.0    |
 | 2020-01-02 | 45.0    | 12.0    |
 
-Both formats are auto-detected. Timezone-aware timestamps are stripped to naive UTC.
+Timezone-aware timestamps are handled automatically (stripped to naive UTC).
+
+---
+
+## Models
+
+ts-autopilot ships with 5 built-in models and supports 4 optional ones — spanning from classical baselines to neural networks.
+
+| Model         | Type        | Description                         | Install |
+|---------------|-------------|-------------------------------------|---------|
+| SeasonalNaive | Baseline    | Repeats last season                 | Built-in |
+| AutoETS       | Statistical | Automated exponential smoothing     | Built-in |
+| AutoARIMA     | Statistical | Automated ARIMA model selection     | Built-in |
+| AutoTheta     | Statistical | Automated Theta method              | Built-in |
+| AutoCES       | Statistical | Complex exponential smoothing       | Built-in |
+| Prophet       | Statistical | Facebook Prophet                    | `pip install "ts-autopilot[prophet]"` |
+| LightGBM      | ML          | Gradient boosting via mlforecast    | `pip install "ts-autopilot[lightgbm]"` |
+| NHITS         | Neural      | N-HiTS deep learning architecture   | `pip install "ts-autopilot[neural]"` |
+| NBEATS        | Neural      | N-BEATS deep learning architecture  | `pip install "ts-autopilot[neural]"` |
+
+Want everything? `pip install "ts-autopilot[all]"`
+
+Run specific models with `-m`:
+
+```bash
+ts-autopilot run -i data.csv -m SeasonalNaive,AutoETS,Prophet
+```
+
+---
+
+## Evaluation
+
+Models are ranked by **MASE** (Mean Absolute Scaled Error) — the gold-standard metric for time series comparison. A MASE of 1.0 means the model performs exactly like a seasonal naive baseline. Below 1.0 means it beats the baseline.
+
+| Metric | What it measures | Interpretation |
+|--------|-----------------|----------------|
+| **MASE** | Accuracy relative to naive baseline | < 1.0 = better than naive |
+| **SMAPE** | Symmetric percentage error | 0-200%, lower is better |
+| **RMSSE** | Scaled RMSE | < 1.0 = better than naive |
+| **MAE** | Raw absolute error | 0 = perfect |
+
+All metrics are computed per series, per fold, then aggregated — giving you honest, cross-validated scores instead of a single optimistic number.
+
+---
 
 ## CLI Reference
 
@@ -61,60 +141,29 @@ Options:
   -i, --input PATH       Input CSV file (required)
   -o, --output PATH      Output directory (default: out/)
   -H, --horizon INT      Forecast horizon (default: 14)
-  -k, --n-folds INT      CV folds (default: 3)
+  -k, --n-folds INT      Number of CV folds (default: 3)
   -m, --models TEXT       Comma-separated model list
   -j, --n-jobs INT       Parallel workers (default: 1)
   -c, --config PATH      YAML or JSON config file
   -v, --verbose          Show data profile and fold-level progress
   -q, --quiet            Suppress all output except errors
   -V, --version          Show version
-  --tollama-url URL      Tollama LLM interpretation service URL
-  --no-tollama           Disable tollama even if URL is set
 ```
 
-You can also run as a Python module:
+Or run as a Python module:
 
 ```bash
 python -m ts_autopilot run -i data.csv
 ```
 
-## Models
-
-| Model         | Type        | Description                         | Dependency       |
-|---------------|-------------|-------------------------------------|------------------|
-| SeasonalNaive | Baseline    | Repeats last season                 | Built-in         |
-| AutoETS       | Statistical | Automated exponential smoothing     | Built-in         |
-| AutoARIMA     | Statistical | Automated ARIMA model selection     | Built-in         |
-| AutoTheta     | Statistical | Automated Theta method              | Built-in         |
-| AutoCES       | Statistical | Complex exponential smoothing       | Built-in         |
-| Prophet       | Statistical | Facebook Prophet                    | `ts-autopilot[prophet]`  |
-| LightGBM      | ML          | Gradient boosting via mlforecast    | `ts-autopilot[lightgbm]` |
-| NHITS         | Neural      | N-HiTS deep learning model          | `ts-autopilot[neural]`   |
-| NBEATS        | Neural      | N-BEATS deep learning model         | `ts-autopilot[neural]`   |
-
-Run specific models with `-m`:
-
-```bash
-ts-autopilot run -i data.csv -m SeasonalNaive,AutoETS,AutoCES
-```
-
-## Evaluation Metrics
-
-| Metric | Description                          | Range          |
-|--------|--------------------------------------|----------------|
-| MASE   | Mean Absolute Scaled Error           | 0 = perfect, 1.0 = naive baseline |
-| SMAPE  | Symmetric Mean Absolute % Error      | 0-200%         |
-| RMSSE  | Root Mean Squared Scaled Error       | 0 = perfect, 1.0 = naive baseline |
-| MAE    | Mean Absolute Error                  | 0 = perfect    |
-
-The leaderboard ranks models by MASE (lower is better). A MASE < 1.0 means the model beats the seasonal naive baseline.
+---
 
 ## Config Files
 
-Instead of CLI flags, use a YAML or JSON config:
+For reproducible benchmarks, use a YAML or JSON config instead of CLI flags:
 
 ```yaml
-# config.yaml
+# benchmark.yaml
 input: data.csv
 output: results/
 horizon: 7
@@ -122,62 +171,53 @@ n_folds: 5
 models:
   - SeasonalNaive
   - AutoETS
+  - AutoARIMA
   - AutoCES
 n_jobs: 4
 ```
 
 ```bash
-ts-autopilot run -c config.yaml
+ts-autopilot run -c benchmark.yaml
 ```
 
-CLI flags override config file values.
+CLI flags override config file values when both are provided.
+
+---
 
 ## Python API
+
+Use ts-autopilot as a library for tighter integration with your workflows.
 
 ```python
 from ts_autopilot.pipeline import run_benchmark, run_from_csv
 
-# From CSV file
+# One-liner from CSV
 result = run_from_csv("data.csv", horizon=14, n_folds=3, output_dir="out/")
 
-# From DataFrame
-import pandas as pd
-df = pd.read_csv("data.csv")
+# From an existing DataFrame
 result = run_benchmark(df, horizon=14, n_folds=3)
 
-# Access results
+# Inspect the leaderboard
 for entry in result.leaderboard:
     print(f"#{entry.rank} {entry.name}: MASE={entry.mean_mase:.4f}")
 
-# Use specific models
-result = run_benchmark(df, horizon=14, n_folds=3, model_names=["SeasonalNaive", "AutoETS"])
-
-# Serialize
+# Serialize / deserialize
 json_str = result.to_json(indent=2)
 loaded = BenchmarkResult.from_json(json_str)
 ```
 
 ### Custom Runners
 
+Extend ts-autopilot with your own models:
+
 ```python
-from ts_autopilot.runners.base import BaseRunner, StatsForecastRunner
+from ts_autopilot.runners.base import BaseRunner
 from ts_autopilot.contracts import ForecastOutput
 
-# Option 1: Wrap a StatsForecast model
-class MyModelRunner(StatsForecastRunner):
+class MyModelRunner(BaseRunner):
     @property
     def name(self) -> str:
         return "MyModel"
-
-    def _make_model(self, season_length: int) -> object:
-        from statsforecast.models import Naive
-        return Naive()
-
-# Option 2: Fully custom runner
-class CustomRunner(BaseRunner):
-    @property
-    def name(self) -> str:
-        return "Custom"
 
     def fit_predict(self, train, horizon, freq, season_length, n_jobs=1):
         # Your forecasting logic here
@@ -186,8 +226,8 @@ class CustomRunner(BaseRunner):
             model_name=self.name, runtime_sec=0.0,
         )
 
-# Use custom runners
-result = run_benchmark(df, horizon=14, n_folds=3, runners=[MyModelRunner(), CustomRunner()])
+# Plug it in
+result = run_benchmark(df, horizon=14, n_folds=3, runners=[MyModelRunner()])
 ```
 
 ### Metrics API
@@ -197,8 +237,8 @@ from ts_autopilot.evaluation.metrics import mase, smape, rmsse, mae
 import numpy as np
 
 y_train = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-y_true = np.array([11, 12, 13])
-y_pred = np.array([10.5, 12.2, 13.1])
+y_true  = np.array([11, 12, 13])
+y_pred  = np.array([10.5, 12.2, 13.1])
 
 print(f"MASE:  {mase(y_true, y_pred, y_train):.4f}")
 print(f"SMAPE: {smape(y_true, y_pred):.2f}%")
@@ -206,9 +246,11 @@ print(f"RMSSE: {rmsse(y_true, y_pred, y_train):.4f}")
 print(f"MAE:   {mae(y_true, y_pred):.4f}")
 ```
 
+---
+
 ## Output Schema
 
-The `results.json` schema is frozen -- field names will not change across versions.
+The `results.json` schema is **frozen** — field names will never change across versions, so it's safe to build pipelines and dashboards on top of it.
 
 ```json
 {
@@ -244,10 +286,46 @@ The `results.json` schema is frozen -- field names will not change across versio
 }
 ```
 
+---
+
+## Roadmap
+
+| Milestone | Status | Highlights |
+|-----------|--------|------------|
+| **v0.1 — MVP** | Done | SeasonalNaive + AutoETS, CLI, cross-validation, results.json |
+| **v0.2 — Beta** | Done | 9 models (statistical + ML + neural), YAML config, HTML reports, per-series breakdown, parallel execution |
+| **v0.3 — Intelligence** | Planned | LLM-powered result interpretation via Tollama, natural-language summaries in reports |
+| **v0.4 — Scale** | Planned | Multi-dataset campaigns, ensemble recommendations, export to dashboard formats |
+
+---
+
+## Architecture
+
+```
+src/ts_autopilot/
+├── cli.py              # Typer CLI — calls pipeline, zero embedded logic
+├── pipeline.py         # Benchmark orchestrator
+├── contracts.py        # Frozen data contracts
+├── config.py           # YAML/JSON config loading
+├── ingestion/          # CSV loading + data profiling
+├── evaluation/         # Metrics + cross-validation
+├── runners/            # Model runners (base + statistical + optional)
+├── reporting/          # HTML report generation (Jinja2)
+└── tollama/            # LLM interpretation client
+```
+
+**Design principles:**
+- CLI is a thin shell — all logic lives in the pipeline
+- Canonical data format (`unique_id`, `ds`, `y`) enforced everywhere
+- Output schema is frozen for version stability
+- Optional dependencies are gracefully degraded (missing models are skipped, not errors)
+
+---
+
 ## Development
 
 ```bash
-# Install dev dependencies
+# Install in dev mode
 pip install -e ".[dev]"
 
 # Run tests
@@ -260,20 +338,9 @@ ruff check src/ tests/
 ruff format src/ tests/
 ```
 
-## Architecture
+Powered by the [Nixtla](https://github.com/nixtla) ecosystem — statsforecast, mlforecast, and neuralforecast.
 
-```
-src/ts_autopilot/
-├── cli.py              # Typer CLI (calls pipeline, no logic)
-├── pipeline.py         # Benchmark orchestrator
-├── contracts.py        # Frozen data contracts
-├── config.py           # YAML/JSON config loading
-├── ingestion/          # CSV loading + profiling
-├── evaluation/         # Metrics + cross-validation
-├── runners/            # Model runners (base + statistical + optional)
-├── reporting/          # HTML report generation
-└── tollama/            # LLM interpretation client
-```
+---
 
 ## License
 
