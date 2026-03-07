@@ -69,10 +69,14 @@ def test_cli_missing_input_fails():
 
 
 def test_cli_help_shows_reserved_flags(monkeypatch):
-    monkeypatch.setenv("COLUMNS", "200")
+    import re
+    import shutil
+
+    monkeypatch.setattr(shutil, "get_terminal_size", lambda *a, **kw: (200, 50))
     result = runner.invoke(app, ["run", "--help"])
-    assert "--tollama-url" in result.output
-    assert "--no-tollama" in result.output
+    clean = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert "--tollama-url" in clean
+    assert "--no-tollama" in clean
 
 
 def test_cli_version_flag():
@@ -214,11 +218,15 @@ def test_cli_summary_shows_best_model(tmp_path):
 
 
 def test_cli_help_shows_models_flag(monkeypatch):
-    monkeypatch.setenv("COLUMNS", "200")
+    import re
+    import shutil
+
+    monkeypatch.setattr(shutil, "get_terminal_size", lambda *a, **kw: (200, 50))
     result = runner.invoke(app, ["run", "--help"])
-    assert "--models" in result.output
-    assert "--verbose" in result.output
-    assert "--quiet" in result.output
+    clean = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert "--models" in clean
+    assert "--verbose" in clean
+    assert "--quiet" in clean
 
 
 def test_cli_leaderboard_shows_std_mase(tmp_path):
