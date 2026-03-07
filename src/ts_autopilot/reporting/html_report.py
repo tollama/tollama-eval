@@ -42,22 +42,24 @@ def render_report(
     tollama_models = [m for m in result.models if m.name.startswith("tollama/")]
     has_tsfm = len(tollama_models) > 0
 
-    return template.render(
-        profile=result.profile,
-        config=result.config,
-        leaderboard=result.leaderboard,
-        models=result.models,
-        warnings=result.warnings,
-        max_mase=max_mase,
-        chart_data=chart_data,
-        version=__version__,
-        generated_at=datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        executive_summary=executive_summary,
-        diagnostics=result.diagnostics,
-        has_forecast_data=len(result.forecast_data) > 0,
-        has_diagnostics=len(result.diagnostics) > 0,
-        has_tsfm=has_tsfm,
-        tollama_models=tollama_models,
+    return str(
+        template.render(
+            profile=result.profile,
+            config=result.config,
+            leaderboard=result.leaderboard,
+            models=result.models,
+            warnings=result.warnings,
+            max_mase=max_mase,
+            chart_data=chart_data,
+            version=__version__,
+            generated_at=datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+            executive_summary=executive_summary,
+            diagnostics=result.diagnostics,
+            has_forecast_data=len(result.forecast_data) > 0,
+            has_diagnostics=len(result.diagnostics) > 0,
+            has_tsfm=has_tsfm,
+            tollama_models=tollama_models,
+        )
     )
 
 
@@ -189,12 +191,13 @@ def _build_forecast_chart_data(result: BenchmarkResult) -> dict:
     if not winner_model:
         return {"series": []}
 
-    avg_scores: dict[str, float] = {}
+    scores_by_series: dict[str, list[float]] = {}
     for fold in winner_model.folds:
         for sid, score in fold.series_scores.items():
-            avg_scores.setdefault(sid, [])
-            avg_scores[sid].append(score)
-    avg_scores = {sid: sum(scores) / len(scores) for sid, scores in avg_scores.items()}
+            scores_by_series.setdefault(sid, []).append(score)
+    avg_scores: dict[str, float] = {
+        sid: sum(scores) / len(scores) for sid, scores in scores_by_series.items()
+    }
 
     if not avg_scores:
         return {"series": []}

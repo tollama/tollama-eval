@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ts_autopilot.contracts import BenchmarkResult
+from ts_autopilot.contracts import BenchmarkResult, ModelResult
 
 
 def generate_executive_summary(result: BenchmarkResult) -> str:
@@ -129,7 +129,7 @@ def generate_executive_summary(result: BenchmarkResult) -> str:
     return " ".join(lines)
 
 
-def _find_worst_series(model):
+def _find_worst_series(model: ModelResult) -> tuple[str, float] | None:
     """Find the worst-performing series across all folds."""
     series_totals: dict[str, list[float]] = {}
     for fold in model.folds:
@@ -142,5 +142,5 @@ def _find_worst_series(model):
     avg_scores = {
         sid: sum(scores) / len(scores) for sid, scores in series_totals.items()
     }
-    worst_sid = max(avg_scores, key=avg_scores.get)
+    worst_sid = max(avg_scores, key=lambda sid: avg_scores[sid])
     return worst_sid, avg_scores[worst_sid]

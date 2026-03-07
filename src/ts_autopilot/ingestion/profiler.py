@@ -59,7 +59,7 @@ def _infer_frequency(df: pd.DataFrame) -> str:
     try:
         freq = pd.infer_freq(dates)
         if freq is not None:
-            return freq
+            return str(freq)
         _logger.warning(
             "Could not infer frequency for series '%s'; defaulting to 'D'.",
             first_uid,

@@ -293,7 +293,7 @@ def test_exit_code_success_is_zero():
 
 def test_retry_on_runtime_error(tiny_long_df):
     """_fit_predict_with_retry retries on RuntimeError."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
 
     from ts_autopilot.contracts import ForecastOutput
     from ts_autopilot.pipeline import _fit_predict_with_retry
@@ -313,14 +313,14 @@ def test_retry_on_runtime_error(tiny_long_df):
     # Fail first, succeed second
     mock_runner.fit_predict.side_effect = [RuntimeError("convergence"), good_output]
 
-    with patch("ts_autopilot.pipeline._RETRY_BACKOFF_SEC", 0.01):
-        result = _fit_predict_with_retry(
-            runner=mock_runner,
-            train=tiny_long_df,
-            horizon=7,
-            freq="D",
-            season_length=7,
-        )
+    result = _fit_predict_with_retry(
+        runner=mock_runner,
+        train=tiny_long_df,
+        horizon=7,
+        freq="D",
+        season_length=7,
+        retry_backoff=0.01,
+    )
 
     assert result == good_output
     assert mock_runner.fit_predict.call_count == 2
@@ -328,7 +328,7 @@ def test_retry_on_runtime_error(tiny_long_df):
 
 def test_retry_exhausted_raises():
     """_fit_predict_with_retry raises after all retries exhausted."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
 
     from ts_autopilot.pipeline import _fit_predict_with_retry
     from ts_autopilot.runners.base import BaseRunner
@@ -337,16 +337,14 @@ def test_retry_exhausted_raises():
     mock_runner.name = "MockModel"
     mock_runner.fit_predict.side_effect = RuntimeError("always fails")
 
-    with (
-        patch("ts_autopilot.pipeline._RETRY_BACKOFF_SEC", 0.01),
-        pytest.raises(RuntimeError, match="failed after"),
-    ):
+    with pytest.raises(RuntimeError, match="failed after"):
         _fit_predict_with_retry(
             runner=mock_runner,
             train=pd.DataFrame(),
             horizon=7,
             freq="D",
             season_length=7,
+            retry_backoff=0.01,
         )
 
 
@@ -374,7 +372,7 @@ def test_retry_does_not_catch_value_error():
 
 def test_retry_catches_linalg_error():
     """LinAlgError should be retried like RuntimeError."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
 
     from ts_autopilot.contracts import ForecastOutput
     from ts_autopilot.pipeline import _fit_predict_with_retry
@@ -395,14 +393,14 @@ def test_retry_catches_linalg_error():
         good_output,
     ]
 
-    with patch("ts_autopilot.pipeline._RETRY_BACKOFF_SEC", 0.01):
-        result = _fit_predict_with_retry(
-            runner=mock_runner,
-            train=pd.DataFrame(),
-            horizon=7,
-            freq="D",
-            season_length=7,
-        )
+    result = _fit_predict_with_retry(
+        runner=mock_runner,
+        train=pd.DataFrame(),
+        horizon=7,
+        freq="D",
+        season_length=7,
+        retry_backoff=0.01,
+    )
     assert result == good_output
     assert mock_runner.fit_predict.call_count == 2
 

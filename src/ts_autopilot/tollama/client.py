@@ -71,19 +71,18 @@ def forecast(
     try:
         logger.debug(
             "Requesting forecast from %s (model=%s, h=%d)",
-            url, model, horizon,
+            url,
+            model,
+            horizon,
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode())
             mean = body["mean"]
             if not isinstance(mean, list) or len(mean) != horizon:
                 got = len(mean) if isinstance(mean, list) else type(mean)
-                raise TollamaError(
-                    f"Expected {horizon} forecast values, got {got}"
-                )
+                raise TollamaError(f"Expected {horizon} forecast values, got {got}")
             quantiles = {
-                k: [float(x) for x in v]
-                for k, v in body.get("quantiles", {}).items()
+                k: [float(x) for x in v] for k, v in body.get("quantiles", {}).items()
             }
             return TollamaForecastResponse(
                 mean=[float(v) for v in mean],

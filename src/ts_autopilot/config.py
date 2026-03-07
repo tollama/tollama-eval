@@ -8,6 +8,8 @@ from pathlib import Path
 
 import yaml
 
+from ts_autopilot.exceptions import ConfigError
+
 _VALID_KEYS = {
     "input",
     "output",
@@ -17,6 +19,8 @@ _VALID_KEYS = {
     "tollama_url",
     "tollama_models",
     "n_jobs",
+    "max_retries",
+    "retry_backoff",
 }
 
 
@@ -32,6 +36,8 @@ class FileConfig:
     tollama_url: str | None = None
     tollama_models: list[str] = field(default_factory=list)
     n_jobs: int | None = None
+    max_retries: int | None = None
+    retry_backoff: float | None = None
 
 
 def load_config(path: str | Path) -> FileConfig:
@@ -39,7 +45,7 @@ def load_config(path: str | Path) -> FileConfig:
 
     Raises:
         FileNotFoundError: If the file does not exist.
-        ValueError: If the file contains invalid keys or values.
+        ConfigError: If the file contains invalid keys or values.
     """
     path = Path(path)
     if not path.exists():
@@ -53,7 +59,7 @@ def load_config(path: str | Path) -> FileConfig:
     elif suffix == ".json":
         data = json.loads(text)
     else:
-        raise ValueError(
+        raise ConfigError(
             f"Unsupported config format: {suffix}. Use .yaml, .yml, or .json."
         )
 
@@ -61,11 +67,11 @@ def load_config(path: str | Path) -> FileConfig:
         data = {}
 
     if not isinstance(data, dict):
-        raise ValueError("Config file must contain a mapping (key-value pairs).")
+        raise ConfigError("Config file must contain a mapping (key-value pairs).")
 
     unknown = set(data.keys()) - _VALID_KEYS
     if unknown:
-        raise ValueError(
+        raise ConfigError(
             f"Unknown config keys: {', '.join(sorted(unknown))}. "
             f"Valid keys: {', '.join(sorted(_VALID_KEYS))}"
         )
@@ -81,13 +87,13 @@ def load_config(path: str | Path) -> FileConfig:
     if "horizon" in data:
         val = data["horizon"]
         if not isinstance(val, int) or val < 1:
-            raise ValueError(f"horizon must be a positive integer, got {val!r}")
+            raise ConfigError(f"horizon must be a positive integer, got {val!r}")
         config.horizon = val
 
     if "n_folds" in data:
         val = data["n_folds"]
         if not isinstance(val, int) or val < 1:
-            raise ValueError(f"n_folds must be a positive integer, got {val!r}")
+            raise ConfigError(f"n_folds must be a positive integer, got {val!r}")
         config.n_folds = val
 
     if "models" in data:
@@ -97,7 +103,7 @@ def load_config(path: str | Path) -> FileConfig:
         elif isinstance(val, list):
             config.models = [str(m) for m in val]
         else:
-            raise ValueError(
+            raise ConfigError(
                 "models must be a list or comma-separated "
                 f"string, got {type(val).__name__}"
             )
@@ -120,7 +126,21 @@ def load_config(path: str | Path) -> FileConfig:
     if "n_jobs" in data:
         val = data["n_jobs"]
         if not isinstance(val, int) or val < 1:
-            raise ValueError(f"n_jobs must be a positive integer, got {val!r}")
+            raise ConfigError(f"n_jobs must be a positive integer, got {val!r}")
         config.n_jobs = val
+
+    if "max_retries" in data:
+        val = data["max_retries"]
+        if not isinstance(val, int) or val < 0:
+            raise ConfigError(
+                f"max_retries must be a non-negative integer, got {val!r}"
+            )
+        config.max_retries = val
+
+    if "retry_backoff" in data:
+        val = data["retry_backoff"]
+        if not isinstance(val, int | float) or val <= 0:
+            raise ConfigError(f"retry_backoff must be a positive number, got {val!r}")
+        config.retry_backoff = float(val)
 
     return config
