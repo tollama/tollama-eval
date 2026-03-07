@@ -110,10 +110,11 @@ def test_report_mase_color_coding(benchmark_result):
     assert "mase-bad" in html
 
 
-def test_report_bar_chart(benchmark_result):
+def test_report_plotly_charts(benchmark_result):
     html = render_report(benchmark_result)
-    assert "bar-chart" in html
-    assert "bar-fill" in html
+    assert "plotly" in html.lower()
+    assert 'id="chart-mase"' in html
+    assert 'id="chart-heatmap"' in html
 
 
 def test_report_generated_timestamp(benchmark_result):
@@ -150,8 +151,8 @@ def test_report_empty_leaderboard(benchmark_result_with_warnings):
     """Report renders without errors when leaderboard is empty."""
     html = render_report(benchmark_result_with_warnings)
     assert "Leaderboard" in html
-    # Bar chart section exists but has no bar rows
-    assert "bar-chart" in html
+    # Chart container exists even when empty
+    assert 'id="chart-mase"' in html
 
 
 def test_report_per_series_breakdown():
@@ -203,6 +204,14 @@ def test_report_no_per_series_without_scores(benchmark_result):
     """Report omits per-series section when series_scores are empty."""
     html = render_report(benchmark_result)
     assert "Per-Series Breakdown" not in html
+
+
+def test_report_multi_metric_leaderboard(benchmark_result):
+    """Report leaderboard table shows all 4 metrics."""
+    html = render_report(benchmark_result)
+    assert "SMAPE" in html
+    assert "RMSSE" in html
+    assert "MAE" in html
 
 
 def test_report_tollama_interpretation():

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ts-autopilot Report</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
     <style>
         :root {
             --green: #28a745;
@@ -16,12 +17,10 @@
             --gold: #ffc107;
             --silver: #adb5bd;
             --bronze: #cd7f32;
-            --bar-bg: #e2e6ea;
-            --bar-fill: #4a90d9;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            max-width: 960px; margin: 2rem auto; padding: 0 1.5rem;
+            max-width: 1060px; margin: 2rem auto; padding: 0 1.5rem;
             color: #212529; line-height: 1.5;
         }
         h1 { border-bottom: 2px solid #dee2e6; padding-bottom: 0.5rem; }
@@ -47,24 +46,13 @@
         }
         .warnings-box ul { margin: 0.25rem 0 0 0; padding-left: 1.25rem; }
 
-        .bar-chart { margin: 1.5rem 0; }
-        .bar-row { display: flex; align-items: center; margin-bottom: 0.5rem; }
-        .bar-label { width: 140px; font-weight: 500; flex-shrink: 0; }
-        .bar-track { flex: 1; background: var(--bar-bg); border-radius: 4px; height: 28px; position: relative; }
-        .bar-fill {
-            background: var(--bar-fill); border-radius: 4px; height: 100%;
-            display: flex; align-items: center; padding: 0 8px;
-            color: white; font-size: 0.85rem; font-weight: 500;
-            min-width: fit-content; box-sizing: border-box;
-        }
-        .bar-fill.best { background: var(--green); }
-
         .worst-series { background: var(--red-bg); }
         .meta { color: #6c757d; font-size: 0.9rem; }
 
+        .chart-container { margin: 1.5rem 0; }
+
         @media print {
             body { max-width: 100%; margin: 0; }
-            .bar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             tr:nth-child(even) { background: transparent !important; }
             th { background: transparent !important; border-bottom: 2px solid #000; }
         }
@@ -100,47 +88,51 @@
 
     <h2>Leaderboard</h2>
 
-    <div class="bar-chart">
-        {% for entry in leaderboard %}
-        <div class="bar-row">
-            <span class="bar-label">#{{ entry.rank }} {{ entry.name }}</span>
-            <div class="bar-track">
-                <div class="bar-fill{% if entry.rank == 1 %} best{% endif %}" style="width: {{ (entry.mean_mase / max_mase * 100)|round }}%">
-                    {{ "%.4f"|format(entry.mean_mase) }}
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
+    <div id="chart-mase" class="chart-container"></div>
 
     <table>
         <tr>
             <th>Rank</th>
             <th>Model</th>
-            <th>Mean MASE</th>
+            <th>MASE</th>
+            <th>SMAPE</th>
+            <th>RMSSE</th>
+            <th>MAE</th>
         </tr>
         {% for entry in leaderboard %}
         <tr class="{% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% endif %}">
             <td>{{ entry.rank }}</td>
             <td>{{ entry.name }}</td>
-            <td class="{% if entry.mean_mase < 1.0 %}mase-good{% elif entry.mean_mase > 1.0 %}mase-bad{% endif %}">{{ "%.6f"|format(entry.mean_mase) }}</td>
+            <td class="{% if entry.mean_mase < 1.0 %}mase-good{% elif entry.mean_mase > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(entry.mean_mase) }}</td>
+            <td>{{ "%.2f"|format(entry.mean_smape) }}%</td>
+            <td class="{% if entry.mean_rmsse < 1.0 %}mase-good{% elif entry.mean_rmsse > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(entry.mean_rmsse) }}</td>
+            <td>{{ "%.4f"|format(entry.mean_mae) }}</td>
         </tr>
         {% endfor %}
     </table>
+
+    <h2>MASE by Fold</h2>
+    <div id="chart-heatmap" class="chart-container"></div>
 
     <h2>Model Details</h2>
     {% for model in models %}
     <h3>{{ model.name }}</h3>
     <p>Runtime: {{ "%.4f"|format(model.runtime_sec) }}s |
-       Mean MASE: <span class="{% if model.mean_mase < 1.0 %}mase-good{% elif model.mean_mase > 1.0 %}mase-bad{% endif %}">{{ "%.6f"|format(model.mean_mase) }}</span> |
-       Std MASE: {{ "%.6f"|format(model.std_mase) }}</p>
+       Mean MASE: <span class="{% if model.mean_mase < 1.0 %}mase-good{% elif model.mean_mase > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(model.mean_mase) }}</span> |
+       Std MASE: {{ "%.4f"|format(model.std_mase) }} |
+       SMAPE: {{ "%.2f"|format(model.mean_smape) }}% |
+       RMSSE: {{ "%.4f"|format(model.mean_rmsse) }} |
+       MAE: {{ "%.4f"|format(model.mean_mae) }}</p>
     <table>
-        <tr><th>Fold</th><th>Cutoff</th><th>MASE</th></tr>
+        <tr><th>Fold</th><th>Cutoff</th><th>MASE</th><th>SMAPE</th><th>RMSSE</th><th>MAE</th></tr>
         {% for fold in model.folds %}
         <tr>
             <td>{{ fold.fold }}</td>
             <td>{{ fold.cutoff }}</td>
-            <td class="{% if fold.mase < 1.0 %}mase-good{% elif fold.mase > 1.0 %}mase-bad{% endif %}">{{ "%.6f"|format(fold.mase) }}</td>
+            <td class="{% if fold.mase < 1.0 %}mase-good{% elif fold.mase > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(fold.mase) }}</td>
+            <td>{{ "%.2f"|format(fold.smape) }}%</td>
+            <td class="{% if fold.rmsse < 1.0 %}mase-good{% elif fold.rmsse > 1.0 %}mase-bad{% endif %}">{{ "%.4f"|format(fold.rmsse) }}</td>
+            <td>{{ "%.4f"|format(fold.mae) }}</td>
         </tr>
         {% endfor %}
     </table>
@@ -179,5 +171,70 @@
     <footer>
         <p class="meta">Generated by ts-autopilot v{{ version }} | {{ generated_at }}</p>
     </footer>
+
+    <script>
+    (function() {
+        var chartData = {{ chart_data | tojson }};
+
+        // MASE Comparison Bar Chart
+        if (chartData.bar_names.length > 0) {
+            var barTrace = {
+                type: 'bar',
+                orientation: 'h',
+                y: chartData.bar_names.slice().reverse(),
+                x: chartData.bar_mase.slice().reverse(),
+                marker: { color: chartData.bar_colors.slice().reverse() },
+                text: chartData.bar_mase.slice().reverse().map(function(v) { return v.toFixed(4); }),
+                textposition: 'outside',
+                hovertemplate: '%{y}: MASE=%{x:.4f}<extra></extra>'
+            };
+            Plotly.newPlot('chart-mase', [barTrace], {
+                title: { text: 'Model Comparison (MASE)', font: { size: 16 } },
+                xaxis: { title: 'MASE (lower is better)', zeroline: true },
+                yaxis: { automargin: true },
+                shapes: [{
+                    type: 'line', x0: 1, x1: 1, y0: -0.5, y1: chartData.bar_names.length - 0.5,
+                    line: { color: '#6c757d', width: 2, dash: 'dash' }
+                }],
+                annotations: [{
+                    x: 1, y: chartData.bar_names.length - 0.5,
+                    text: 'Naive baseline', showarrow: false,
+                    font: { size: 11, color: '#6c757d' }, xanchor: 'left', xshift: 4
+                }],
+                margin: { l: 120, r: 60, t: 50, b: 40 },
+                height: Math.max(250, chartData.bar_names.length * 45 + 100)
+            }, { responsive: true });
+        }
+
+        // MASE by Fold Heatmap
+        if (chartData.heatmap_z.length > 0) {
+            var heatTrace = {
+                type: 'heatmap',
+                z: chartData.heatmap_z,
+                x: chartData.heatmap_folds,
+                y: chartData.heatmap_models,
+                colorscale: [
+                    [0, '#28a745'],
+                    [0.5, '#ffc107'],
+                    [1, '#dc3545']
+                ],
+                colorbar: { title: 'MASE' },
+                hovertemplate: '%{y} | %{x}<br>MASE: %{z:.4f}<extra></extra>',
+                text: chartData.heatmap_z.map(function(row) {
+                    return row.map(function(v) { return v.toFixed(4); });
+                }),
+                texttemplate: '%{text}',
+                textfont: { size: 12 }
+            };
+            Plotly.newPlot('chart-heatmap', [heatTrace], {
+                title: { text: 'MASE by Model and Fold', font: { size: 16 } },
+                xaxis: { title: '' },
+                yaxis: { automargin: true },
+                margin: { l: 120, r: 40, t: 50, b: 40 },
+                height: Math.max(250, chartData.heatmap_models.length * 50 + 100)
+            }, { responsive: true });
+        }
+    })();
+    </script>
 </body>
 </html>
