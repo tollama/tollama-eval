@@ -28,13 +28,20 @@ from ts_autopilot.ingestion.loader import load_csv
 from ts_autopilot.ingestion.profiler import profile_dataframe
 from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
-from ts_autopilot.runners.statistical import AutoETSRunner, SeasonalNaiveRunner
+from ts_autopilot.runners.statistical import (
+    AutoARIMARunner,
+    AutoETSRunner,
+    AutoThetaRunner,
+    SeasonalNaiveRunner,
+)
 
 logger = get_logger("pipeline")
 
 DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
     SeasonalNaiveRunner(),
     AutoETSRunner(),
+    AutoARIMARunner(),
+    AutoThetaRunner(),
 )
 
 

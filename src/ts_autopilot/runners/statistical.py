@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from statsforecast.models import AutoETS, SeasonalNaive
+from statsforecast.models import AutoARIMA, AutoETS, AutoTheta, SeasonalNaive
 
 from ts_autopilot.runners.base import StatsForecastRunner
 
@@ -23,3 +23,21 @@ class AutoETSRunner(StatsForecastRunner):
 
     def _make_model(self, season_length: int) -> object:
         return AutoETS(season_length=season_length)
+
+
+class AutoARIMARunner(StatsForecastRunner):
+    @property
+    def name(self) -> str:
+        return "AutoARIMA"
+
+    def _make_model(self, season_length: int) -> object:
+        return AutoARIMA(season_length=season_length)
+
+
+class AutoThetaRunner(StatsForecastRunner):
+    @property
+    def name(self) -> str:
+        return "AutoTheta"
+
+    def _make_model(self, season_length: int) -> object:
+        return AutoTheta(season_length=season_length)
