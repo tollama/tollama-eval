@@ -136,6 +136,9 @@ class NHITSRunner(BaseRunner):
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
+            accelerator="cpu",
+            start_padding_enabled=True,
+            enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)
         nf.fit(df=train)
@@ -179,6 +182,9 @@ class NBEATSRunner(BaseRunner):
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
+            accelerator="cpu",
+            start_padding_enabled=True,
+            enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)
         nf.fit(df=train)
