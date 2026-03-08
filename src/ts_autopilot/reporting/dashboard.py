@@ -106,9 +106,7 @@ def _show_sample_format() -> None:
     with col2:
         st.markdown("**Wide format**")
         st.code(
-            "date,series_1,series_2\n"
-            "2020-01-01,10.5,20.0\n"
-            "2020-01-02,11.2,21.5",
+            "date,series_1,series_2\n2020-01-01,10.5,20.0\n2020-01-02,11.2,21.5",
             language="csv",
         )
 
@@ -235,8 +233,14 @@ def _run_benchmark(
         if result.models and len(result.models[0].folds) > 1:
             fig2 = go.Figure()
             colors = [
-                "#2563eb", "#dc2626", "#059669", "#d97706",
-                "#7c3aed", "#db2777", "#0891b2", "#65a30d",
+                "#2563eb",
+                "#dc2626",
+                "#059669",
+                "#d97706",
+                "#7c3aed",
+                "#db2777",
+                "#0891b2",
+                "#65a30d",
             ]
             for i, model in enumerate(result.models):
                 fig2.add_trace(

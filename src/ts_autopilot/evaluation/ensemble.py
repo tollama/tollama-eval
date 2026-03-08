@@ -37,9 +37,7 @@ class EnsembleRecommendation:
             f"Ensemble recommendation across {self.n_series} series "
             f"and {self.n_models} models:"
         ]
-        for model, wins in sorted(
-            self.model_win_counts.items(), key=lambda x: -x[1]
-        ):
+        for model, wins in sorted(self.model_win_counts.items(), key=lambda x: -x[1]):
             pct = 100 * wins / self.n_series if self.n_series > 0 else 0
             lines.append(f"  {model}: best for {wins} series ({pct:.0f}%)")
         lines.append(
@@ -76,8 +74,7 @@ def recommend_ensemble(result: BenchmarkResult) -> EnsembleRecommendation:
     model_series_avg: dict[str, dict[str, float]] = {}
     for model_name, series_dict in model_series_scores.items():
         model_series_avg[model_name] = {
-            sid: sum(scores) / len(scores)
-            for sid, scores in series_dict.items()
+            sid: sum(scores) / len(scores) for sid, scores in series_dict.items()
         }
 
     # Find all unique series

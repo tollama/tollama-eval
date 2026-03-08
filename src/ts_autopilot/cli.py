@@ -285,9 +285,7 @@ def run(
     # Set up progress display (rich if available, plain text otherwise)
     use_rich = _try_rich() and not log_json
     if use_rich:
-        progress, _mtask, _ftask, progress_cb = _make_rich_progress_cb(
-            quiet, verbose
-        )
+        progress, _mtask, _ftask, progress_cb = _make_rich_progress_cb(quiet, verbose)
     else:
         progress = None
         progress_cb = _make_plain_progress_cb(quiet, verbose)
@@ -450,17 +448,30 @@ def campaign(
     input_dir: Path = _INPUT_DIR_OPTION,
     output: Path = _OUTPUT_OPTION,
     horizon: int = typer.Option(
-        14, "--horizon", "-H", help="Forecast horizon.", min=1,
+        14,
+        "--horizon",
+        "-H",
+        help="Forecast horizon.",
+        min=1,
     ),
     n_folds: int = typer.Option(
-        3, "--n-folds", "-k", help="Number of CV folds.", min=1,
+        3,
+        "--n-folds",
+        "-k",
+        help="Number of CV folds.",
+        min=1,
     ),
     models: str | None = typer.Option(
-        None, "--models", "-m",
+        None,
+        "--models",
+        "-m",
         help="Comma-separated list of models.",
     ),
     quiet: bool = typer.Option(
-        False, "--quiet", "-q", help="Suppress output.",
+        False,
+        "--quiet",
+        "-q",
+        help="Suppress output.",
     ),
 ) -> None:
     """Run benchmarks across multiple CSV files in a directory."""
@@ -470,7 +481,8 @@ def campaign(
     if not csv_files:
         typer.secho(
             f"No CSV files found in {input_dir}",
-            fg=typer.colors.RED, err=True,
+            fg=typer.colors.RED,
+            err=True,
         )
         raise typer.Exit(code=ExitCode.DATA_ERROR)
 
@@ -513,21 +525,23 @@ def campaign(
             results_summary.append(entry)
             if not quiet and winner:
                 typer.secho(
-                    f"  Best: {winner.name} "
-                    f"(MASE={winner.mean_mase:.4f})",
+                    f"  Best: {winner.name} (MASE={winner.mean_mase:.4f})",
                     fg=typer.colors.GREEN,
                 )
         except Exception as exc:
-            results_summary.append({
-                "dataset": dataset_name,
-                "status": f"error: {exc}",
-                "n_series": 0,
-                "best_model": "N/A",
-                "best_mase": None,
-            })
+            results_summary.append(
+                {
+                    "dataset": dataset_name,
+                    "status": f"error: {exc}",
+                    "n_series": 0,
+                    "best_model": "N/A",
+                    "best_mase": None,
+                }
+            )
             if not quiet:
                 typer.secho(
-                    f"  Error: {exc}", fg=typer.colors.RED,
+                    f"  Error: {exc}",
+                    fg=typer.colors.RED,
                 )
 
     elapsed = time.perf_counter() - t0

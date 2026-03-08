@@ -14,8 +14,12 @@ from ts_autopilot.evaluation.ensemble import recommend_ensemble
 def _make_result(series_scores_a=None, series_scores_b=None):
     """Create a BenchmarkResult with per-series scores."""
     profile = DataProfile(
-        n_series=2, frequency="D", missing_ratio=0.0,
-        season_length_guess=7, min_length=60, max_length=60,
+        n_series=2,
+        frequency="D",
+        missing_ratio=0.0,
+        season_length_guess=7,
+        min_length=60,
+        max_length=60,
         total_rows=120,
     )
     config = BenchmarkConfig(horizon=14, n_folds=2)
@@ -24,30 +28,34 @@ def _make_result(series_scores_a=None, series_scores_b=None):
     sb = series_scores_b or {"s1": 1.0, "s2": 0.6}
 
     folds_a = [
-        FoldResult(fold=1, cutoff="2020-02-15", mase=0.8,
-                   series_scores=sa),
-        FoldResult(fold=2, cutoff="2020-02-29", mase=0.85,
-                   series_scores=sa),
+        FoldResult(fold=1, cutoff="2020-02-15", mase=0.8, series_scores=sa),
+        FoldResult(fold=2, cutoff="2020-02-29", mase=0.85, series_scores=sa),
     ]
     folds_b = [
-        FoldResult(fold=1, cutoff="2020-02-15", mase=0.8,
-                   series_scores=sb),
-        FoldResult(fold=2, cutoff="2020-02-29", mase=0.8,
-                   series_scores=sb),
+        FoldResult(fold=1, cutoff="2020-02-15", mase=0.8, series_scores=sb),
+        FoldResult(fold=2, cutoff="2020-02-29", mase=0.8, series_scores=sb),
     ]
     models = [
-        ModelResult(name="ModelA", runtime_sec=1.0, folds=folds_a,
-                    mean_mase=0.825, std_mase=0.025),
-        ModelResult(name="ModelB", runtime_sec=2.0, folds=folds_b,
-                    mean_mase=0.8, std_mase=0.0),
+        ModelResult(
+            name="ModelA",
+            runtime_sec=1.0,
+            folds=folds_a,
+            mean_mase=0.825,
+            std_mase=0.025,
+        ),
+        ModelResult(
+            name="ModelB", runtime_sec=2.0, folds=folds_b, mean_mase=0.8, std_mase=0.0
+        ),
     ]
     leaderboard = [
         LeaderboardEntry(rank=1, name="ModelB", mean_mase=0.8),
         LeaderboardEntry(rank=2, name="ModelA", mean_mase=0.825),
     ]
     return BenchmarkResult(
-        profile=profile, config=config,
-        models=models, leaderboard=leaderboard,
+        profile=profile,
+        config=config,
+        models=models,
+        leaderboard=leaderboard,
     )
 
 
@@ -95,22 +103,29 @@ def test_ensemble_summary_text():
 def test_ensemble_no_series_scores():
     """When no per-series scores exist, return empty recommendation."""
     profile = DataProfile(
-        n_series=2, frequency="D", missing_ratio=0.0,
-        season_length_guess=7, min_length=60, max_length=60,
+        n_series=2,
+        frequency="D",
+        missing_ratio=0.0,
+        season_length_guess=7,
+        min_length=60,
+        max_length=60,
         total_rows=120,
     )
     config = BenchmarkConfig(horizon=14, n_folds=1)
     folds = [FoldResult(fold=1, cutoff="2020-02-15", mase=0.8)]
     models = [
-        ModelResult(name="ModelA", runtime_sec=1.0, folds=folds,
-                    mean_mase=0.8, std_mase=0.0),
+        ModelResult(
+            name="ModelA", runtime_sec=1.0, folds=folds, mean_mase=0.8, std_mase=0.0
+        ),
     ]
     leaderboard = [
         LeaderboardEntry(rank=1, name="ModelA", mean_mase=0.8),
     ]
     result = BenchmarkResult(
-        profile=profile, config=config,
-        models=models, leaderboard=leaderboard,
+        profile=profile,
+        config=config,
+        models=models,
+        leaderboard=leaderboard,
     )
     rec = recommend_ensemble(result)
     assert rec.n_series == 0

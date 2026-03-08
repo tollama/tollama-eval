@@ -44,9 +44,7 @@ def export_leaderboard_csv(result: BenchmarkResult, output_path: str | Path) -> 
     return output_path
 
 
-def export_fold_details_csv(
-    result: BenchmarkResult, output_path: str | Path
-) -> Path:
+def export_fold_details_csv(result: BenchmarkResult, output_path: str | Path) -> Path:
     """Export per-model per-fold details as a CSV file.
 
     Args:
@@ -82,9 +80,7 @@ def export_fold_details_csv(
     return output_path
 
 
-def export_per_series_csv(
-    result: BenchmarkResult, output_path: str | Path
-) -> Path:
+def export_per_series_csv(result: BenchmarkResult, output_path: str | Path) -> Path:
     """Export per-series scores across all models as a CSV file.
 
     Args:

@@ -141,7 +141,10 @@ def test_summary_smape_included():
     result = _make_result()
     # Default smape is 0, so it won't show
     result.leaderboard[0] = LeaderboardEntry(
-        rank=1, name="AutoETS", mean_mase=0.85, mean_smape=12.5,
+        rank=1,
+        name="AutoETS",
+        mean_mase=0.85,
+        mean_smape=12.5,
     )
     summary = generate_executive_summary(result)
     assert "SMAPE" in summary
@@ -162,14 +165,14 @@ def test_summary_model_comparison_3_models():
     # Add a third model
     result.models.append(
         ModelResult(
-            name="AutoARIMA", runtime_sec=3.0,
+            name="AutoARIMA",
+            runtime_sec=3.0,
             folds=[FoldResult(fold=1, cutoff="2020-06-01", mase=0.9)],
-            mean_mase=0.9, std_mase=0.03,
+            mean_mase=0.9,
+            std_mase=0.03,
         )
     )
-    result.leaderboard.append(
-        LeaderboardEntry(rank=3, name="AutoARIMA", mean_mase=0.9)
-    )
+    result.leaderboard.append(LeaderboardEntry(rank=3, name="AutoARIMA", mean_mase=0.9))
     summary = generate_executive_summary(result)
     assert "beat" in summary.lower() or "naive" in summary.lower()
 

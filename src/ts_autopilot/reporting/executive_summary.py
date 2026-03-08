@@ -175,8 +175,9 @@ def _model_comparison_narrative(result: BenchmarkResult) -> str:
         fastest = min(models, key=lambda m: m.runtime_sec)
         best = next((m for m in models if m.name == lb[0].name), None)
         if best and fastest.name != best.name:
-            speedup = (best.runtime_sec / fastest.runtime_sec
-                       if fastest.runtime_sec > 0 else 0)
+            speedup = (
+                best.runtime_sec / fastest.runtime_sec if fastest.runtime_sec > 0 else 0
+            )
             if speedup > 2:
                 parts.append(
                     f"{fastest.name} runs {speedup:.1f}x faster than "
