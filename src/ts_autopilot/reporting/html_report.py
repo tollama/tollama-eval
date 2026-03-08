@@ -40,6 +40,8 @@ def render_report(
     )
 
     chart_data = _build_chart_data(result)
+    pareto_data = _build_pareto_chart_data(result)
+    chart_data["pareto"] = pareto_data
     executive_summary = generate_executive_summary(result)
 
     # Detect if any tollama TSFM models are in the results
@@ -267,3 +269,31 @@ def _build_diagnostics_chart_data(result: BenchmarkResult) -> dict:
         "residuals": diag.residuals,
         "fitted": diag.fitted,
     }
+
+
+def _build_pareto_chart_data(result: BenchmarkResult) -> dict:
+    """Build Pareto frontier (accuracy vs speed) chart data."""
+    from ts_autopilot.evaluation.speed_benchmark import compute_speed_report
+
+    if not result.models:
+        return {"points": [], "frontier": []}
+
+    report = compute_speed_report(result)
+
+    points = []
+    frontier = []
+    for pp in report.pareto_points:
+        point = {
+            "name": pp.model_name,
+            "mase": round(pp.mean_mase, 4),
+            "runtime": round(pp.total_runtime_sec, 4),
+            "is_pareto": pp.is_pareto_optimal,
+        }
+        points.append(point)
+        if pp.is_pareto_optimal:
+            frontier.append(point)
+
+    # Sort frontier by runtime for line drawing
+    frontier.sort(key=lambda p: p["runtime"])
+
+    return {"points": points, "frontier": frontier}

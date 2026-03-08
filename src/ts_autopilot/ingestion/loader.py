@@ -48,6 +48,7 @@ def _validate_path(path: Path) -> Path:
 def load_csv(
     path: str | Path,
     max_memory_mb: int = _MAX_MEMORY_MB_DEFAULT,
+    exog_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Load a CSV and return a canonical long-format DataFrame.
 
@@ -56,12 +57,17 @@ def load_csv(
       - ds: datetime64[ns] (timezone-naive)
       - y: float64
 
+    If the CSV has additional numeric columns beyond the canonical set,
+    they are preserved as exogenous variables.
+
     Supports long format (unique_id, ds, y) and wide format
     (dates as index/first column, series as remaining columns).
 
     Args:
         path: Path to the CSV file.
         max_memory_mb: Maximum in-memory DataFrame size in MB (default 2048).
+        exog_cols: Explicit list of exogenous column names to keep.
+            If None, auto-detect extra numeric columns in long format.
 
     Raises:
         SchemaError: if the file cannot be parsed into canonical format.
@@ -84,7 +90,7 @@ def load_csv(
     # Long format: has ds and y columns
     if "ds" in cols and "y" in cols:
         logger.debug("Detected long format (columns: %s)", sorted(cols))
-        result = _parse_long(df)
+        result = _parse_long(df, exog_cols=exog_cols)
     else:
         # Wide format: try to parse first column as dates
         logger.debug("Attempting wide format parse (columns: %s)", sorted(cols))
@@ -110,12 +116,19 @@ def load_csv(
     return result
 
 
-def _parse_long(df: pd.DataFrame) -> pd.DataFrame:
+def _parse_long(
+    df: pd.DataFrame,
+    exog_cols: list[str] | None = None,
+) -> pd.DataFrame:
     """Validate and coerce a long-format DataFrame."""
     if "unique_id" not in df.columns:
         df["unique_id"] = "series_1"
 
-    return _coerce_canonical(df)
+    # Detect exogenous columns
+    if exog_cols is None:
+        exog_cols = detect_exog_columns(df)
+
+    return _coerce_canonical(df, extra_cols=exog_cols)
 
 
 def _parse_wide(df: pd.DataFrame, path: str | Path) -> pd.DataFrame:
@@ -160,9 +173,36 @@ def _parse_wide(df: pd.DataFrame, path: str | Path) -> pd.DataFrame:
     return _coerce_canonical(long)
 
 
-def _coerce_canonical(df: pd.DataFrame) -> pd.DataFrame:
+def detect_exog_columns(df: pd.DataFrame) -> list[str]:
+    """Detect exogenous columns in a long-format DataFrame.
+
+    Returns column names that are numeric and not part of the canonical set.
+
+    Args:
+        df: DataFrame with at least (unique_id, ds, y) columns.
+
+    Returns:
+        List of exogenous column names.
+    """
+    canonical = {"unique_id", "ds", "y"}
+    exog = []
+    for col in df.columns:
+        if col in canonical:
+            continue
+        if pd.api.types.is_numeric_dtype(df[col]):
+            exog.append(col)
+    return exog
+
+
+def _coerce_canonical(
+    df: pd.DataFrame,
+    extra_cols: list[str] | None = None,
+) -> pd.DataFrame:
     """Apply final type coercions and sorting."""
-    df = df[["unique_id", "ds", "y"]].copy()
+    keep = ["unique_id", "ds", "y"]
+    if extra_cols:
+        keep.extend(c for c in extra_cols if c in df.columns)
+    df = df[keep].copy()
 
     df["unique_id"] = df["unique_id"].astype(str)
     df["ds"] = pd.to_datetime(df["ds"])
@@ -173,11 +213,18 @@ def _coerce_canonical(df: pd.DataFrame) -> pd.DataFrame:
 
     df["y"] = df["y"].astype("float64")
 
+    # Coerce exogenous columns to float
+    if extra_cols:
+        for col in extra_cols:
+            if col in df.columns:
+                df[col] = df[col].astype("float64")
+
     df = df.sort_values(["unique_id", "ds"]).reset_index(drop=True)
 
     logger.debug(
-        "Canonical DataFrame: %d rows, %d series",
+        "Canonical DataFrame: %d rows, %d series, %d exog cols",
         len(df),
         df["unique_id"].nunique(),
+        len(extra_cols or []),
     )
     return df

@@ -80,7 +80,7 @@ class DynamicOptimizedThetaRunner(StatsForecastRunner):
 
     @property
     def name(self) -> str:
-        return "DOTheta"
+        return "DynamicOptimizedTheta"
 
     def _make_model(self, season_length: int) -> object:
         from statsforecast.models import DynamicOptimizedTheta
