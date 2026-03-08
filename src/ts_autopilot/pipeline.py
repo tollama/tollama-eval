@@ -4,10 +4,19 @@ from __future__ import annotations
 
 import contextlib
 import os
+import signal
 import tempfile
+import threading
 import time
+import uuid
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ts_autopilot.cache import ResultCache
 
 import numpy as np
 import pandas as pd
@@ -31,9 +40,7 @@ from ts_autopilot.evaluation.metrics import (
     per_series_rmsse,
     per_series_smape,
 )
-from ts_autopilot.exceptions import ModelFitError
-from ts_autopilot.ingestion.loader import load_csv
-from ts_autopilot.ingestion.profiler import profile_dataframe
+from ts_autopilot.exceptions import ModelFitError, ModelTimeoutError
 from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
 from ts_autopilot.runners.optional import get_optional_runners
@@ -55,6 +62,41 @@ DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
     AutoCESRunner(),
     *get_optional_runners(),
 )
+
+DEFAULT_MAX_RETRIES = 2
+DEFAULT_RETRY_BACKOFF_SEC = 1.0
+DEFAULT_MODEL_TIMEOUT_SEC = 300.0
+
+# Global shutdown event for graceful signal handling
+_shutdown_event = threading.Event()
+
+
+def _install_signal_handlers() -> None:
+    """Install SIGINT/SIGTERM handlers that set the shutdown event."""
+
+    def _handler(signum: int, frame: object) -> None:
+        logger.warning("Received signal %d, shutting down gracefully...", signum)
+        _shutdown_event.set()
+
+    # Only install in main thread
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, _handler)
+        # SIGINT is handled by Python's default KeyboardInterrupt,
+        # but we also set the event so the pipeline loop can break cleanly
+        prev_handler = signal.getsignal(signal.SIGINT)
+
+        def _int_handler(signum: int, frame: object) -> None:
+            _shutdown_event.set()
+            is_custom = (
+                callable(prev_handler)
+                and prev_handler is not signal.default_int_handler
+            )
+            if is_custom:
+                prev_handler(signum, frame)
+            else:
+                raise KeyboardInterrupt
+
+        signal.signal(signal.SIGINT, _int_handler)
 
 
 def _validate_dataframe(df: pd.DataFrame) -> list[str]:
@@ -159,10 +201,6 @@ def _detect_date_gaps(df: pd.DataFrame, freq: str) -> list[str]:
     return warnings
 
 
-DEFAULT_MAX_RETRIES = 2
-DEFAULT_RETRY_BACKOFF_SEC = 1.0
-
-
 def _fit_predict_with_retry(
     runner: BaseRunner,
     train: pd.DataFrame,
@@ -172,23 +210,38 @@ def _fit_predict_with_retry(
     n_jobs: int = 1,
     max_retries: int = DEFAULT_MAX_RETRIES,
     retry_backoff: float = DEFAULT_RETRY_BACKOFF_SEC,
+    model_timeout_sec: float = DEFAULT_MODEL_TIMEOUT_SEC,
 ) -> ForecastOutput:
     """Call runner.fit_predict with retry on transient failures.
 
     Retries up to *max_retries* times with exponential backoff.
     Only retries on RuntimeError (e.g. numerical convergence issues);
     ValueError and similar are raised immediately.
+
+    If model_timeout_sec > 0, each attempt is wrapped in a timeout.
     """
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
         try:
-            return runner.fit_predict(
-                train=train,
-                horizon=horizon,
-                freq=freq,
-                season_length=season_length,
-                n_jobs=n_jobs,
-            )
+            if model_timeout_sec > 0:
+                output = _run_with_timeout(
+                    runner,
+                    train,
+                    horizon,
+                    freq,
+                    season_length,
+                    n_jobs,
+                    model_timeout_sec,
+                )
+            else:
+                output = runner.fit_predict(
+                    train=train,
+                    horizon=horizon,
+                    freq=freq,
+                    season_length=season_length,
+                    n_jobs=n_jobs,
+                )
+            return output
         except (RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
             last_exc = exc
             if attempt < max_retries:
@@ -209,9 +262,36 @@ def _fit_predict_with_retry(
                     max_retries + 1,
                     exc,
                 )
+        except ModelTimeoutError:
+            raise
         except Exception:
             raise
     raise ModelFitError(runner.name, max_retries + 1, last_exc)
+
+
+def _run_with_timeout(
+    runner: BaseRunner,
+    train: pd.DataFrame,
+    horizon: int,
+    freq: str,
+    season_length: int,
+    n_jobs: int,
+    timeout_sec: float,
+) -> ForecastOutput:
+    """Run fit_predict in a thread with timeout."""
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            runner.fit_predict,
+            train=train,
+            horizon=horizon,
+            freq=freq,
+            season_length=season_length,
+            n_jobs=n_jobs,
+        )
+        try:
+            return future.result(timeout=timeout_sec)
+        except FuturesTimeoutError as exc:
+            raise ModelTimeoutError(runner.name, timeout_sec) from exc
 
 
 def run_benchmark(
@@ -224,6 +304,11 @@ def run_benchmark(
     n_jobs: int = 1,
     max_retries: int = DEFAULT_MAX_RETRIES,
     retry_backoff: float = DEFAULT_RETRY_BACKOFF_SEC,
+    model_timeout_sec: float = DEFAULT_MODEL_TIMEOUT_SEC,
+    run_id: str | None = None,
+    cache: ResultCache | None = None,
+    data_hash: str | None = None,
+    parallel_models: bool = False,
 ) -> BenchmarkResult:
     """Run the full benchmark pipeline (pure logic, no I/O).
 
@@ -235,6 +320,11 @@ def run_benchmark(
       5. Aggregate into ModelResult + leaderboard
       6. Return BenchmarkResult
     """
+    if run_id is None:
+        run_id = uuid.uuid4().hex[:12]
+
+    logger.info("[run_id=%s] Benchmark starting", run_id)
+
     if runners is None:
         runners = list(DEFAULT_RUNNERS)
 
@@ -264,7 +354,8 @@ def run_benchmark(
     warnings = list(dict.fromkeys(warnings))
 
     logger.info(
-        "Starting benchmark: %d series, horizon=%d, n_folds=%d, models=%s",
+        "[run_id=%s] Starting benchmark: %d series, horizon=%d, n_folds=%d, models=%s",
+        run_id,
         profile.n_series,
         horizon,
         n_folds,
@@ -277,22 +368,29 @@ def run_benchmark(
     all_forecast_data: list[ForecastData] = []
     pipeline_t0 = time.perf_counter()
 
-    for runner_idx, runner in enumerate(runners):
-        if progress_callback is not None:
-            progress_callback("model", runner_idx + 1, len(runners))
-
+    def _run_single_model(
+        runner: BaseRunner,
+        runner_idx: int,
+    ) -> tuple[ModelResult, list[ForecastData]]:
+        """Run all folds for a single model. Returns (ModelResult, forecasts)."""
         logger.info(
-            "Running model %d/%d: %s",
+            "[run_id=%s] Running model %d/%d: %s",
+            run_id,
             runner_idx + 1,
             len(runners),
             runner.name,
         )
 
-        fold_results: list[FoldResult] = []
+        fold_results_inner: list[FoldResult] = []
+        forecast_data: list[ForecastData] = []
         total_runtime = 0.0
+        model_failed = False
 
         for fold_idx, split in enumerate(splits):
-            if progress_callback is not None:
+            if _shutdown_event.is_set():
+                break
+
+            if not parallel_models and progress_callback is not None:
                 progress_callback("fold", fold_idx + 1, len(splits))
 
             logger.debug(
@@ -304,28 +402,48 @@ def run_benchmark(
                 len(split.test),
             )
 
-            output = _fit_predict_with_retry(
-                runner=runner,
-                train=split.train,
-                horizon=horizon,
-                freq=profile.frequency,
-                season_length=profile.season_length_guess,
-                n_jobs=n_jobs,
-                max_retries=max_retries,
-                retry_backoff=retry_backoff,
-            )
+            # Check cache before running the model
+            if cache is not None and data_hash is not None:
+                cached = cache.get(data_hash, runner.name, split.fold)
+                if cached is not None:
+                    fold_results_inner.append(cached)
+                    continue
+
+            try:
+                output = _fit_predict_with_retry(
+                    runner=runner,
+                    train=split.train,
+                    horizon=horizon,
+                    freq=profile.frequency,
+                    season_length=profile.season_length_guess,
+                    n_jobs=n_jobs,
+                    max_retries=max_retries,
+                    retry_backoff=retry_backoff,
+                    model_timeout_sec=model_timeout_sec,
+                )
+            except (ModelTimeoutError, ModelFitError) as exc:
+                logger.warning(
+                    "[run_id=%s] Skipping model %s: %s",
+                    run_id,
+                    runner.name,
+                    exc,
+                )
+                model_failed = True
+                break
+
             total_runtime += output.runtime_sec
 
             # Capture forecast vs actual data for report visualizations
-            test_sorted = split.test.sort_values(["unique_id", "ds"])
+            # Invariant: splits are pre-sorted by (unique_id, ds)
+            # from make_expanding_splits, so no re-sorting needed.
+            test_sorted = split.test
             tail_len = min(2 * horizon, len(split.train))
             train_tail = (
-                split.train.sort_values(["unique_id", "ds"])
-                .groupby("unique_id")
+                split.train
+                .groupby("unique_id", sort=False)
                 .tail(tail_len)
-                .sort_values(["unique_id", "ds"])
             )
-            all_forecast_data.append(
+            forecast_data.append(
                 ForecastData(
                     model_name=runner.name,
                     fold=split.fold,
@@ -333,7 +451,9 @@ def run_benchmark(
                     ds=output.ds,
                     y_hat=output.y_hat,
                     y_actual=test_sorted["y"].tolist(),
-                    ds_train_tail=[d.isoformat() for d in train_tail["ds"]],
+                    ds_train_tail=[
+                        d.isoformat() for d in train_tail["ds"]
+                    ],
                     y_train_tail=train_tail["y"].tolist(),
                 )
             )
@@ -379,17 +499,24 @@ def run_benchmark(
             )
             fold_mae = float(np.mean(list(mae_scores.values())))
 
-            fold_results.append(
-                FoldResult(
-                    fold=split.fold,
-                    cutoff=split.cutoff.isoformat(),
-                    mase=round(fold_mase, 6),
-                    smape=round(fold_smape, 4),
-                    rmsse=round(fold_rmsse, 6),
-                    mae=round(fold_mae, 6),
-                    series_scores={k: round(v, 6) for k, v in series_scores.items()},
-                )
+            fold_result = FoldResult(
+                fold=split.fold,
+                cutoff=split.cutoff.isoformat(),
+                mase=round(fold_mase, 6),
+                smape=round(fold_smape, 4),
+                rmsse=round(fold_rmsse, 6),
+                mae=round(fold_mae, 6),
+                series_scores={
+                    k: round(v, 6) for k, v in series_scores.items()
+                },
             )
+            fold_results_inner.append(fold_result)
+
+            # Store in cache
+            if cache is not None and data_hash is not None:
+                cache.put(
+                    data_hash, runner.name, split.fold, fold_result
+                )
 
             logger.debug(
                 "  %s fold %d MASE=%.6f (%.4fs)",
@@ -399,33 +526,92 @@ def run_benchmark(
                 output.runtime_sec,
             )
 
-        mase_values = [f.mase for f in fold_results]
-        mean_val = round(float(np.mean(mase_values)), 6)
-        model_results.append(
-            ModelResult(
-                name=runner.name,
-                runtime_sec=round(total_runtime, 4),
-                folds=fold_results,
-                mean_mase=mean_val,
-                std_mase=round(float(np.std(mase_values)), 6),
-                mean_smape=round(float(np.mean([f.smape for f in fold_results])), 4),
-                mean_rmsse=round(float(np.mean([f.rmsse for f in fold_results])), 6),
-                mean_mae=round(float(np.mean([f.mae for f in fold_results])), 6),
+        if model_failed or not fold_results_inner:
+            return (
+                ModelResult(
+                    name=runner.name,
+                    runtime_sec=round(total_runtime, 4),
+                    folds=[],
+                    mean_mase=float("nan"),
+                    std_mase=float("nan"),
+                    mean_smape=float("nan"),
+                    mean_rmsse=float("nan"),
+                    mean_mae=float("nan"),
+                ),
+                forecast_data,
             )
+
+        mase_values = [f.mase for f in fold_results_inner]
+        mean_val = round(float(np.mean(mase_values)), 6)
+        mr = ModelResult(
+            name=runner.name,
+            runtime_sec=round(total_runtime, 4),
+            folds=fold_results_inner,
+            mean_mase=mean_val,
+            std_mase=round(float(np.std(mase_values)), 6),
+            mean_smape=round(
+                float(np.mean([f.smape for f in fold_results_inner])), 4
+            ),
+            mean_rmsse=round(
+                float(np.mean([f.rmsse for f in fold_results_inner])), 6
+            ),
+            mean_mae=round(
+                float(np.mean([f.mae for f in fold_results_inner])), 6
+            ),
         )
 
         logger.info(
-            "Completed %s: mean_mase=%.6f, runtime=%.4fs",
+            "[run_id=%s] Completed %s: mean_mase=%.6f, runtime=%.4fs",
+            run_id,
             runner.name,
             mean_val,
             total_runtime,
         )
+        return mr, forecast_data
+
+    # Run models: parallel or sequential
+    if parallel_models and len(runners) > 1:
+        logger.info(
+            "[run_id=%s] Running %d models in parallel",
+            run_id,
+            len(runners),
+        )
+        with ThreadPoolExecutor(max_workers=len(runners)) as executor:
+            futures = {
+                executor.submit(_run_single_model, runner, idx): runner
+                for idx, runner in enumerate(runners)
+            }
+            for future in as_completed(futures):
+                if _shutdown_event.is_set():
+                    break
+                mr, fds = future.result()
+                model_results.append(mr)
+                all_forecast_data.extend(fds)
+    else:
+        for runner_idx, runner in enumerate(runners):
+            if _shutdown_event.is_set():
+                logger.warning(
+                    "[run_id=%s] Shutdown requested after %d/%d models",
+                    run_id,
+                    runner_idx,
+                    len(runners),
+                )
+                break
+
+            if progress_callback is not None:
+                progress_callback("model", runner_idx + 1, len(runners))
+
+            mr, fds = _run_single_model(runner, runner_idx)
+            model_results.append(mr)
+            all_forecast_data.extend(fds)
 
     pipeline_elapsed = time.perf_counter() - pipeline_t0
 
     # Compute residual diagnostics for each model
     all_diagnostics: list[DiagnosticsResult] = []
     for model in model_results:
+        if not model.folds:
+            continue
         model_forecasts = [
             fd for fd in all_forecast_data if fd.model_name == model.name
         ]
@@ -443,8 +629,9 @@ def run_benchmark(
             )
             all_diagnostics.append(diag)
 
-    # Build leaderboard: rank by mean_mase ascending
-    sorted_models = sorted(model_results, key=lambda m: m.mean_mase)
+    # Build leaderboard: rank by mean_mase ascending, excluding NaN models
+    successful_models = [m for m in model_results if not np.isnan(m.mean_mase)]
+    sorted_models = sorted(successful_models, key=lambda m: m.mean_mase)
     leaderboard = [
         LeaderboardEntry(
             rank=i + 1,
@@ -458,7 +645,8 @@ def run_benchmark(
     ]
 
     logger.info(
-        "Benchmark complete in %.2fs. Winner: %s (MASE=%.6f)",
+        "[run_id=%s] Benchmark complete in %.2fs. Winner: %s (MASE=%.6f)",
+        run_id,
         pipeline_elapsed,
         leaderboard[0].name if leaderboard else "N/A",
         leaderboard[0].mean_mase if leaderboard else 0.0,
@@ -508,6 +696,13 @@ def run_from_csv(
     retry_backoff: float = DEFAULT_RETRY_BACKOFF_SEC,
     report_title: str | None = None,
     report_lang: str | None = None,
+    model_timeout_sec: float = DEFAULT_MODEL_TIMEOUT_SEC,
+    memory_limit_mb: int = 2048,
+    allow_private_urls: bool = False,
+    run_id: str | None = None,
+    no_cache: bool = False,
+    cache_dir: Path | None = None,
+    parallel_models: bool = False,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html.
 
@@ -516,17 +711,32 @@ def run_from_csv(
     """
     from ts_autopilot.reporting.html_report import render_report
 
+    if run_id is None:
+        run_id = uuid.uuid4().hex[:12]
+
+    # Install signal handlers for graceful shutdown
+    _install_signal_handlers()
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Loading CSV: %s", csv_path)
+    logger.info("[run_id=%s] Loading CSV: %s", run_id, csv_path)
     t0 = time.perf_counter()
-    df = load_csv(csv_path)
-    logger.info("Loaded %d rows, %d series", len(df), df["unique_id"].nunique())
+    df = load_csv(csv_path, max_memory_mb=memory_limit_mb)
+    logger.info(
+        "[run_id=%s] Loaded %d rows, %d series",
+        run_id,
+        len(df),
+        df["unique_id"].nunique(),
+    )
 
     # Build extra tollama runners if configured
     extra_runners: list[BaseRunner] | None = None
     if tollama_url and tollama_models:
+        from ts_autopilot.tollama.client import validate_tollama_url
+
+        validate_tollama_url(tollama_url, allow_private=allow_private_urls)
+
         from ts_autopilot.runners.tollama import get_tollama_runners
 
         tollama_runners = get_tollama_runners(tollama_url, tollama_models)
@@ -535,10 +745,28 @@ def run_from_csv(
             base.extend(tollama_runners)
             extra_runners = base
             logger.info(
-                "Added %d tollama model(s): %s",
+                "[run_id=%s] Added %d tollama model(s): %s",
+                run_id,
                 len(tollama_runners),
                 [r.name for r in tollama_runners],
             )
+
+    # Set up result cache
+    cache_instance: ResultCache | None = None
+    computed_hash: str | None = None
+    if not no_cache:
+        from ts_autopilot.cache import ResultCache as _ResultCache
+        from ts_autopilot.cache import _compute_data_hash
+
+        effective_cache_dir = cache_dir or (output_dir / ".cache")
+        cache_instance = _ResultCache(effective_cache_dir)
+        computed_hash = _compute_data_hash(df, horizon, n_folds)
+        logger.info(
+            "[run_id=%s] Cache enabled: dir=%s, hash=%s",
+            run_id,
+            effective_cache_dir,
+            computed_hash,
+        )
 
     result = run_benchmark(
         df,
@@ -550,25 +778,42 @@ def run_from_csv(
         n_jobs=n_jobs,
         max_retries=max_retries,
         retry_backoff=retry_backoff,
+        model_timeout_sec=model_timeout_sec,
+        run_id=run_id,
+        cache=cache_instance,
+        data_hash=computed_hash,
+        parallel_models=parallel_models,
     )
 
     # Attach metadata
     total_runtime = time.perf_counter() - t0
     metadata = ResultMetadata.create_now()
     metadata.total_runtime_sec = round(total_runtime, 4)
+    metadata.run_id = run_id
     result.metadata = metadata
+
+    # Check if we were interrupted
+    if _shutdown_event.is_set():
+        partial_path = output_dir / "results.partial.json"
+        _atomic_write(partial_path, result.to_json(indent=2))
+        logger.warning(
+            "[run_id=%s] Wrote partial results to %s (interrupted)",
+            run_id,
+            partial_path,
+        )
+        return result
 
     # Atomic write results.json
     results_path = output_dir / "results.json"
     _atomic_write(results_path, result.to_json(indent=2))
-    logger.info("Wrote %s", results_path)
+    logger.info("[run_id=%s] Wrote %s", run_id, results_path)
 
     # Atomic write details.json (forecast data + diagnostics for report reproducibility)
     details = result.to_details_dict()
     if details:
         details_path = output_dir / "details.json"
         _atomic_write(details_path, result.to_details_json(indent=2))
-        logger.info("Wrote %s", details_path)
+        logger.info("[run_id=%s] Wrote %s", run_id, details_path)
 
     # Atomic write report.html
     report_path = output_dir / "report.html"
@@ -576,7 +821,7 @@ def run_from_csv(
         report_path,
         render_report(result, report_title=report_title, report_lang=report_lang),
     )
-    logger.info("Wrote %s", report_path)
+    logger.info("[run_id=%s] Wrote %s", run_id, report_path)
 
     # Optional PDF generation
     if generate_pdf:
@@ -586,7 +831,7 @@ def run_from_csv(
         if is_available():
             pdf_path = output_dir / "report.pdf"
             if make_pdf(report_path, pdf_path):
-                logger.info("Wrote %s", pdf_path)
+                logger.info("[run_id=%s] Wrote %s", run_id, pdf_path)
         else:
             logger.info(
                 "PDF export requested but weasyprint not installed. "
@@ -594,3 +839,17 @@ def run_from_csv(
             )
 
     return result
+
+
+# Re-import for backward compatibility (used by cli.py)
+from ts_autopilot.ingestion.loader import load_csv  # noqa: E402
+from ts_autopilot.ingestion.profiler import profile_dataframe  # noqa: E402
+
+__all__ = [
+    "DEFAULT_MAX_RETRIES",
+    "DEFAULT_MODEL_TIMEOUT_SEC",
+    "DEFAULT_RETRY_BACKOFF_SEC",
+    "generate_warnings",
+    "run_benchmark",
+    "run_from_csv",
+]

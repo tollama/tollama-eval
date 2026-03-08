@@ -34,12 +34,14 @@ dependencies = [
     "jinja2>=3.1,<4",
     "httpx>=0.25,<1",
     "pyyaml>=6.0,<7",
+    "pydantic>=2.0,<3",
 ]
 
 [project.urls]
 Homepage = "https://github.com/ychoi-atop/ts-autopilot"
 Repository = "https://github.com/ychoi-atop/ts-autopilot"
 Issues = "https://github.com/ychoi-atop/ts-autopilot/issues"
+Changelog = "https://github.com/ychoi-atop/ts-autopilot/blob/main/CHANGELOG.md"
 
 [project.scripts]
 ts-autopilot = "ts_autopilot.cli:app"
@@ -53,9 +55,15 @@ addopts = "-v"
 
 [tool.coverage.run]
 source = ["ts_autopilot"]
+omit = [
+    "src/ts_autopilot/__main__.py",
+    "src/ts_autopilot/reporting/dashboard.py",
+    "src/ts_autopilot/runners/optional.py",
+    "src/ts_autopilot/reporting/pdf_export.py",
+]
 
 [tool.coverage.report]
-fail_under = 80
+fail_under = 90
 show_missing = true
 exclude_lines = [
     "pragma: no cover",
@@ -79,6 +87,9 @@ src = ["src"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/ts_autopilot/cli.py" = ["B008"]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
@@ -86,6 +97,8 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
     "types-PyYAML>=6.0",
+    "hypothesis>=6.0",
+    "pdoc>=14.0",
 ]
 prophet = [
     "prophet>=1.1",
@@ -103,12 +116,17 @@ pdf = [
 dashboard = [
     "streamlit>=1.28",
 ]
+tracing = [
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+]
 all = [
     "ts-autopilot[prophet]",
     "ts-autopilot[lightgbm]",
     "ts-autopilot[neural]",
     "ts-autopilot[pdf]",
     "ts-autopilot[dashboard]",
+    "ts-autopilot[tracing]",
 ]
 
 [dependency-groups]
@@ -118,4 +136,6 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
     "types-PyYAML>=6.0",
+    "hypothesis>=6.0",
+    "pdoc>=14.0",
 ]

@@ -7,6 +7,7 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
 
+import importlib
 import sys
 import time
 import traceback
@@ -146,6 +147,110 @@ def _make_plain_progress_cb(quiet: bool, verbose: bool) -> object:
     return cb
 
 
+def _merge_config(
+    file_cfg: Any,
+    *,
+    cli_input: Path | None,
+    cli_output: Path,
+    cli_horizon: int,
+    cli_n_folds: int,
+    cli_models: str | None,
+    cli_tollama_url: str | None,
+    cli_tollama_models: str | None,
+    cli_n_jobs: int,
+    cli_no_cache: bool,
+    cli_cache_dir: Path | None,
+    cli_parallel_models: bool,
+    default_timeout: float,
+) -> dict[str, Any]:
+    """Merge file config with CLI args. CLI non-default values win."""
+    from ts_autopilot.pipeline import (
+        DEFAULT_MAX_RETRIES,
+        DEFAULT_RETRY_BACKOFF_SEC,
+    )
+
+    merged: dict[str, Any] = {}
+
+    # Input/output paths: CLI wins if provided
+    merged["input"] = (
+        cli_input if cli_input is not None
+        else Path(file_cfg.input) if file_cfg.input else None
+    )
+    merged["output"] = (
+        Path(file_cfg.output) if file_cfg.output and cli_output == Path("out/")
+        else cli_output
+    )
+
+    # Numeric params: CLI wins if not at default
+    merged["horizon"] = (
+        file_cfg.horizon if file_cfg.horizon is not None and cli_horizon == 14
+        else cli_horizon
+    )
+    merged["n_folds"] = (
+        file_cfg.n_folds if file_cfg.n_folds is not None and cli_n_folds == 3
+        else cli_n_folds
+    )
+    merged["n_jobs"] = (
+        file_cfg.n_jobs if file_cfg.n_jobs is not None and cli_n_jobs == 1
+        else cli_n_jobs
+    )
+
+    # String/list params: CLI wins if provided
+    merged["models"] = (
+        cli_models if cli_models is not None
+        else ",".join(file_cfg.models) if file_cfg.models else None
+    )
+    merged["tollama_url"] = (
+        cli_tollama_url if cli_tollama_url is not None
+        else file_cfg.tollama_url
+    )
+    merged["tollama_models"] = (
+        cli_tollama_models if cli_tollama_models is not None
+        else ",".join(file_cfg.tollama_models) if file_cfg.tollama_models else None
+    )
+
+    # Report settings (config file only)
+    merged["report_title"] = file_cfg.report_title
+    merged["report_lang"] = file_cfg.report_lang
+
+    # Timeout/memory (config file overrides defaults)
+    merged["model_timeout_sec"] = (
+        file_cfg.model_timeout_sec
+        if file_cfg.model_timeout_sec is not None
+        else default_timeout
+    )
+    merged["memory_limit_mb"] = (
+        file_cfg.memory_limit_mb
+        if file_cfg.memory_limit_mb is not None
+        else 2048
+    )
+    merged["allow_private_urls"] = file_cfg.allow_private_urls
+
+    # Retry settings (config file only)
+    merged["max_retries"] = (
+        file_cfg.max_retries
+        if file_cfg.max_retries is not None
+        else DEFAULT_MAX_RETRIES
+    )
+    merged["retry_backoff"] = (
+        file_cfg.retry_backoff
+        if file_cfg.retry_backoff is not None
+        else DEFAULT_RETRY_BACKOFF_SEC
+    )
+
+    # Cache settings: CLI wins if non-default
+    merged["no_cache"] = cli_no_cache or file_cfg.no_cache
+    merged["cache_dir"] = (
+        cli_cache_dir if cli_cache_dir is not None
+        else Path(file_cfg.cache_dir) if file_cfg.cache_dir else None
+    )
+
+    # Parallel models: CLI wins if set
+    merged["parallel_models"] = cli_parallel_models or file_cfg.parallel_models
+
+    return merged
+
+
 @app.command()
 def run(
     input: Path | None = _INPUT_OPTION,
@@ -214,6 +319,21 @@ def run(
         "--log-json",
         help="Emit structured JSON logs to stderr.",
     ),
+    no_cache: bool = typer.Option(
+        False,
+        "--no-cache",
+        help="Disable result caching.",
+    ),
+    cache_dir: Path | None = typer.Option(
+        None,
+        "--cache-dir",
+        help="Directory for cached results.",
+    ),
+    parallel_models: bool = typer.Option(
+        False,
+        "--parallel-models",
+        help="Run models in parallel processes.",
+    ),
     config: Path | None = _CONFIG_OPTION,
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
@@ -221,13 +341,12 @@ def run(
     from ts_autopilot.logging_config import setup_logging
     from ts_autopilot.pipeline import (
         DEFAULT_MAX_RETRIES,
+        DEFAULT_MODEL_TIMEOUT_SEC,
         DEFAULT_RETRY_BACKOFF_SEC,
         run_from_csv,
     )
 
-    # Load config file and merge with CLI flags (CLI wins)
-    report_title: str | None = None
-    report_lang: str | None = None
+    # Merge config file with CLI flags
     if config is not None:
         from ts_autopilot.config import load_config
 
@@ -237,33 +356,47 @@ def run(
             typer.secho(f"Config error: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
 
-        if input is None and file_cfg.input:
-            input = Path(file_cfg.input)
-        if file_cfg.output and output == Path("out/"):
-            output = Path(file_cfg.output)
-        if file_cfg.horizon is not None and horizon == 14:
-            horizon = file_cfg.horizon
-        if file_cfg.n_folds is not None and n_folds == 3:
-            n_folds = file_cfg.n_folds
-        if file_cfg.models and models is None:
-            models = ",".join(file_cfg.models)
-        if file_cfg.tollama_url and tollama_url is None:
-            tollama_url = file_cfg.tollama_url
-        if file_cfg.tollama_models and tollama_models is None:
-            tollama_models = ",".join(file_cfg.tollama_models)
-        if file_cfg.n_jobs is not None and n_jobs == 1:
-            n_jobs = file_cfg.n_jobs
-        report_title = file_cfg.report_title
-        report_lang = file_cfg.report_lang
-
-    # Retry settings (config file only, no CLI flags needed)
-    max_retries = DEFAULT_MAX_RETRIES
-    retry_backoff = DEFAULT_RETRY_BACKOFF_SEC
-    if config is not None:
-        if file_cfg.max_retries is not None:
-            max_retries = file_cfg.max_retries
-        if file_cfg.retry_backoff is not None:
-            retry_backoff = file_cfg.retry_backoff
+        m = _merge_config(
+            file_cfg,
+            cli_input=input,
+            cli_output=output,
+            cli_horizon=horizon,
+            cli_n_folds=n_folds,
+            cli_models=models,
+            cli_tollama_url=tollama_url,
+            cli_tollama_models=tollama_models,
+            cli_n_jobs=n_jobs,
+            cli_no_cache=no_cache,
+            cli_cache_dir=cache_dir,
+            cli_parallel_models=parallel_models,
+            default_timeout=DEFAULT_MODEL_TIMEOUT_SEC,
+        )
+        input = m["input"]
+        output = m["output"]
+        horizon = m["horizon"]
+        n_folds = m["n_folds"]
+        n_jobs = m["n_jobs"]
+        models = m["models"]
+        tollama_url = m["tollama_url"]
+        tollama_models = m["tollama_models"]
+        report_title = m["report_title"]
+        report_lang = m["report_lang"]
+        model_timeout_sec = m["model_timeout_sec"]
+        memory_limit_mb = m["memory_limit_mb"]
+        allow_private_urls = m["allow_private_urls"]
+        max_retries = m["max_retries"]
+        retry_backoff = m["retry_backoff"]
+        no_cache = m["no_cache"]
+        cache_dir = m["cache_dir"]
+        parallel_models = m["parallel_models"]
+    else:
+        report_title = None
+        report_lang = None
+        model_timeout_sec = DEFAULT_MODEL_TIMEOUT_SEC
+        memory_limit_mb = 2048
+        allow_private_urls = False
+        max_retries = DEFAULT_MAX_RETRIES
+        retry_backoff = DEFAULT_RETRY_BACKOFF_SEC
 
     if input is None:
         typer.secho(
@@ -350,6 +483,12 @@ def run(
                 retry_backoff=retry_backoff,
                 report_title=report_title,
                 report_lang=report_lang,
+                model_timeout_sec=model_timeout_sec,
+                memory_limit_mb=memory_limit_mb,
+                allow_private_urls=allow_private_urls,
+                no_cache=no_cache,
+                cache_dir=cache_dir,
+                parallel_models=parallel_models,
             )
         finally:
             if progress is not None:
@@ -567,6 +706,86 @@ def campaign(
         typer.echo(f"  {ok}/{len(csv_files)} datasets succeeded")
         typer.echo(f"  Results: {summary_path.resolve()}")
         typer.echo(f"  Completed in {elapsed:.2f}s")
+
+
+@app.command()
+def doctor() -> None:
+    """Run diagnostic checks on the environment."""
+    checks: list[tuple[str, bool, str]] = []
+
+    # Python version
+    vi = sys.version_info
+    py_ver = f"{vi.major}.{vi.minor}.{vi.micro}"
+    py_ok = sys.version_info >= (3, 10)
+    checks.append(
+        (
+            "Python version",
+            py_ok,
+            f"{py_ver} {'(OK)' if py_ok else '(need 3.10+)'}",
+        )
+    )
+
+    # Core dependencies
+    core_deps = [
+        "pandas",
+        "numpy",
+        "statsforecast",
+        "typer",
+        "jinja2",
+        "httpx",
+        "yaml",
+    ]
+    for dep in core_deps:
+        try:
+            mod = importlib.import_module(dep)
+            ver = getattr(mod, "__version__", "installed")
+            checks.append((f"Core: {dep}", True, str(ver)))
+        except ImportError:
+            checks.append((f"Core: {dep}", False, "NOT INSTALLED"))
+
+    # Optional dependencies
+    optional_deps = {
+        "prophet": "Prophet",
+        "lightgbm": "LightGBM",
+        "neuralforecast": "NeuralForecast",
+        "weasyprint": "PDF export",
+        "streamlit": "Dashboard",
+    }
+    for dep, label in optional_deps.items():
+        try:
+            importlib.import_module(dep)
+            checks.append((f"Optional: {label}", True, "available"))
+        except ImportError:
+            checks.append((f"Optional: {label}", False, "not installed"))
+
+    # Output directory
+    out_dir = Path("out/")
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        test_file = out_dir / ".doctor_test"
+        test_file.write_text("ok")
+        test_file.unlink()
+        checks.append(("Output dir writable", True, str(out_dir.resolve())))
+    except OSError as exc:
+        checks.append(("Output dir writable", False, str(exc)))
+
+    # Print results
+    typer.secho("\nts-autopilot doctor", bold=True)
+    typer.secho("=" * 50)
+    passed = 0
+    failed = 0
+    for name, ok, detail in checks:
+        if ok:
+            status = typer.style("PASS", fg=typer.colors.GREEN)
+            passed += 1
+        else:
+            status = typer.style("FAIL", fg=typer.colors.RED)
+            failed += 1
+        typer.echo(f"  [{status}] {name}: {detail}")
+
+    typer.echo("")
+    summary_color = typer.colors.GREEN if failed == 0 else typer.colors.YELLOW
+    typer.secho(f"  {passed} passed, {failed} failed", fg=summary_color, bold=True)
 
 
 if __name__ == "__main__":

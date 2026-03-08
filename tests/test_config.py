@@ -43,14 +43,14 @@ def test_load_yaml_with_models_string(tmp_path):
 def test_unknown_key_raises(tmp_path):
     cfg_path = tmp_path / "config.yml"
     cfg_path.write_text("input: data.csv\nbogus_key: true\n")
-    with pytest.raises(ValueError, match="Unknown config keys"):
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
         load_config(cfg_path)
 
 
 def test_invalid_horizon_raises(tmp_path):
     cfg_path = tmp_path / "config.yml"
     cfg_path.write_text("horizon: -5\n")
-    with pytest.raises(ValueError, match="positive integer"):
+    with pytest.raises(ValueError, match="greater than or equal to 1"):
         load_config(cfg_path)
 
 

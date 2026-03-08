@@ -24,3 +24,16 @@ class ModelFitError(AutopilotError, RuntimeError):
         super().__init__(f"Model {model_name} failed after {attempts} attempts")
         if cause is not None:
             self.__cause__ = cause
+
+
+class ModelTimeoutError(AutopilotError, TimeoutError):
+    """Raised when a model exceeds the per-fold timeout."""
+
+    def __init__(self, model_name: str, timeout_sec: float):
+        self.model_name = model_name
+        self.timeout_sec = timeout_sec
+        super().__init__(f"Model {model_name} timed out after {timeout_sec:.0f}s")
+
+
+class URLValidationError(ConfigError):
+    """Raised when a URL fails security validation (e.g. SSRF prevention)."""

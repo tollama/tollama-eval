@@ -1,9 +1,14 @@
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -35,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,3 +52,28 @@ jobs:
         run: uv pip install -e ".[dev]" --system
       - name: Run tests with coverage
         run: python -m pytest tests/ --cov=ts_autopilot --cov-report=term-missing --cov-fail-under=80
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: pip install uv
+      - name: Install deps
+        run: uv pip install -e ".[dev]" --system
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Run dependency audit
+        run: pip-audit --strict
+      - name: Generate SBOM
+        run: |
+          pip install pip-licenses
+          pip-licenses --format=json --output-file=sbom.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
