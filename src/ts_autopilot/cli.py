@@ -173,40 +173,52 @@ def _merge_config(
 
     # Input/output paths: CLI wins if provided
     merged["input"] = (
-        cli_input if cli_input is not None
-        else Path(file_cfg.input) if file_cfg.input else None
+        cli_input
+        if cli_input is not None
+        else Path(file_cfg.input)
+        if file_cfg.input
+        else None
     )
     merged["output"] = (
-        Path(file_cfg.output) if file_cfg.output and cli_output == Path("out/")
+        Path(file_cfg.output)
+        if file_cfg.output and cli_output == Path("out/")
         else cli_output
     )
 
     # Numeric params: CLI wins if not at default
     merged["horizon"] = (
-        file_cfg.horizon if file_cfg.horizon is not None and cli_horizon == 14
+        file_cfg.horizon
+        if file_cfg.horizon is not None and cli_horizon == 14
         else cli_horizon
     )
     merged["n_folds"] = (
-        file_cfg.n_folds if file_cfg.n_folds is not None and cli_n_folds == 3
+        file_cfg.n_folds
+        if file_cfg.n_folds is not None and cli_n_folds == 3
         else cli_n_folds
     )
     merged["n_jobs"] = (
-        file_cfg.n_jobs if file_cfg.n_jobs is not None and cli_n_jobs == 1
+        file_cfg.n_jobs
+        if file_cfg.n_jobs is not None and cli_n_jobs == 1
         else cli_n_jobs
     )
 
     # String/list params: CLI wins if provided
     merged["models"] = (
-        cli_models if cli_models is not None
-        else ",".join(file_cfg.models) if file_cfg.models else None
+        cli_models
+        if cli_models is not None
+        else ",".join(file_cfg.models)
+        if file_cfg.models
+        else None
     )
     merged["tollama_url"] = (
-        cli_tollama_url if cli_tollama_url is not None
-        else file_cfg.tollama_url
+        cli_tollama_url if cli_tollama_url is not None else file_cfg.tollama_url
     )
     merged["tollama_models"] = (
-        cli_tollama_models if cli_tollama_models is not None
-        else ",".join(file_cfg.tollama_models) if file_cfg.tollama_models else None
+        cli_tollama_models
+        if cli_tollama_models is not None
+        else ",".join(file_cfg.tollama_models)
+        if file_cfg.tollama_models
+        else None
     )
 
     # Report settings (config file only)
@@ -220,9 +232,7 @@ def _merge_config(
         else default_timeout
     )
     merged["memory_limit_mb"] = (
-        file_cfg.memory_limit_mb
-        if file_cfg.memory_limit_mb is not None
-        else 2048
+        file_cfg.memory_limit_mb if file_cfg.memory_limit_mb is not None else 2048
     )
     merged["allow_private_urls"] = file_cfg.allow_private_urls
 
@@ -241,8 +251,11 @@ def _merge_config(
     # Cache settings: CLI wins if non-default
     merged["no_cache"] = cli_no_cache or file_cfg.no_cache
     merged["cache_dir"] = (
-        cli_cache_dir if cli_cache_dir is not None
-        else Path(file_cfg.cache_dir) if file_cfg.cache_dir else None
+        cli_cache_dir
+        if cli_cache_dir is not None
+        else Path(file_cfg.cache_dir)
+        if file_cfg.cache_dir
+        else None
     )
 
     # Parallel models: CLI wins if set

@@ -67,7 +67,7 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
       - name: Run dependency audit
-        run: pip-audit --strict
+        run: pip-audit --strict -r requirements-lock.txt
       - name: Generate SBOM
         run: |
           pip install pip-licenses

@@ -13,7 +13,8 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
-from typing import TYPE_CHECKING
+from types import FrameType
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from ts_autopilot.cache import ResultCache
@@ -74,7 +75,7 @@ _shutdown_event = threading.Event()
 def _install_signal_handlers() -> None:
     """Install SIGINT/SIGTERM handlers that set the shutdown event."""
 
-    def _handler(signum: int, frame: object) -> None:
+    def _handler(signum: int, frame: FrameType | None) -> None:
         logger.warning("Received signal %d, shutting down gracefully...", signum)
         _shutdown_event.set()
 
@@ -85,14 +86,18 @@ def _install_signal_handlers() -> None:
         # but we also set the event so the pipeline loop can break cleanly
         prev_handler = signal.getsignal(signal.SIGINT)
 
-        def _int_handler(signum: int, frame: object) -> None:
+        def _int_handler(signum: int, frame: FrameType | None) -> None:
             _shutdown_event.set()
             is_custom = (
                 callable(prev_handler)
                 and prev_handler is not signal.default_int_handler
             )
             if is_custom:
-                prev_handler(signum, frame)
+                handler = cast(
+                    Callable[[int, FrameType | None], object],
+                    prev_handler,
+                )
+                handler(signum, frame)
             else:
                 raise KeyboardInterrupt
 
@@ -438,11 +443,7 @@ def run_benchmark(
             # from make_expanding_splits, so no re-sorting needed.
             test_sorted = split.test
             tail_len = min(2 * horizon, len(split.train))
-            train_tail = (
-                split.train
-                .groupby("unique_id", sort=False)
-                .tail(tail_len)
-            )
+            train_tail = split.train.groupby("unique_id", sort=False).tail(tail_len)
             forecast_data.append(
                 ForecastData(
                     model_name=runner.name,
@@ -451,9 +452,7 @@ def run_benchmark(
                     ds=output.ds,
                     y_hat=output.y_hat,
                     y_actual=test_sorted["y"].tolist(),
-                    ds_train_tail=[
-                        d.isoformat() for d in train_tail["ds"]
-                    ],
+                    ds_train_tail=[d.isoformat() for d in train_tail["ds"]],
                     y_train_tail=train_tail["y"].tolist(),
                 )
             )
@@ -506,17 +505,13 @@ def run_benchmark(
                 smape=round(fold_smape, 4),
                 rmsse=round(fold_rmsse, 6),
                 mae=round(fold_mae, 6),
-                series_scores={
-                    k: round(v, 6) for k, v in series_scores.items()
-                },
+                series_scores={k: round(v, 6) for k, v in series_scores.items()},
             )
             fold_results_inner.append(fold_result)
 
             # Store in cache
             if cache is not None and data_hash is not None:
-                cache.put(
-                    data_hash, runner.name, split.fold, fold_result
-                )
+                cache.put(data_hash, runner.name, split.fold, fold_result)
 
             logger.debug(
                 "  %s fold %d MASE=%.6f (%.4fs)",
@@ -549,15 +544,9 @@ def run_benchmark(
             folds=fold_results_inner,
             mean_mase=mean_val,
             std_mase=round(float(np.std(mase_values)), 6),
-            mean_smape=round(
-                float(np.mean([f.smape for f in fold_results_inner])), 4
-            ),
-            mean_rmsse=round(
-                float(np.mean([f.rmsse for f in fold_results_inner])), 6
-            ),
-            mean_mae=round(
-                float(np.mean([f.mae for f in fold_results_inner])), 6
-            ),
+            mean_smape=round(float(np.mean([f.smape for f in fold_results_inner])), 4),
+            mean_rmsse=round(float(np.mean([f.rmsse for f in fold_results_inner])), 6),
+            mean_mae=round(float(np.mean([f.mae for f in fold_results_inner])), 6),
         )
 
         logger.info(

@@ -31,7 +31,7 @@ all:  ## Run lint, typecheck, and tests
 	$(MAKE) test
 
 audit:  ## Run dependency vulnerability scan
-	pip-audit --strict
+	pip-audit --strict -r requirements-lock.txt
 
 docker:  ## Build Docker image
 	docker build -t ts-autopilot:latest .
