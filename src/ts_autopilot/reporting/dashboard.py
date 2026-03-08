@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 
 def _check_streamlit() -> bool:
@@ -112,7 +113,7 @@ def _show_sample_format() -> None:
 
 
 def _run_benchmark(
-    uploaded_file: object,
+    uploaded_file: Any,
     horizon: int,
     n_folds: int,
     model_names: list[str],

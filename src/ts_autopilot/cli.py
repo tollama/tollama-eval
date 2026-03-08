@@ -7,6 +7,7 @@ import time
 import traceback
 from enum import IntEnum
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -86,7 +87,7 @@ def _try_rich() -> bool:
 
 def _make_rich_progress_cb(
     quiet: bool, verbose: bool
-) -> tuple[object | None, object | None, object | None, object]:
+) -> tuple[Any | None, Any | None, Any | None, Any]:
     """Create rich-based progress tracking.
 
     Returns (progress, model_task_id, fold_task_id, callback_fn).

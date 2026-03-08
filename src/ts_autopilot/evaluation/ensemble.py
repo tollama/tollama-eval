@@ -79,8 +79,8 @@ def recommend_ensemble(result: BenchmarkResult) -> EnsembleRecommendation:
 
     # Find all unique series
     all_series: set[str] = set()
-    for series_dict in model_series_avg.values():
-        all_series.update(series_dict.keys())
+    for avg_dict in model_series_avg.values():
+        all_series.update(avg_dict.keys())
 
     # For each series, find the best model
     recommendations: list[SeriesRecommendation] = []
@@ -89,9 +89,9 @@ def recommend_ensemble(result: BenchmarkResult) -> EnsembleRecommendation:
 
     for sid in sorted(all_series):
         scores: dict[str, float] = {}
-        for model_name, series_dict in model_series_avg.items():
-            if sid in series_dict:
-                scores[model_name] = series_dict[sid]
+        for model_name, avg_dict in model_series_avg.items():
+            if sid in avg_dict:
+                scores[model_name] = avg_dict[sid]
 
         if not scores:
             continue
