@@ -347,6 +347,37 @@ def run(
         "--parallel-models",
         help="Run models in parallel processes.",
     ),
+    detect_anomalies: bool = typer.Option(
+        False,
+        "--detect-anomalies",
+        help="Run anomaly detection on input data before benchmarking.",
+    ),
+    metric_weights: str | None = typer.Option(
+        None,
+        "--metric-weights",
+        help=(
+            "Custom metric weights for composite scoring. "
+            "Format: 'mase=0.5,smape=0.3,speed=0.2'."
+        ),
+    ),
+    auto_select: bool = typer.Option(
+        False,
+        "--auto-select",
+        help="Automatically select models based on data characteristics.",
+    ),
+    exog_cols: str | None = typer.Option(
+        None,
+        "--exog-cols",
+        help=(
+            "Comma-separated exogenous column names. "
+            "If omitted, extra columns are auto-detected."
+        ),
+    ),
+    distributed: bool = typer.Option(
+        False,
+        "--distributed",
+        help="Use Ray for distributed fold execution (requires ray).",
+    ),
     config: Path | None = _CONFIG_OPTION,
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
@@ -434,6 +465,17 @@ def run(
     if models is not None:
         model_names = [m.strip() for m in models.split(",") if m.strip()]
 
+    # Parse metric weights if provided
+    parsed_weights: dict[str, float] | None = None
+    if metric_weights is not None:
+        from ts_autopilot.evaluation.metrics import parse_metric_weights
+
+        try:
+            parsed_weights = parse_metric_weights(metric_weights)
+        except ValueError as exc:
+            typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
+
     # Set up progress display (rich if available, plain text otherwise)
     use_rich = _try_rich() and not log_json
     if use_rich:
@@ -469,6 +511,27 @@ def run(
 
     t0 = time.perf_counter()
 
+    # Auto-select models if requested (runs profiling early)
+    if auto_select and model_names is None:
+        from ts_autopilot.automl.selector import AutoSelector
+        from ts_autopilot.ingestion.loader import load_csv as _load_csv
+        from ts_autopilot.ingestion.profiler import profile_dataframe
+        from ts_autopilot.pipeline import DEFAULT_RUNNERS
+
+        _df_tmp = _load_csv(input, max_memory_mb=memory_limit_mb)
+        _profile_tmp = profile_dataframe(_df_tmp)
+        selector = AutoSelector(
+            profile=_profile_tmp,
+            include_extended=True,
+            include_neural=False,
+        )
+        recommended = selector.recommended_model_names()
+        # Filter to models available in the default runner set
+        available = {r.name for r in DEFAULT_RUNNERS}
+        model_names = [m for m in recommended if m in available]
+        if not quiet:
+            typer.echo(selector.summary())
+
     effective_tollama_url = tollama_url if not no_tollama else None
     effective_tollama_models: list[str] | None = None
     if tollama_models and effective_tollama_url:
@@ -481,28 +544,58 @@ def run(
             progress.start()
 
         try:
-            result = run_from_csv(
-                csv_path=input,
-                horizon=horizon,
-                n_folds=n_folds,
-                output_dir=output,
-                model_names=model_names,
-                progress_callback=progress_cb,
-                tollama_url=effective_tollama_url,
-                tollama_models=effective_tollama_models,
-                n_jobs=n_jobs,
-                generate_pdf=pdf,
-                max_retries=max_retries,
-                retry_backoff=retry_backoff,
-                report_title=report_title,
-                report_lang=report_lang,
-                model_timeout_sec=model_timeout_sec,
-                memory_limit_mb=memory_limit_mb,
-                allow_private_urls=allow_private_urls,
-                no_cache=no_cache,
-                cache_dir=cache_dir,
-                parallel_models=parallel_models,
-            )
+            if distributed:
+                from ts_autopilot.distributed.ray_runner import (
+                    is_available as ray_available,
+                )
+                from ts_autopilot.distributed.ray_runner import (
+                    run_benchmark_distributed,
+                )
+                from ts_autopilot.ingestion.loader import load_csv as _load_csv3
+
+                if not ray_available():
+                    typer.secho(
+                        "Warning: Ray not installed, falling back to local.",
+                        fg=typer.colors.YELLOW,
+                    )
+
+                _dist_df = _load_csv3(input, max_memory_mb=memory_limit_mb)
+                result = run_benchmark_distributed(
+                    df=_dist_df,
+                    horizon=horizon,
+                    n_folds=n_folds,
+                    model_names=model_names,
+                    n_jobs=n_jobs,
+                )
+                # Write output files
+                output.mkdir(parents=True, exist_ok=True)
+                (output / "results.json").write_text(result.to_json(indent=2))
+                from ts_autopilot.reporting.html_report import render_report
+
+                (output / "report.html").write_text(render_report(result))
+            else:
+                result = run_from_csv(
+                    csv_path=input,
+                    horizon=horizon,
+                    n_folds=n_folds,
+                    output_dir=output,
+                    model_names=model_names,
+                    progress_callback=progress_cb,
+                    tollama_url=effective_tollama_url,
+                    tollama_models=effective_tollama_models,
+                    n_jobs=n_jobs,
+                    generate_pdf=pdf,
+                    max_retries=max_retries,
+                    retry_backoff=retry_backoff,
+                    report_title=report_title,
+                    report_lang=report_lang,
+                    model_timeout_sec=model_timeout_sec,
+                    memory_limit_mb=memory_limit_mb,
+                    allow_private_urls=allow_private_urls,
+                    no_cache=no_cache,
+                    cache_dir=cache_dir,
+                    parallel_models=parallel_models,
+                )
         finally:
             if progress is not None:
                 progress.stop()
@@ -549,6 +642,41 @@ def run(
         else:
             typer.echo("Hint: Use --verbose for full traceback.", err=True)
         raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
+
+    # Anomaly detection (post-benchmark on input data)
+    if detect_anomalies:
+        from ts_autopilot.anomaly.detector import run_all_detectors
+        from ts_autopilot.ingestion.loader import load_csv as _load_csv2
+
+        _anom_df = _load_csv2(input, max_memory_mb=memory_limit_mb)
+        reports = run_all_detectors(_anom_df)
+        if not quiet:
+            for report in reports:
+                typer.echo("")
+                typer.echo(report.summary())
+
+    # Composite score display
+    if parsed_weights is not None and result.leaderboard:
+        from ts_autopilot.evaluation.metrics import composite_score
+
+        if not quiet:
+            typer.echo("")
+            typer.secho("Composite Scores:", bold=True)
+        model_by_name = {m.name: m for m in result.models}
+        for entry in result.leaderboard:
+            m = model_by_name.get(entry.name)
+            if m is None:
+                continue
+            cs = composite_score(
+                mase_val=m.mean_mase,
+                smape_val=m.mean_smape,
+                rmsse_val=m.mean_rmsse,
+                mae_val=m.mean_mae,
+                runtime_sec=m.runtime_sec,
+                weights=parsed_weights,
+            )
+            if not quiet:
+                typer.echo(f"  {entry.name}: composite={cs:.4f}")
 
     elapsed = time.perf_counter() - t0
 
@@ -799,6 +927,63 @@ def doctor() -> None:
     typer.echo("")
     summary_color = typer.colors.GREEN if failed == 0 else typer.colors.YELLOW
     typer.secho(f"  {passed} passed, {failed} failed", fg=summary_color, bold=True)
+
+
+@app.command()
+def serve(
+    port: int = typer.Option(
+        8000,
+        "--port",
+        "-p",
+        help="Port to listen on.",
+    ),
+    host: str = typer.Option(
+        "0.0.0.0",
+        "--host",
+        help="Host to bind to.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("out/server"),
+        "--output-dir",
+        "-o",
+        help="Directory for storing benchmark results.",
+    ),
+) -> None:
+    """Start the REST API server for remote benchmarking."""
+    try:
+        from ts_autopilot.server.app import create_app
+    except ImportError as exc:
+        typer.secho(
+            "Error: FastAPI and uvicorn are required for the REST server.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        typer.echo(
+            'Install with: pip install "ts-autopilot[server]"',
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
+
+    try:
+        import uvicorn
+    except ImportError as exc:
+        typer.secho(
+            "Error: uvicorn is required for the REST server.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        typer.echo(
+            'Install with: pip install "ts-autopilot[server]"',
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
+
+    app_instance = create_app(results_dir=output_dir)
+    typer.secho(
+        f"Starting ts-autopilot server on {host}:{port}",
+        bold=True,
+    )
+    uvicorn.run(app_instance, host=host, port=port)
 
 
 if __name__ == "__main__":

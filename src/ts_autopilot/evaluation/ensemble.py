@@ -1,14 +1,21 @@
-"""Ensemble recommendation engine.
+"""Ensemble recommendation and construction engine.
 
 Analyzes per-series scores to recommend the best model for each series,
 enabling per-series model selection (virtual ensemble).
+
+Also provides actual ensemble construction methods:
+- Simple average
+- Inverse-MASE weighted average
+- Best-per-series selection
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from ts_autopilot.contracts import BenchmarkResult
+import numpy as np
+
+from ts_autopilot.contracts import BenchmarkResult, ForecastData
 
 
 @dataclass
@@ -123,4 +130,214 @@ def recommend_ensemble(result: BenchmarkResult) -> EnsembleRecommendation:
         n_models=len(result.models),
         model_win_counts=win_counts,
         avg_ensemble_mase=round(avg_ensemble, 6),
+    )
+
+
+# --- Phase 2b: Ensemble Construction ---
+
+
+@dataclass
+class EnsembleForecast:
+    """Constructed ensemble forecast."""
+
+    method: str  # 'average', 'weighted', 'best_per_series'
+    unique_id: list[str]
+    ds: list[str]
+    y_hat: list[float]
+    component_models: list[str]
+    weights: dict[str, float] = field(default_factory=dict)
+
+
+def build_average_ensemble(
+    forecast_data: list[ForecastData],
+    fold: int | None = None,
+) -> EnsembleForecast:
+    """Build a simple average ensemble from model forecasts.
+
+    Averages predictions across all models for each (unique_id, ds) pair.
+
+    Args:
+        forecast_data: List of ForecastData from benchmark run.
+        fold: If specified, only use forecasts from this fold.
+
+    Returns:
+        EnsembleForecast with averaged predictions.
+    """
+    if fold is not None:
+        forecast_data = [fd for fd in forecast_data if fd.fold == fold]
+
+    if not forecast_data:
+        return EnsembleForecast(
+            method="average",
+            unique_id=[],
+            ds=[],
+            y_hat=[],
+            component_models=[],
+        )
+
+    # Group predictions by (unique_id, ds) → list of y_hat values
+    point_predictions: dict[tuple[str, str], list[float]] = {}
+    component_models: set[str] = set()
+
+    for fd in forecast_data:
+        component_models.add(fd.model_name)
+        for uid, ds, yhat in zip(fd.unique_id, fd.ds, fd.y_hat, strict=False):
+            key = (uid, ds)
+            point_predictions.setdefault(key, []).append(yhat)
+
+    # Average
+    unique_ids: list[str] = []
+    dss: list[str] = []
+    yhats: list[float] = []
+
+    for (uid, ds), preds in sorted(point_predictions.items()):
+        unique_ids.append(uid)
+        dss.append(ds)
+        yhats.append(float(np.mean(preds)))
+
+    models_list = sorted(component_models)
+    return EnsembleForecast(
+        method="average",
+        unique_id=unique_ids,
+        ds=dss,
+        y_hat=yhats,
+        component_models=models_list,
+        weights={m: 1.0 / len(models_list) for m in models_list},
+    )
+
+
+def build_weighted_ensemble(
+    forecast_data: list[ForecastData],
+    model_scores: dict[str, float],
+    fold: int | None = None,
+) -> EnsembleForecast:
+    """Build an inverse-MASE weighted ensemble.
+
+    Models with lower MASE get higher weight: w_i = (1/MASE_i) / sum(1/MASE_j).
+
+    Args:
+        forecast_data: List of ForecastData from benchmark run.
+        model_scores: Dict of model_name → mean_mase.
+        fold: If specified, only use forecasts from this fold.
+
+    Returns:
+        EnsembleForecast with weighted predictions.
+    """
+    if fold is not None:
+        forecast_data = [fd for fd in forecast_data if fd.fold == fold]
+
+    if not forecast_data:
+        return EnsembleForecast(
+            method="weighted",
+            unique_id=[],
+            ds=[],
+            y_hat=[],
+            component_models=[],
+        )
+
+    # Compute inverse-MASE weights
+    valid_models = {
+        name: score
+        for name, score in model_scores.items()
+        if score > 0 and not np.isnan(score)
+    }
+    if not valid_models:
+        return build_average_ensemble(forecast_data, fold)
+
+    inv_scores = {name: 1.0 / score for name, score in valid_models.items()}
+    total_inv = sum(inv_scores.values())
+    weights = {name: inv / total_inv for name, inv in inv_scores.items()}
+
+    # Group and weight predictions
+    point_predictions: dict[tuple[str, str], float] = {}
+    component_models: set[str] = set()
+
+    for fd in forecast_data:
+        if fd.model_name not in weights:
+            continue
+        w = weights[fd.model_name]
+        component_models.add(fd.model_name)
+        for uid, ds, yhat in zip(fd.unique_id, fd.ds, fd.y_hat, strict=False):
+            key = (uid, ds)
+            point_predictions[key] = point_predictions.get(key, 0.0) + w * yhat
+
+    unique_ids: list[str] = []
+    dss: list[str] = []
+    yhats: list[float] = []
+
+    for (uid, ds), pred in sorted(point_predictions.items()):
+        unique_ids.append(uid)
+        dss.append(ds)
+        yhats.append(float(pred))
+
+    return EnsembleForecast(
+        method="weighted",
+        unique_id=unique_ids,
+        ds=dss,
+        y_hat=yhats,
+        component_models=sorted(component_models),
+        weights={k: round(v, 4) for k, v in weights.items()},
+    )
+
+
+def build_best_per_series_ensemble(
+    forecast_data: list[ForecastData],
+    recommendation: EnsembleRecommendation,
+    fold: int | None = None,
+) -> EnsembleForecast:
+    """Build an ensemble that picks the best model for each series.
+
+    Uses the recommendation engine to select the best model per series,
+    then constructs a forecast using each series' best model.
+
+    Args:
+        forecast_data: List of ForecastData from benchmark run.
+        recommendation: EnsembleRecommendation with per-series best models.
+        fold: If specified, only use forecasts from this fold.
+
+    Returns:
+        EnsembleForecast with per-series best model predictions.
+    """
+    if fold is not None:
+        forecast_data = [fd for fd in forecast_data if fd.fold == fold]
+
+    # Build lookup: series_id → best_model_name
+    best_model_map = {
+        rec.series_id: rec.best_model for rec in recommendation.series_recommendations
+    }
+
+    # Build lookup: (model_name, unique_id, ds) → y_hat
+    predictions: dict[tuple[str, str, str], float] = {}
+    for fd in forecast_data:
+        for uid, ds, yhat in zip(fd.unique_id, fd.ds, fd.y_hat, strict=False):
+            predictions[(fd.model_name, uid, ds)] = yhat
+
+    unique_ids: list[str] = []
+    dss: list[str] = []
+    yhats: list[float] = []
+    component_models: set[str] = set()
+
+    # For each point, use the best model's prediction
+    seen_points: set[tuple[str, str]] = set()
+    for fd in forecast_data:
+        for uid, ds in zip(fd.unique_id, fd.ds, strict=False):
+            point_key = (uid, ds)
+            if point_key in seen_points:
+                continue
+            seen_points.add(point_key)
+
+            best_model = best_model_map.get(uid)
+            if best_model and (best_model, uid, ds) in predictions:
+                unique_ids.append(uid)
+                dss.append(ds)
+                yhats.append(predictions[(best_model, uid, ds)])
+                component_models.add(best_model)
+
+    return EnsembleForecast(
+        method="best_per_series",
+        unique_id=unique_ids,
+        ds=dss,
+        y_hat=yhats,
+        component_models=sorted(component_models),
+        weights=dict(recommendation.model_win_counts),
     )

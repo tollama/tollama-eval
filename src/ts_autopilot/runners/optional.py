@@ -109,6 +109,56 @@ class LightGBMRunner(BaseRunner):
         )
 
 
+class XGBoostRunner(BaseRunner):
+    """XGBoost model runner via mlforecast.
+
+    Requires: pip install xgboost mlforecast
+    """
+
+    @property
+    def name(self) -> str:
+        return "XGBoost"
+
+    def fit_predict(
+        self,
+        train: pd.DataFrame,
+        horizon: int,
+        freq: str,
+        season_length: int,
+        n_jobs: int = 1,
+    ) -> ForecastOutput:
+        import xgboost as xgb
+        from mlforecast import MLForecast
+
+        t0 = time.perf_counter()
+
+        models = [
+            xgb.XGBRegressor(
+                n_estimators=100,
+                learning_rate=0.1,
+                max_depth=6,
+                verbosity=0,
+                n_jobs=n_jobs,
+            )
+        ]
+        mlf = MLForecast(
+            models=models,
+            freq=freq,
+            lags=[1, season_length],
+        )
+        mlf.fit(train)
+        preds = mlf.predict(h=horizon)
+
+        elapsed = time.perf_counter() - t0
+        return ForecastOutput(
+            unique_id=preds["unique_id"].astype(str).tolist(),
+            ds=preds["ds"].astype(str).tolist(),
+            y_hat=preds["XGBRegressor"].tolist(),
+            model_name=self.name,
+            runtime_sec=round(elapsed, 4),
+        )
+
+
 class NHITSRunner(BaseRunner):
     """N-HiTS neural model runner via neuralforecast.
 
@@ -201,6 +251,186 @@ class NBEATSRunner(BaseRunner):
         )
 
 
+class TiDERunner(BaseRunner):
+    """TiDE (Time-series Dense Encoder) neural model.
+
+    Requires: pip install neuralforecast
+    """
+
+    @property
+    def name(self) -> str:
+        return "TiDE"
+
+    def fit_predict(
+        self,
+        train: pd.DataFrame,
+        horizon: int,
+        freq: str,
+        season_length: int,
+        n_jobs: int = 1,
+    ) -> ForecastOutput:
+        from neuralforecast import NeuralForecast
+        from neuralforecast.models import TiDE
+
+        t0 = time.perf_counter()
+
+        model = TiDE(
+            input_size=2 * horizon,
+            h=horizon,
+            max_steps=100,
+            accelerator="cpu",
+            enable_progress_bar=False,
+        )
+        nf = NeuralForecast(models=[model], freq=freq)
+        nf.fit(df=train)
+        preds = nf.predict()
+        preds = preds.reset_index() if "unique_id" not in preds.columns else preds
+
+        elapsed = time.perf_counter() - t0
+        return ForecastOutput(
+            unique_id=preds["unique_id"].astype(str).tolist(),
+            ds=preds["ds"].astype(str).tolist(),
+            y_hat=preds["TiDE"].tolist(),
+            model_name=self.name,
+            runtime_sec=round(elapsed, 4),
+        )
+
+
+class DeepARRunner(BaseRunner):
+    """DeepAR probabilistic neural model.
+
+    Requires: pip install neuralforecast
+    """
+
+    @property
+    def name(self) -> str:
+        return "DeepAR"
+
+    def fit_predict(
+        self,
+        train: pd.DataFrame,
+        horizon: int,
+        freq: str,
+        season_length: int,
+        n_jobs: int = 1,
+    ) -> ForecastOutput:
+        from neuralforecast import NeuralForecast
+        from neuralforecast.models import DeepAR
+
+        t0 = time.perf_counter()
+
+        model = DeepAR(
+            input_size=2 * horizon,
+            h=horizon,
+            max_steps=100,
+            accelerator="cpu",
+            enable_progress_bar=False,
+        )
+        nf = NeuralForecast(models=[model], freq=freq)
+        nf.fit(df=train)
+        preds = nf.predict()
+        preds = preds.reset_index() if "unique_id" not in preds.columns else preds
+
+        elapsed = time.perf_counter() - t0
+        return ForecastOutput(
+            unique_id=preds["unique_id"].astype(str).tolist(),
+            ds=preds["ds"].astype(str).tolist(),
+            y_hat=preds["DeepAR"].tolist(),
+            model_name=self.name,
+            runtime_sec=round(elapsed, 4),
+        )
+
+
+class PatchTSTRunner(BaseRunner):
+    """PatchTST transformer model.
+
+    Requires: pip install neuralforecast
+    """
+
+    @property
+    def name(self) -> str:
+        return "PatchTST"
+
+    def fit_predict(
+        self,
+        train: pd.DataFrame,
+        horizon: int,
+        freq: str,
+        season_length: int,
+        n_jobs: int = 1,
+    ) -> ForecastOutput:
+        from neuralforecast import NeuralForecast
+        from neuralforecast.models import PatchTST
+
+        t0 = time.perf_counter()
+
+        model = PatchTST(
+            input_size=2 * horizon,
+            h=horizon,
+            max_steps=100,
+            accelerator="cpu",
+            enable_progress_bar=False,
+        )
+        nf = NeuralForecast(models=[model], freq=freq)
+        nf.fit(df=train)
+        preds = nf.predict()
+        preds = preds.reset_index() if "unique_id" not in preds.columns else preds
+
+        elapsed = time.perf_counter() - t0
+        return ForecastOutput(
+            unique_id=preds["unique_id"].astype(str).tolist(),
+            ds=preds["ds"].astype(str).tolist(),
+            y_hat=preds["PatchTST"].tolist(),
+            model_name=self.name,
+            runtime_sec=round(elapsed, 4),
+        )
+
+
+class TFTRunner(BaseRunner):
+    """Temporal Fusion Transformer model.
+
+    Requires: pip install neuralforecast
+    """
+
+    @property
+    def name(self) -> str:
+        return "TFT"
+
+    def fit_predict(
+        self,
+        train: pd.DataFrame,
+        horizon: int,
+        freq: str,
+        season_length: int,
+        n_jobs: int = 1,
+    ) -> ForecastOutput:
+        from neuralforecast import NeuralForecast
+        from neuralforecast.models import TFT
+
+        t0 = time.perf_counter()
+
+        model = TFT(
+            input_size=2 * horizon,
+            h=horizon,
+            max_steps=100,
+            accelerator="cpu",
+            enable_progress_bar=False,
+        )
+        nf = NeuralForecast(models=[model], freq=freq)
+        nf.fit(df=train)
+        preds = nf.predict()
+        preds = preds.reset_index() if "unique_id" not in preds.columns else preds
+
+        elapsed = time.perf_counter() - t0
+        return ForecastOutput(
+            unique_id=preds["unique_id"].astype(str).tolist(),
+            ds=preds["ds"].astype(str).tolist(),
+            y_hat=preds["TFT"].tolist(),
+            model_name=self.name,
+            runtime_sec=round(elapsed, 4),
+        )
+
+
 def get_optional_runners() -> list[BaseRunner]:
     """Return list of available optional runners (only if deps are installed)."""
     runners: list[BaseRunner] = []
@@ -215,7 +445,7 @@ def get_optional_runners() -> list[BaseRunner]:
 
     try:
         import lightgbm  # noqa: F401
-        import mlforecast  # noqa: F401
+        import mlforecast
 
         runners.append(LightGBMRunner())
         logger.debug("LightGBM runner available")
@@ -223,11 +453,27 @@ def get_optional_runners() -> list[BaseRunner]:
         logger.debug("LightGBM/mlforecast not installed, skipping")
 
     try:
+        import mlforecast  # noqa: F401
+        import xgboost  # noqa: F401
+
+        runners.append(XGBoostRunner())
+        logger.debug("XGBoost runner available")
+    except ImportError:
+        logger.debug("XGBoost/mlforecast not installed, skipping")
+
+    try:
         import neuralforecast  # noqa: F401
 
         runners.append(NHITSRunner())
         runners.append(NBEATSRunner())
-        logger.debug("NeuralForecast runners available (NHITS, NBEATS)")
+        runners.append(TiDERunner())
+        runners.append(DeepARRunner())
+        runners.append(PatchTSTRunner())
+        runners.append(TFTRunner())
+        logger.debug(
+            "NeuralForecast runners available"
+            " (NHITS, NBEATS, TiDE, DeepAR, PatchTST, TFT)"
+        )
     except ImportError:
         logger.debug("neuralforecast not installed, skipping")
 

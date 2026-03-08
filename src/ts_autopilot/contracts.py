@@ -23,13 +23,27 @@ class DataProfile:
     min_length: int
     max_length: int
     total_rows: int
+    exog_columns: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        # Omit empty exog_columns for backward compat
+        if not d.get("exog_columns"):
+            d.pop("exog_columns", None)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> DataProfile:
-        return cls(**d)
+        return cls(
+            n_series=d["n_series"],
+            frequency=d["frequency"],
+            missing_ratio=d["missing_ratio"],
+            season_length_guess=d["season_length_guess"],
+            min_length=d["min_length"],
+            max_length=d["max_length"],
+            total_rows=d["total_rows"],
+            exog_columns=d.get("exog_columns", []),
+        )
 
 
 @dataclass

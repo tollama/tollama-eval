@@ -107,8 +107,15 @@ lightgbm = [
     "lightgbm>=4.0",
     "mlforecast>=0.10",
 ]
+xgboost = [
+    "xgboost>=2.0",
+    "mlforecast>=0.10",
+]
 neural = [
     "neuralforecast>=1.6",
+]
+hierarchical = [
+    "hierarchicalforecast>=0.4",
 ]
 pdf = [
     "weasyprint>=60.0",
@@ -120,13 +127,24 @@ tracing = [
     "opentelemetry-api>=1.20",
     "opentelemetry-sdk>=1.20",
 ]
+server = [
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+]
+distributed = [
+    "ray[default]>=2.0",
+]
 all = [
     "ts-autopilot[prophet]",
     "ts-autopilot[lightgbm]",
+    "ts-autopilot[xgboost]",
     "ts-autopilot[neural]",
+    "ts-autopilot[hierarchical]",
     "ts-autopilot[pdf]",
     "ts-autopilot[dashboard]",
     "ts-autopilot[tracing]",
+    "ts-autopilot[server]",
+    "ts-autopilot[distributed]",
 ]
 
 [dependency-groups]

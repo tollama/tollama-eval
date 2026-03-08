@@ -39,11 +39,37 @@ with cross-validated metrics and a visual report.
 - **AutoTheta** — automated Theta method
 - **CES (AutoCES)** — complex exponential smoothing
 
-#### Optional Models (extras, 4 models)
+#### Extended Statistical Models (9 models)
+- **MSTL** — multiple seasonal-trend decomposition using LOESS
+- **DynamicOptimizedTheta (DOTheta)** — dynamic theta variant
+- **Holt** — double exponential smoothing (linear trend)
+- **HoltWinters** — triple exponential smoothing (trend + seasonality)
+- **HistoricAverage** — simple mean baseline
+- **Naive** — repeat last observation
+- **RandomWalkWithDrift** — random walk with trend
+- **WindowAverage** — simple moving average
+- **SeasonalWindowAverage** — seasonal moving average
+
+#### Intermittent Demand Models (6 models)
+- **CrostonClassic** — classic Croston method
+- **CrostonOptimized** — optimized Croston method
+- **CrostonSBA** — Syntetos-Boylan Approximation (bias-corrected)
+- **ADIDA** — Aggregate-Disaggregate Intermittent Demand Approach
+- **IMAPA** — Intermittent Multiple Aggregation Prediction Algorithm
+- **TSB** — Teunter-Syntetos-Babai method
+
+#### Optional ML Models (extras)
 - **Prophet** — Facebook Prophet (`pip install "ts-autopilot[prophet]"`)
 - **LightGBM** — gradient boosting via mlforecast (`pip install "ts-autopilot[lightgbm]"`)
-- **NHITS** — neural model (`pip install "ts-autopilot[neural]"`)
-- **NBEATS** — neural model (`pip install "ts-autopilot[neural]"`)
+- **XGBoost** — gradient boosting via mlforecast (`pip install "ts-autopilot[xgboost]"`)
+
+#### Optional Neural Models (extras, `pip install "ts-autopilot[neural]"`)
+- **NHITS** — N-HiTS neural model
+- **NBEATS** — N-BEATS neural model
+- **TiDE** — Time-series Dense Encoder
+- **DeepAR** — probabilistic autoregressive model
+- **PatchTST** — Patch Time Series Transformer
+- **TFT** — Temporal Fusion Transformer
 
 #### Foundation Models (via Tollama, 7 models)
 - Chronos-2, TimesFM, Moirai, Granite-TTM, Lag-Llama, PatchTST, TIDE
@@ -51,8 +77,43 @@ with cross-validated metrics and a visual report.
 ### 5. Evaluation & Metrics
 - **Expanding-window (walk-forward) cross-validation** with configurable folds
 - Per-series minimum length validation and date gap detection
-- **4 metrics**: MASE (primary ranking), SMAPE, RMSSE, MAE
+- **6 metrics**: MASE (primary ranking), SMAPE, RMSSE, MAE, MSIS, Coverage
 - Per-series metric breakdowns
+- **Composite scoring** with configurable metric weights
+- **Probabilistic metrics**: MSIS (Mean Scaled Interval Score), coverage probability
+
+### 5b. AutoML & Intelligent Model Selection
+- **Auto-model recommendation** based on data profile (series length, frequency, intermittency)
+- Models categorized by priority: must-run, recommended, optional
+- **Intermittency detection** using SBC (Syntetos-Boylan Classification): smooth, erratic, intermittent, lumpy
+- Automatic intermittent demand model selection when zero ratio > 30%
+- Configurable max model count
+
+### 5c. Ensemble Construction
+- **Simple average ensemble** — average predictions across all models
+- **Inverse-MASE weighted ensemble** — weight by model accuracy
+- **Best-per-series ensemble** — select best model per series
+- Per-series best-model recommendation with win counts
+- Virtual ensemble MASE computation
+
+### 5d. Anomaly Detection
+- **Z-score detector** — statistical threshold-based detection
+- **IQR detector** — interquartile range outlier detection
+- **Rolling detector** — rolling mean/std anomaly detection
+- **Residual detector** — forecast residual-based anomaly detection
+- Anomaly scoring, ranking, and reporting
+- Multi-detector ensemble (`run_all_detectors`)
+
+### 5e. Model Stability Analysis
+- **Fold CV** — coefficient of variation across CV folds
+- **Series CV** — coefficient of variation across series
+- **Rank consistency** — how often a model maintains its rank
+- **Composite stability score** (0-1) for leaderboard tie-breaking
+
+### 5f. Speed Benchmarking & Pareto Analysis
+- Per-model speed profiles (total runtime, per-series, throughput)
+- **Pareto frontier** analysis (accuracy vs speed tradeoff)
+- Identification of fastest and most efficient models
 
 ### 6. Residual Diagnostics
 - Mean, std, skewness, kurtosis of residuals
@@ -130,15 +191,20 @@ with cross-validated metrics and a visual report.
 ## Planned Features (Roadmap)
 
 ### v0.3 — Intelligence Phase
-- LLM-powered result interpretation via Tollama
+- LLM-powered result interpretation (via separate LLM API, not Tollama)
 - Natural-language summaries in reports
 - Model comparison narratives
+- Exogenous variable support
+- Hierarchical forecasting reconciliation (via hierarchicalforecast)
 
 ### v0.4 — Scale Phase
-- Multi-dataset campaigns (benchmark across many datasets)
-- Ensemble recommendations
-- Export to dashboard formats
-- Cross-dataset analytics
+- Multi-dataset campaign analytics with cross-dataset comparison
+- Distributed execution via Ray
+- REST API server (FastAPI-based)
+- Fluent Python SDK: `TSAutopilot(df).with_models([...]).run()`
+- Custom model plugin system via entry points
+- Export to PowerPoint, Excel, Jupyter notebook
+- Enhanced reporting: confidence bands, anomaly sections, Pareto charts
 
 ## Architectural Principles
 - **Zero-config default** — works out of the box with just a CSV
