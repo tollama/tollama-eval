@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TypedDict
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -16,6 +17,13 @@ from ts_autopilot.reporting.executive_summary import generate_executive_summary
 logger = get_logger("html_report")
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+class _ParetoPointDict(TypedDict):
+    name: str
+    mase: float
+    runtime: float
+    is_pareto: bool
 
 
 def render_report(
@@ -309,10 +317,10 @@ def _build_pareto_chart_data(result: BenchmarkResult) -> dict:
 
     report = compute_speed_report(result)
 
-    points = []
-    frontier = []
+    points: list[_ParetoPointDict] = []
+    frontier: list[_ParetoPointDict] = []
     for pp in report.pareto_points:
-        point = {
+        point: _ParetoPointDict = {
             "name": pp.model_name,
             "mase": round(pp.mean_mase, 4),
             "runtime": round(pp.total_runtime_sec, 4),

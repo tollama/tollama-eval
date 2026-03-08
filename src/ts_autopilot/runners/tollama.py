@@ -55,6 +55,7 @@ class TollamaRunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         """Send each series to tollama and collect forecasts.
 
@@ -62,6 +63,7 @@ class TollamaRunner(BaseRunner):
         Each series is sent independently to the /v1/forecast endpoint.
         """
         t0 = time.perf_counter()
+        _ = (season_length, n_jobs, exog)  # interface compatibility
 
         all_uids: list[str] = []
         all_ds: list[str] = []

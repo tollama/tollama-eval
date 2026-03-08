@@ -6,6 +6,7 @@ import importlib.metadata
 import os
 import time
 from abc import ABC, abstractmethod
+from typing import cast
 
 # Adopt new statsforecast behavior where ID is a column, not an index.
 # Must be set before importing statsforecast.
@@ -128,7 +129,11 @@ def discover_plugins() -> list[BaseRunner]:
         if hasattr(eps, "select"):
             group_eps = eps.select(group="ts_autopilot.runners")
         else:
-            group_eps = eps.get("ts_autopilot.runners", [])  # type: ignore[assignment]
+            legacy_eps = cast(dict[str, importlib.metadata.EntryPoints], eps)
+            group_eps = legacy_eps.get(
+                "ts_autopilot.runners",
+                cast(importlib.metadata.EntryPoints, ()),
+            )
 
         for ep in group_eps:
             try:

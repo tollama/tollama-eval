@@ -251,8 +251,8 @@ def render_critical_difference_svg(
 
     # Deduplicate cliques (merge overlapping)
     merged_cliques: list[set[str]] = []
-    for clique in cliques:
-        clique_set = set(clique)
+    for clique_names in cliques:
+        clique_set = set(clique_names)
         merged = False
         for mc in merged_cliques:
             if mc & clique_set:
@@ -264,28 +264,28 @@ def render_critical_difference_svg(
 
     # Verify clique validity: all pairs within a clique must be within CD
     valid_cliques: list[set[str]] = []
-    for clique in merged_cliques:
-        clique_ranks = [(n, mean_ranks[n]) for n in clique]
-        clique_ranks.sort(key=lambda x: x[1])
-        if len(clique_ranks) >= 2:
-            min_r = clique_ranks[0][1]
-            max_r = clique_ranks[-1][1]
+    for clique_set in merged_cliques:
+        clique_rank_pairs = [(name, mean_ranks[name]) for name in clique_set]
+        clique_rank_pairs.sort(key=lambda x: x[1])
+        if len(clique_rank_pairs) >= 2:
+            min_r = clique_rank_pairs[0][1]
+            max_r = clique_rank_pairs[-1][1]
             if max_r - min_r <= cd:
-                valid_cliques.append(clique)
+                valid_cliques.append(clique_set)
             else:
                 # Split into valid sub-cliques
-                for ci in range(len(clique_ranks)):
-                    for cj in range(ci + 1, len(clique_ranks)):
-                        sub = [clique_ranks[x][0] for x in range(ci, cj + 1)]
-                        sub_min = clique_ranks[ci][1]
-                        sub_max = clique_ranks[cj][1]
+                for ci in range(len(clique_rank_pairs)):
+                    for cj in range(ci + 1, len(clique_rank_pairs)):
+                        sub = [clique_rank_pairs[x][0] for x in range(ci, cj + 1)]
+                        sub_min = clique_rank_pairs[ci][1]
+                        sub_max = clique_rank_pairs[cj][1]
                         if sub_max - sub_min <= cd and len(sub) >= 2:
                             sub_set = set(sub)
                             # Only add if not a subset of an existing clique
                             if not any(sub_set <= vc for vc in valid_cliques):
                                 valid_cliques.append(sub_set)
         else:
-            valid_cliques.append(clique)
+            valid_cliques.append(clique_set)
 
     # Remove subset cliques
     final_cliques: list[set[str]] = []
@@ -352,20 +352,20 @@ def render_critical_difference_svg(
     )
 
     # Tick marks and labels
-    for rank in range(1, k + 1):
-        x = rank_to_x(rank)
+    for tick_rank in range(1, k + 1):
+        x = rank_to_x(float(tick_rank))
         lines.append(
             f'<line x1="{x}" y1="{axis_y - 4}" x2="{x}" y2="{axis_y + 4}" '
             f'stroke="currentColor" stroke-width="1.5"/>'
         )
         lines.append(
             f'<text x="{x}" y="{axis_y - 8}" text-anchor="middle" '
-            f'fill="currentColor" font-size="10">{rank}</text>'
+            f'fill="currentColor" font-size="10">{tick_rank}</text>'
         )
 
     # Model labels and connecting lines — top models
-    for idx, (name, rank) in enumerate(top_models):
-        x = rank_to_x(rank)
+    for idx, (name, model_rank) in enumerate(top_models):
+        x = rank_to_x(model_rank)
         label_y = top_label_y - (len(top_models) - idx) * model_spacing
         esc_name = xml_escape(name)
         lines.append(
@@ -382,8 +382,8 @@ def render_critical_difference_svg(
         )
 
     # Model labels — bottom models
-    for idx, (name, rank) in enumerate(bottom_models):
-        x = rank_to_x(rank)
+    for idx, (name, model_rank) in enumerate(bottom_models):
+        x = rank_to_x(model_rank)
         label_y = bottom_label_start_y + idx * model_spacing
         esc_name = xml_escape(name)
         lines.append(
@@ -403,10 +403,10 @@ def render_critical_difference_svg(
         "#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed",
         "#db2777", "#0891b2", "#65a30d",
     ]
-    for ci, clique in enumerate(final_cliques):
-        clique_ranks = sorted(mean_ranks[n] for n in clique)
-        x1 = rank_to_x(clique_ranks[0])
-        x2 = rank_to_x(clique_ranks[-1])
+    for ci, clique_set in enumerate(final_cliques):
+        clique_rank_values = sorted(mean_ranks[name] for name in clique_set)
+        x1 = rank_to_x(clique_rank_values[0])
+        x2 = rank_to_x(clique_rank_values[-1])
         bar_y = axis_y + tick_height + ci * clique_spacing
         color = bar_colors[ci % len(bar_colors)]
         lines.append(

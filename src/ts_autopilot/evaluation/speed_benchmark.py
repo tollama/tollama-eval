@@ -45,21 +45,21 @@ class SpeedReport:
 
     def summary(self) -> str:
         lines = ["Speed Benchmark:"]
-        for p in sorted(self.profiles, key=lambda x: x.total_runtime_sec):
+        for profile in sorted(self.profiles, key=lambda x: x.total_runtime_sec):
             lines.append(
-                f"  {p.model_name}: {p.total_runtime_sec:.2f}s total, "
-                f"{p.avg_sec_per_series:.4f}s/series, "
-                f"{p.throughput_series_per_sec:.1f} series/s"
+                f"  {profile.model_name}: {profile.total_runtime_sec:.2f}s total, "
+                f"{profile.avg_sec_per_series:.4f}s/series, "
+                f"{profile.throughput_series_per_sec:.1f} series/s"
             )
         lines.append(f"\nFastest: {self.fastest_model}")
         lines.append(f"Most efficient (MASE/sec): {self.most_efficient_model}")
-        pareto = [p for p in self.pareto_points if p.is_pareto_optimal]
+        pareto = [point for point in self.pareto_points if point.is_pareto_optimal]
         if pareto:
             lines.append("Pareto-optimal models:")
-            for p in pareto:
+            for point in pareto:
                 lines.append(
-                    f"  {p.model_name}: MASE={p.mean_mase:.4f}, "
-                    f"time={p.total_runtime_sec:.2f}s"
+                    f"  {point.model_name}: MASE={point.mean_mase:.4f}, "
+                    f"time={point.total_runtime_sec:.2f}s"
                 )
         return "\n".join(lines)
 

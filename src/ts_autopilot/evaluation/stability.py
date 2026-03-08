@@ -62,11 +62,11 @@ def compute_stability(result: BenchmarkResult) -> StabilityReport:
     )
     fold_rankings: dict[int, dict[str, float]] = {}
     for fold_idx in range(n_folds):
-        fold_mases: dict[str, float] = {}
+        fold_mase_by_model: dict[str, float] = {}
         for model in result.models:
             if fold_idx < len(model.folds):
-                fold_mases[model.name] = model.folds[fold_idx].mase
-        fold_rankings[fold_idx] = fold_mases
+                fold_mase_by_model[model.name] = model.folds[fold_idx].mase
+        fold_rankings[fold_idx] = fold_mase_by_model
 
     for model in result.models:
         if not model.folds:
@@ -82,9 +82,9 @@ def compute_stability(result: BenchmarkResult) -> StabilityReport:
             continue
 
         # Fold CV
-        fold_mases = [f.mase for f in model.folds if not np.isnan(f.mase)]
-        if len(fold_mases) > 1 and np.mean(fold_mases) > 0:
-            fold_cv = float(np.std(fold_mases) / np.mean(fold_mases))
+        fold_mase_values = [f.mase for f in model.folds if not np.isnan(f.mase)]
+        if len(fold_mase_values) > 1 and np.mean(fold_mase_values) > 0:
+            fold_cv = float(np.std(fold_mase_values) / np.mean(fold_mase_values))
         else:
             fold_cv = 0.0
 

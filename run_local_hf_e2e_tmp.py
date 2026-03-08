@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E2E runner: all models × 10 locally-downloaded HF datasets.
+"""E2E runner: all models x 10 locally-downloaded HF datasets.
 
 Uses hf_data/<name>/raw/rows.jsonl files. No HuggingFace download needed.
 """
@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import json
 import random
-import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from statistics import median
 from time import perf_counter
@@ -322,10 +321,15 @@ def pick_10_datasets() -> list[dict]:
 # HTTP helpers
 # ─────────────────────────────────────────────────────────────
 
-def _http(method: str, url: str, body: bytes | None = None,
-          timeout: float = 120.0) -> tuple[int, dict | None, str | None]:
+def _http(
+    method: str,
+    url: str,
+    body: bytes | None = None,
+    timeout: float = 120.0,
+) -> tuple[int, dict | None, str | None]:
     """HTTP call that handles both plain JSON and NDJSON streaming responses."""
-    import urllib.request, urllib.error
+    import urllib.error
+    import urllib.request
     req = urllib.request.Request(
         url, data=body, method=method,
         headers={"Content-Type": "application/json", "Accept": "application/json"},
@@ -377,19 +381,23 @@ def health() -> bool:
 
 def pull_model(model: str) -> str | None:
     # Try with accept_license first, then without
-    body = json.dumps({"model": model, "stream": False, "accept_license": True}).encode()
-    code, resp, exc = _http("POST", f"{BASE_URL}/api/pull", body, timeout=60.0)
+    body = json.dumps(
+        {"model": model, "stream": False, "accept_license": True}
+    ).encode()
+    code, _resp, _exc = _http("POST", f"{BASE_URL}/api/pull", body, timeout=60.0)
     if code in (200, 201):
         return None
     # Retry without accept_license
     body2 = json.dumps({"model": model, "stream": False}).encode()
-    code2, resp2, exc2 = _http("POST", f"{BASE_URL}/api/pull", body2, timeout=60.0)
+    code2, _resp2, exc2 = _http("POST", f"{BASE_URL}/api/pull", body2, timeout=60.0)
     if code2 in (200, 201):
         return None
     return exc2 or f"pull returned {code2}"
 
 
-def forecast(payload: dict, timeout: float = 600.0) -> tuple[int | None, dict | None, str | None]:
+def forecast(
+    payload: dict, timeout: float = 600.0
+) -> tuple[int | None, dict | None, str | None]:
     body = json.dumps(payload).encode()
     code, resp, exc = _http("POST", f"{BASE_URL}/api/forecast", body, timeout=timeout)
     return code, resp, exc
@@ -440,7 +448,10 @@ def main() -> int:
         if series_list:
             loaded[hf_id] = series_list
             s = series_list[0]
-            log(f"  ✓ {hf_id} → freq={s['freq']} ts_col={s['ts_col']!r} tgt_col={s['tgt_col']!r}")
+            log(
+                f"  ✓ {hf_id} → freq={s['freq']} ts_col={s['ts_col']!r} "
+                f"tgt_col={s['tgt_col']!r}"
+            )
         else:
             log(f"  ✗ {hf_id}: skipped (columns unparseable or insufficient rows)")
 
@@ -448,7 +459,7 @@ def main() -> int:
         err("No datasets could be loaded — all column detection failed.")
         return 1
 
-    print(f"\nRunning {len(ALL_MODELS)} models × {len(loaded)} datasets\n")
+    print(f"\nRunning {len(ALL_MODELS)} models x {len(loaded)} datasets\n")
     results: list[dict] = []
 
     for model in ALL_MODELS:
@@ -457,11 +468,19 @@ def main() -> int:
 
         pull_err = pull_model(model)
         if pull_err:
-            err(f"  {model}: pull FAILED – {pull_err[:120]}")
+            err(f"  {model}: pull FAILED - {pull_err[:120]}")
             for hf_id, series_list in loaded.items():
                 for s in series_list:
-                    results.append({"model": model, "dataset": hf_id, "series": s["id"],
-                                    "status": "FAIL", "error": f"pull: {pull_err[:80]}", "latency_ms": 0})
+                    results.append(
+                        {
+                            "model": model,
+                            "dataset": hf_id,
+                            "series": s["id"],
+                            "status": "FAIL",
+                            "error": f"pull: {pull_err[:80]}",
+                            "latency_ms": 0,
+                        }
+                    )
             continue
         log(f"  {model}: pulled ✓")
 
@@ -497,7 +516,11 @@ def main() -> int:
                     "freq": s["freq"],
                 })
 
-                tag = f"  {model[:22]:<22} | {hf_id.split('/')[-1][:20]:<20} | {latency_ms:>6}ms"
+                tag = (
+                    f"  {model[:22]:<22} | "
+                    f"{hf_id.split('/')[-1][:20]:<20} | "
+                    f"{latency_ms:>6}ms"
+                )
                 if status == "PASS":
                     ok(tag)
                 else:
@@ -506,7 +529,7 @@ def main() -> int:
     # ── Summary ─────────────────────────────────────────────
     print()
     print("=" * 72)
-    print(" FINAL E2E SUMMARY – all models × 10 local HF datasets")
+    print(" FINAL E2E SUMMARY - all models x 10 local HF datasets")
     print("=" * 72)
     print(f"  {'Model':<28}  {'PASS':>5}  {'FAIL':>5}  {'Total':>6}  {'Avg ms':>8}")
     print("  " + "─" * 60)
@@ -527,7 +550,10 @@ def main() -> int:
 
     total_fail = sum(1 for r in results if r["status"] == "FAIL")
     total_pass = sum(1 for r in results if r["status"] == "PASS")
-    print(f"\n  Grand total: {total_pass} PASS, {total_fail} FAIL out of {len(results)} runs")
+    print(
+        f"\n  Grand total: {total_pass} PASS, {total_fail} FAIL "
+        f"out of {len(results)} runs"
+    )
 
     # Save results
     out_path = REPO_DIR / "artifacts" / "realdata" / "local_hf10_e2e_results.json"

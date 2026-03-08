@@ -1,6 +1,8 @@
-import pandas as pd
 import json
 from pathlib import Path
+
+import pandas as pd
+
 
 def main():
     repo_dir = Path("/Users/yongchoelchoi/Documents/GitHub/tollama/hf_data")
@@ -45,9 +47,19 @@ def main():
     
     # find robust ts col and tgt col
     if ts_col not in df.columns:
-        ts_col = next((c for c in df.columns if "date" in c.lower() or "time" in c.lower()), df.columns[0])
+        ts_col = next(
+            (
+                c
+                for c in df.columns
+                if "date" in c.lower() or "time" in c.lower()
+            ),
+            df.columns[0],
+        )
     if tgt_col not in df.columns:
-        tgt_col = next((c for c in df.columns if c.lower() in ("sales", "y", "target", "value")), df.columns[-1])
+        tgt_col = next(
+            (c for c in df.columns if c.lower() in ("sales", "y", "target", "value")),
+            df.columns[-1],
+        )
         
     df = df.rename(columns={ts_col: "ds", tgt_col: "y"})
     df["ds"] = pd.to_datetime(df["ds"], format=None, errors="coerce")
@@ -69,5 +81,7 @@ def main():
     
     agg_df.to_csv("real_data.csv", index=False)
     print("Saved real_data.csv with", len(agg_df), "daily aggregated rows")
+
+
 if __name__ == "__main__":
     main()

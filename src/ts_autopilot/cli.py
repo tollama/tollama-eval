@@ -405,7 +405,7 @@ def run(
             typer.secho(f"Config error: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
 
-        m = _merge_config(
+        merged_cfg = _merge_config(
             file_cfg,
             cli_input=input,
             cli_output=output,
@@ -420,24 +420,24 @@ def run(
             cli_parallel_models=parallel_models,
             default_timeout=DEFAULT_MODEL_TIMEOUT_SEC,
         )
-        input = m["input"]
-        output = m["output"]
-        horizon = m["horizon"]
-        n_folds = m["n_folds"]
-        n_jobs = m["n_jobs"]
-        models = m["models"]
-        tollama_url = m["tollama_url"]
-        tollama_models = m["tollama_models"]
-        report_title = m["report_title"]
-        report_lang = m["report_lang"]
-        model_timeout_sec = m["model_timeout_sec"]
-        memory_limit_mb = m["memory_limit_mb"]
-        allow_private_urls = m["allow_private_urls"]
-        max_retries = m["max_retries"]
-        retry_backoff = m["retry_backoff"]
-        no_cache = m["no_cache"]
-        cache_dir = m["cache_dir"]
-        parallel_models = m["parallel_models"]
+        input = merged_cfg["input"]
+        output = merged_cfg["output"]
+        horizon = merged_cfg["horizon"]
+        n_folds = merged_cfg["n_folds"]
+        n_jobs = merged_cfg["n_jobs"]
+        models = merged_cfg["models"]
+        tollama_url = merged_cfg["tollama_url"]
+        tollama_models = merged_cfg["tollama_models"]
+        report_title = merged_cfg["report_title"]
+        report_lang = merged_cfg["report_lang"]
+        model_timeout_sec = merged_cfg["model_timeout_sec"]
+        memory_limit_mb = merged_cfg["memory_limit_mb"]
+        allow_private_urls = merged_cfg["allow_private_urls"]
+        max_retries = merged_cfg["max_retries"]
+        retry_backoff = merged_cfg["retry_backoff"]
+        no_cache = merged_cfg["no_cache"]
+        cache_dir = merged_cfg["cache_dir"]
+        parallel_models = merged_cfg["parallel_models"]
     else:
         report_title = None
         report_lang = None
@@ -667,17 +667,19 @@ def run(
         if not quiet:
             typer.echo("")
             typer.secho("Composite Scores:", bold=True)
-        model_by_name = {m.name: m for m in result.models}
+        model_by_name = {
+            model_result.name: model_result for model_result in result.models
+        }
         for entry in result.leaderboard:
-            m = model_by_name.get(entry.name)
-            if m is None:
+            model_result = model_by_name.get(entry.name)
+            if model_result is None:
                 continue
             cs = composite_score(
-                mase_val=m.mean_mase,
-                smape_val=m.mean_smape,
-                rmsse_val=m.mean_rmsse,
-                mae_val=m.mean_mae,
-                runtime_sec=m.runtime_sec,
+                mase_val=model_result.mean_mase,
+                smape_val=model_result.mean_smape,
+                rmsse_val=model_result.mean_rmsse,
+                mae_val=model_result.mean_mae,
+                runtime_sec=model_result.runtime_sec,
                 weights=parsed_weights,
             )
             if not quiet:

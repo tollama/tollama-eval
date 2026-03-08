@@ -34,6 +34,7 @@ class ProphetRunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         from prophet import Prophet
 
@@ -84,6 +85,7 @@ class LightGBMRunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         import lightgbm as lgb
         from mlforecast import MLForecast
@@ -126,6 +128,7 @@ class XGBoostRunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         import xgboost as xgb
         from mlforecast import MLForecast
@@ -176,6 +179,7 @@ class NHITSRunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         from neuralforecast import NeuralForecast
         from neuralforecast.models import NHITS
@@ -222,6 +226,7 @@ class NBEATSRunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         from neuralforecast import NeuralForecast
         from neuralforecast.models import NBEATS
@@ -268,6 +273,7 @@ class TiDERunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         from neuralforecast import NeuralForecast
         from neuralforecast.models import TiDE
@@ -313,6 +319,7 @@ class DeepARRunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         from neuralforecast import NeuralForecast
         from neuralforecast.models import DeepAR
@@ -358,6 +365,7 @@ class PatchTSTRunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         from neuralforecast import NeuralForecast
         from neuralforecast.models import PatchTST
@@ -403,6 +411,7 @@ class TFTRunner(BaseRunner):
         freq: str,
         season_length: int,
         n_jobs: int = 1,
+        exog: pd.DataFrame | None = None,
     ) -> ForecastOutput:
         from neuralforecast import NeuralForecast
         from neuralforecast.models import TFT
