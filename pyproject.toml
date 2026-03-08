@@ -100,11 +100,15 @@ neural = [
 pdf = [
     "weasyprint>=60.0",
 ]
+dashboard = [
+    "streamlit>=1.28",
+]
 all = [
     "ts-autopilot[prophet]",
     "ts-autopilot[lightgbm]",
     "ts-autopilot[neural]",
     "ts-autopilot[pdf]",
+    "ts-autopilot[dashboard]",
 ]
 
 [dependency-groups]

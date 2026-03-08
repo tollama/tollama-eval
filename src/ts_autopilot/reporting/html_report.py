@@ -16,11 +16,15 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 def render_report(
     result: BenchmarkResult,
+    report_title: str | None = None,
+    report_lang: str | None = None,
 ) -> str:
     """Render an HTML report from a BenchmarkResult.
 
     Args:
         result: Fully populated BenchmarkResult.
+        report_title: Custom title for the report header.
+        report_lang: Language code for the HTML lang attribute (e.g. 'ko', 'ja').
 
     Returns:
         HTML string.
@@ -59,6 +63,8 @@ def render_report(
             has_diagnostics=len(result.diagnostics) > 0,
             has_tsfm=has_tsfm,
             tollama_models=tollama_models,
+            report_title=report_title,
+            lang=report_lang or "en",
         )
     )
 

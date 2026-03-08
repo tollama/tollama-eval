@@ -506,6 +506,8 @@ def run_from_csv(
     generate_pdf: bool = False,
     max_retries: int = DEFAULT_MAX_RETRIES,
     retry_backoff: float = DEFAULT_RETRY_BACKOFF_SEC,
+    report_title: str | None = None,
+    report_lang: str | None = None,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html.
 
@@ -570,7 +572,10 @@ def run_from_csv(
 
     # Atomic write report.html
     report_path = output_dir / "report.html"
-    _atomic_write(report_path, render_report(result))
+    _atomic_write(
+        report_path,
+        render_report(result, report_title=report_title, report_lang=report_lang),
+    )
     logger.info("Wrote %s", report_path)
 
     # Optional PDF generation

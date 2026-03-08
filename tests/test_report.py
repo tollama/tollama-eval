@@ -125,14 +125,14 @@ def test_report_generated_timestamp(benchmark_result):
 
 def test_report_warnings_section(benchmark_result_with_warnings):
     html = render_report(benchmark_result_with_warnings)
-    assert '<div class="warnings-box">' in html
+    assert 'class="warnings-box"' in html
     assert "Only 1 series found." in html
     assert "Missing ratio is 15.0%." in html
 
 
 def test_report_no_warnings_section(benchmark_result):
     html = render_report(benchmark_result)
-    assert '<div class="warnings-box">' not in html
+    assert 'class="warnings-box"' not in html
 
 
 def test_report_print_css(benchmark_result):

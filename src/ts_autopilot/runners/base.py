@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import time
 from abc import ABC, abstractmethod
+
+# Adopt new statsforecast behavior where ID is a column, not an index.
+# Must be set before importing statsforecast.
+os.environ.setdefault("NIXTLA_ID_AS_COL", "1")
 
 import pandas as pd
 from statsforecast import StatsForecast
