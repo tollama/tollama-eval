@@ -7,6 +7,7 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
 
+import importlib
 import sys
 import time
 import traceback
@@ -221,6 +222,7 @@ def run(
     from ts_autopilot.logging_config import setup_logging
     from ts_autopilot.pipeline import (
         DEFAULT_MAX_RETRIES,
+        DEFAULT_MODEL_TIMEOUT_SEC,
         DEFAULT_RETRY_BACKOFF_SEC,
         run_from_csv,
     )
@@ -228,6 +230,10 @@ def run(
     # Load config file and merge with CLI flags (CLI wins)
     report_title: str | None = None
     report_lang: str | None = None
+    model_timeout_sec: float = DEFAULT_MODEL_TIMEOUT_SEC
+    memory_limit_mb: int = 2048
+    allow_private_urls: bool = False
+
     if config is not None:
         from ts_autopilot.config import load_config
 
@@ -255,6 +261,11 @@ def run(
             n_jobs = file_cfg.n_jobs
         report_title = file_cfg.report_title
         report_lang = file_cfg.report_lang
+        if file_cfg.model_timeout_sec is not None:
+            model_timeout_sec = file_cfg.model_timeout_sec
+        if file_cfg.memory_limit_mb is not None:
+            memory_limit_mb = file_cfg.memory_limit_mb
+        allow_private_urls = file_cfg.allow_private_urls
 
     # Retry settings (config file only, no CLI flags needed)
     max_retries = DEFAULT_MAX_RETRIES
@@ -350,6 +361,9 @@ def run(
                 retry_backoff=retry_backoff,
                 report_title=report_title,
                 report_lang=report_lang,
+                model_timeout_sec=model_timeout_sec,
+                memory_limit_mb=memory_limit_mb,
+                allow_private_urls=allow_private_urls,
             )
         finally:
             if progress is not None:
@@ -567,6 +581,86 @@ def campaign(
         typer.echo(f"  {ok}/{len(csv_files)} datasets succeeded")
         typer.echo(f"  Results: {summary_path.resolve()}")
         typer.echo(f"  Completed in {elapsed:.2f}s")
+
+
+@app.command()
+def doctor() -> None:
+    """Run diagnostic checks on the environment."""
+    checks: list[tuple[str, bool, str]] = []
+
+    # Python version
+    vi = sys.version_info
+    py_ver = f"{vi.major}.{vi.minor}.{vi.micro}"
+    py_ok = sys.version_info >= (3, 10)
+    checks.append(
+        (
+            "Python version",
+            py_ok,
+            f"{py_ver} {'(OK)' if py_ok else '(need 3.10+)'}",
+        )
+    )
+
+    # Core dependencies
+    core_deps = [
+        "pandas",
+        "numpy",
+        "statsforecast",
+        "typer",
+        "jinja2",
+        "httpx",
+        "yaml",
+    ]
+    for dep in core_deps:
+        try:
+            mod = importlib.import_module(dep)
+            ver = getattr(mod, "__version__", "installed")
+            checks.append((f"Core: {dep}", True, str(ver)))
+        except ImportError:
+            checks.append((f"Core: {dep}", False, "NOT INSTALLED"))
+
+    # Optional dependencies
+    optional_deps = {
+        "prophet": "Prophet",
+        "lightgbm": "LightGBM",
+        "neuralforecast": "NeuralForecast",
+        "weasyprint": "PDF export",
+        "streamlit": "Dashboard",
+    }
+    for dep, label in optional_deps.items():
+        try:
+            importlib.import_module(dep)
+            checks.append((f"Optional: {label}", True, "available"))
+        except ImportError:
+            checks.append((f"Optional: {label}", False, "not installed"))
+
+    # Output directory
+    out_dir = Path("out/")
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        test_file = out_dir / ".doctor_test"
+        test_file.write_text("ok")
+        test_file.unlink()
+        checks.append(("Output dir writable", True, str(out_dir.resolve())))
+    except OSError as exc:
+        checks.append(("Output dir writable", False, str(exc)))
+
+    # Print results
+    typer.secho("\nts-autopilot doctor", bold=True)
+    typer.secho("=" * 50)
+    passed = 0
+    failed = 0
+    for name, ok, detail in checks:
+        if ok:
+            status = typer.style("PASS", fg=typer.colors.GREEN)
+            passed += 1
+        else:
+            status = typer.style("FAIL", fg=typer.colors.RED)
+            failed += 1
+        typer.echo(f"  [{status}] {name}: {detail}")
+
+    typer.echo("")
+    summary_color = typer.colors.GREEN if failed == 0 else typer.colors.YELLOW
+    typer.secho(f"  {passed} passed, {failed} failed", fg=summary_color, bold=True)
 
 
 if __name__ == "__main__":

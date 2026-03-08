@@ -223,13 +223,22 @@ class ResultMetadata:
     version: str
     generated_at: str  # ISO 8601 UTC timestamp
     total_runtime_sec: float = 0.0
+    run_id: str = ""  # Correlation ID for log tracing
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        if not d.get("run_id"):
+            d.pop("run_id", None)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ResultMetadata:
-        return cls(**d)
+        return cls(
+            version=d["version"],
+            generated_at=d["generated_at"],
+            total_runtime_sec=d.get("total_runtime_sec", 0.0),
+            run_id=d.get("run_id", ""),
+        )
 
     @classmethod
     def create_now(cls) -> ResultMetadata:

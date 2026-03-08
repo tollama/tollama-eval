@@ -40,6 +40,7 @@ dependencies = [
 Homepage = "https://github.com/ychoi-atop/ts-autopilot"
 Repository = "https://github.com/ychoi-atop/ts-autopilot"
 Issues = "https://github.com/ychoi-atop/ts-autopilot/issues"
+Changelog = "https://github.com/ychoi-atop/ts-autopilot/blob/main/CHANGELOG.md"
 
 [project.scripts]
 ts-autopilot = "ts_autopilot.cli:app"
@@ -86,6 +87,7 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
     "types-PyYAML>=6.0",
+    "hypothesis>=6.0",
 ]
 prophet = [
     "prophet>=1.1",
@@ -103,12 +105,17 @@ pdf = [
 dashboard = [
     "streamlit>=1.28",
 ]
+tracing = [
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+]
 all = [
     "ts-autopilot[prophet]",
     "ts-autopilot[lightgbm]",
     "ts-autopilot[neural]",
     "ts-autopilot[pdf]",
     "ts-autopilot[dashboard]",
+    "ts-autopilot[tracing]",
 ]
 
 [dependency-groups]
@@ -118,4 +125,5 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
     "types-PyYAML>=6.0",
+    "hypothesis>=6.0",
 ]

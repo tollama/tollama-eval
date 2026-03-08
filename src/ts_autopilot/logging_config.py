@@ -10,6 +10,23 @@ from datetime import datetime, timezone
 _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 _LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
+# Thread-local storage for run_id injection
+_current_run_id: str = ""
+
+
+def set_run_id(run_id: str) -> None:
+    """Set the current run_id for log correlation."""
+    global _current_run_id
+    _current_run_id = run_id
+
+
+class _RunIdFilter(logging.Filter):
+    """Inject run_id into log records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.run_id = _current_run_id  # type: ignore[attr-defined]
+        return True
+
 
 class _JsonFormatter(logging.Formatter):
     """Emit one JSON object per log line for machine consumption."""
@@ -21,6 +38,9 @@ class _JsonFormatter(logging.Formatter):
             "logger": record.name,
             "msg": record.getMessage(),
         }
+        run_id = getattr(record, "run_id", "")
+        if run_id:
+            entry["run_id"] = run_id
         if record.exc_info and record.exc_info[1] is not None:
             entry["exception"] = self.formatException(record.exc_info)
         return json.dumps(entry, default=str)
@@ -54,7 +74,9 @@ def setup_logging(
 
     root = logging.getLogger("ts_autopilot")
     root.handlers.clear()
+    root.filters.clear()
     root.addHandler(handler)
+    root.addFilter(_RunIdFilter())
     root.setLevel(level)
     root.propagate = False
 

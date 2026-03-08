@@ -23,6 +23,12 @@ _VALID_KEYS = {
     "retry_backoff",
     "report_title",
     "report_lang",
+    "model_timeout_sec",
+    "memory_limit_mb",
+    "allow_private_urls",
+    "parallel_models",
+    "cache_dir",
+    "no_cache",
 }
 
 
@@ -42,6 +48,12 @@ class FileConfig:
     retry_backoff: float | None = None
     report_title: str | None = None
     report_lang: str | None = None
+    model_timeout_sec: float | None = None
+    memory_limit_mb: int | None = None
+    allow_private_urls: bool = False
+    parallel_models: bool = False
+    cache_dir: str | None = None
+    no_cache: bool = False
 
 
 def load_config(path: str | Path) -> FileConfig:
@@ -122,7 +134,7 @@ def load_config(path: str | Path) -> FileConfig:
         elif isinstance(val, list):
             config.tollama_models = [str(m) for m in val]
         else:
-            raise ValueError(
+            raise ConfigError(
                 "tollama_models must be a list or comma-separated "
                 f"string, got {type(val).__name__}"
             )
@@ -152,5 +164,33 @@ def load_config(path: str | Path) -> FileConfig:
 
     if "report_lang" in data:
         config.report_lang = str(data["report_lang"])
+
+    if "model_timeout_sec" in data:
+        val = data["model_timeout_sec"]
+        if not isinstance(val, int | float) or val <= 0:
+            raise ConfigError(
+                f"model_timeout_sec must be a positive number, got {val!r}"
+            )
+        config.model_timeout_sec = float(val)
+
+    if "memory_limit_mb" in data:
+        val = data["memory_limit_mb"]
+        if not isinstance(val, int) or val < 1:
+            raise ConfigError(
+                f"memory_limit_mb must be a positive integer, got {val!r}"
+            )
+        config.memory_limit_mb = val
+
+    if "allow_private_urls" in data:
+        config.allow_private_urls = bool(data["allow_private_urls"])
+
+    if "parallel_models" in data:
+        config.parallel_models = bool(data["parallel_models"])
+
+    if "cache_dir" in data:
+        config.cache_dir = str(data["cache_dir"])
+
+    if "no_cache" in data:
+        config.no_cache = bool(data["no_cache"])
 
     return config
