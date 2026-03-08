@@ -1,5 +1,6 @@
 # ts-autopilot output
 out/
+.ts_autopilot_cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

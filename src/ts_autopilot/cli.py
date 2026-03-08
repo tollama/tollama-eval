@@ -147,6 +147,110 @@ def _make_plain_progress_cb(quiet: bool, verbose: bool) -> object:
     return cb
 
 
+def _merge_config(
+    file_cfg: Any,
+    *,
+    cli_input: Path | None,
+    cli_output: Path,
+    cli_horizon: int,
+    cli_n_folds: int,
+    cli_models: str | None,
+    cli_tollama_url: str | None,
+    cli_tollama_models: str | None,
+    cli_n_jobs: int,
+    cli_no_cache: bool,
+    cli_cache_dir: Path | None,
+    cli_parallel_models: bool,
+    default_timeout: float,
+) -> dict[str, Any]:
+    """Merge file config with CLI args. CLI non-default values win."""
+    from ts_autopilot.pipeline import (
+        DEFAULT_MAX_RETRIES,
+        DEFAULT_RETRY_BACKOFF_SEC,
+    )
+
+    merged: dict[str, Any] = {}
+
+    # Input/output paths: CLI wins if provided
+    merged["input"] = (
+        cli_input if cli_input is not None
+        else Path(file_cfg.input) if file_cfg.input else None
+    )
+    merged["output"] = (
+        Path(file_cfg.output) if file_cfg.output and cli_output == Path("out/")
+        else cli_output
+    )
+
+    # Numeric params: CLI wins if not at default
+    merged["horizon"] = (
+        file_cfg.horizon if file_cfg.horizon is not None and cli_horizon == 14
+        else cli_horizon
+    )
+    merged["n_folds"] = (
+        file_cfg.n_folds if file_cfg.n_folds is not None and cli_n_folds == 3
+        else cli_n_folds
+    )
+    merged["n_jobs"] = (
+        file_cfg.n_jobs if file_cfg.n_jobs is not None and cli_n_jobs == 1
+        else cli_n_jobs
+    )
+
+    # String/list params: CLI wins if provided
+    merged["models"] = (
+        cli_models if cli_models is not None
+        else ",".join(file_cfg.models) if file_cfg.models else None
+    )
+    merged["tollama_url"] = (
+        cli_tollama_url if cli_tollama_url is not None
+        else file_cfg.tollama_url
+    )
+    merged["tollama_models"] = (
+        cli_tollama_models if cli_tollama_models is not None
+        else ",".join(file_cfg.tollama_models) if file_cfg.tollama_models else None
+    )
+
+    # Report settings (config file only)
+    merged["report_title"] = file_cfg.report_title
+    merged["report_lang"] = file_cfg.report_lang
+
+    # Timeout/memory (config file overrides defaults)
+    merged["model_timeout_sec"] = (
+        file_cfg.model_timeout_sec
+        if file_cfg.model_timeout_sec is not None
+        else default_timeout
+    )
+    merged["memory_limit_mb"] = (
+        file_cfg.memory_limit_mb
+        if file_cfg.memory_limit_mb is not None
+        else 2048
+    )
+    merged["allow_private_urls"] = file_cfg.allow_private_urls
+
+    # Retry settings (config file only)
+    merged["max_retries"] = (
+        file_cfg.max_retries
+        if file_cfg.max_retries is not None
+        else DEFAULT_MAX_RETRIES
+    )
+    merged["retry_backoff"] = (
+        file_cfg.retry_backoff
+        if file_cfg.retry_backoff is not None
+        else DEFAULT_RETRY_BACKOFF_SEC
+    )
+
+    # Cache settings: CLI wins if non-default
+    merged["no_cache"] = cli_no_cache or file_cfg.no_cache
+    merged["cache_dir"] = (
+        cli_cache_dir if cli_cache_dir is not None
+        else Path(file_cfg.cache_dir) if file_cfg.cache_dir else None
+    )
+
+    # Parallel models: CLI wins if set
+    merged["parallel_models"] = cli_parallel_models or file_cfg.parallel_models
+
+    return merged
+
+
 @app.command()
 def run(
     input: Path | None = _INPUT_OPTION,
@@ -215,6 +319,21 @@ def run(
         "--log-json",
         help="Emit structured JSON logs to stderr.",
     ),
+    no_cache: bool = typer.Option(
+        False,
+        "--no-cache",
+        help="Disable result caching.",
+    ),
+    cache_dir: Path | None = typer.Option(
+        None,
+        "--cache-dir",
+        help="Directory for cached results.",
+    ),
+    parallel_models: bool = typer.Option(
+        False,
+        "--parallel-models",
+        help="Run models in parallel processes.",
+    ),
     config: Path | None = _CONFIG_OPTION,
 ) -> None:
     """Run automated time series benchmarking on a CSV file."""
@@ -227,13 +346,7 @@ def run(
         run_from_csv,
     )
 
-    # Load config file and merge with CLI flags (CLI wins)
-    report_title: str | None = None
-    report_lang: str | None = None
-    model_timeout_sec: float = DEFAULT_MODEL_TIMEOUT_SEC
-    memory_limit_mb: int = 2048
-    allow_private_urls: bool = False
-
+    # Merge config file with CLI flags
     if config is not None:
         from ts_autopilot.config import load_config
 
@@ -243,38 +356,47 @@ def run(
             typer.secho(f"Config error: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=ExitCode.DATA_ERROR) from exc
 
-        if input is None and file_cfg.input:
-            input = Path(file_cfg.input)
-        if file_cfg.output and output == Path("out/"):
-            output = Path(file_cfg.output)
-        if file_cfg.horizon is not None and horizon == 14:
-            horizon = file_cfg.horizon
-        if file_cfg.n_folds is not None and n_folds == 3:
-            n_folds = file_cfg.n_folds
-        if file_cfg.models and models is None:
-            models = ",".join(file_cfg.models)
-        if file_cfg.tollama_url and tollama_url is None:
-            tollama_url = file_cfg.tollama_url
-        if file_cfg.tollama_models and tollama_models is None:
-            tollama_models = ",".join(file_cfg.tollama_models)
-        if file_cfg.n_jobs is not None and n_jobs == 1:
-            n_jobs = file_cfg.n_jobs
-        report_title = file_cfg.report_title
-        report_lang = file_cfg.report_lang
-        if file_cfg.model_timeout_sec is not None:
-            model_timeout_sec = file_cfg.model_timeout_sec
-        if file_cfg.memory_limit_mb is not None:
-            memory_limit_mb = file_cfg.memory_limit_mb
-        allow_private_urls = file_cfg.allow_private_urls
-
-    # Retry settings (config file only, no CLI flags needed)
-    max_retries = DEFAULT_MAX_RETRIES
-    retry_backoff = DEFAULT_RETRY_BACKOFF_SEC
-    if config is not None:
-        if file_cfg.max_retries is not None:
-            max_retries = file_cfg.max_retries
-        if file_cfg.retry_backoff is not None:
-            retry_backoff = file_cfg.retry_backoff
+        m = _merge_config(
+            file_cfg,
+            cli_input=input,
+            cli_output=output,
+            cli_horizon=horizon,
+            cli_n_folds=n_folds,
+            cli_models=models,
+            cli_tollama_url=tollama_url,
+            cli_tollama_models=tollama_models,
+            cli_n_jobs=n_jobs,
+            cli_no_cache=no_cache,
+            cli_cache_dir=cache_dir,
+            cli_parallel_models=parallel_models,
+            default_timeout=DEFAULT_MODEL_TIMEOUT_SEC,
+        )
+        input = m["input"]
+        output = m["output"]
+        horizon = m["horizon"]
+        n_folds = m["n_folds"]
+        n_jobs = m["n_jobs"]
+        models = m["models"]
+        tollama_url = m["tollama_url"]
+        tollama_models = m["tollama_models"]
+        report_title = m["report_title"]
+        report_lang = m["report_lang"]
+        model_timeout_sec = m["model_timeout_sec"]
+        memory_limit_mb = m["memory_limit_mb"]
+        allow_private_urls = m["allow_private_urls"]
+        max_retries = m["max_retries"]
+        retry_backoff = m["retry_backoff"]
+        no_cache = m["no_cache"]
+        cache_dir = m["cache_dir"]
+        parallel_models = m["parallel_models"]
+    else:
+        report_title = None
+        report_lang = None
+        model_timeout_sec = DEFAULT_MODEL_TIMEOUT_SEC
+        memory_limit_mb = 2048
+        allow_private_urls = False
+        max_retries = DEFAULT_MAX_RETRIES
+        retry_backoff = DEFAULT_RETRY_BACKOFF_SEC
 
     if input is None:
         typer.secho(
@@ -364,6 +486,9 @@ def run(
                 model_timeout_sec=model_timeout_sec,
                 memory_limit_mb=memory_limit_mb,
                 allow_private_urls=allow_private_urls,
+                no_cache=no_cache,
+                cache_dir=cache_dir,
+                parallel_models=parallel_models,
             )
         finally:
             if progress is not None:

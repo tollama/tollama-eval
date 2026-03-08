@@ -61,7 +61,7 @@ class TestConfigErrorInConfig:
 
         cfg_path = tmp_path / "config.yml"
         cfg_path.write_text("bogus_key: true\n")
-        with pytest.raises(ConfigError, match="Unknown config keys"):
+        with pytest.raises(ConfigError, match="Extra inputs are not permitted"):
             load_config(cfg_path)
 
     def test_unsupported_format_raises_config_error(self, tmp_path):
@@ -96,7 +96,7 @@ class TestRetryConfig:
 
         cfg_path = tmp_path / "config.yml"
         cfg_path.write_text("max_retries: -1\n")
-        with pytest.raises(ConfigError, match="non-negative integer"):
+        with pytest.raises(ConfigError, match="greater than or equal to 0"):
             load_config(cfg_path)
 
     def test_negative_backoff_raises(self, tmp_path):
@@ -104,7 +104,7 @@ class TestRetryConfig:
 
         cfg_path = tmp_path / "config.yml"
         cfg_path.write_text("retry_backoff: -0.5\n")
-        with pytest.raises(ConfigError, match="positive number"):
+        with pytest.raises(ConfigError, match="greater than 0"):
             load_config(cfg_path)
 
 

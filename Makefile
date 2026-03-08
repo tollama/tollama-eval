@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test coverage clean help all audit docker
+.PHONY: install lint format typecheck test coverage clean help all audit docker lock docs
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -23,7 +23,7 @@ test:  ## Run tests with verbose output
 	python -m pytest tests/ -v
 
 coverage:  ## Run tests with coverage report
-	python -m pytest tests/ --cov=ts_autopilot --cov-report=term-missing --cov-fail-under=80
+	python -m pytest tests/ --cov=ts_autopilot --cov-report=term-missing --cov-fail-under=90
 
 all:  ## Run lint, typecheck, and tests
 	$(MAKE) lint
@@ -35,6 +35,12 @@ audit:  ## Run dependency vulnerability scan
 
 docker:  ## Build Docker image
 	docker build -t ts-autopilot:latest .
+
+lock:  ## Regenerate dependency lock file
+	uv pip compile pyproject.toml -o requirements-lock.txt
+
+docs:  ## Generate API reference docs
+	pdoc src/ts_autopilot/ -o docs/_build/
 
 clean:  ## Remove build artifacts
 	rm -rf build/ dist/ *.egg-info src/*.egg-info .pytest_cache .ruff_cache .mypy_cache

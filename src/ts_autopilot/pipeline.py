@@ -10,9 +10,13 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ts_autopilot.cache import ResultCache
 
 import numpy as np
 import pandas as pd
@@ -302,6 +306,9 @@ def run_benchmark(
     retry_backoff: float = DEFAULT_RETRY_BACKOFF_SEC,
     model_timeout_sec: float = DEFAULT_MODEL_TIMEOUT_SEC,
     run_id: str | None = None,
+    cache: ResultCache | None = None,
+    data_hash: str | None = None,
+    parallel_models: bool = False,
 ) -> BenchmarkResult:
     """Run the full benchmark pipeline (pure logic, no I/O).
 
@@ -361,20 +368,11 @@ def run_benchmark(
     all_forecast_data: list[ForecastData] = []
     pipeline_t0 = time.perf_counter()
 
-    for runner_idx, runner in enumerate(runners):
-        # Check for graceful shutdown
-        if _shutdown_event.is_set():
-            logger.warning(
-                "[run_id=%s] Shutdown requested after %d/%d models",
-                run_id,
-                runner_idx,
-                len(runners),
-            )
-            break
-
-        if progress_callback is not None:
-            progress_callback("model", runner_idx + 1, len(runners))
-
+    def _run_single_model(
+        runner: BaseRunner,
+        runner_idx: int,
+    ) -> tuple[ModelResult, list[ForecastData]]:
+        """Run all folds for a single model. Returns (ModelResult, forecasts)."""
         logger.info(
             "[run_id=%s] Running model %d/%d: %s",
             run_id,
@@ -383,7 +381,8 @@ def run_benchmark(
             runner.name,
         )
 
-        fold_results: list[FoldResult] = []
+        fold_results_inner: list[FoldResult] = []
+        forecast_data: list[ForecastData] = []
         total_runtime = 0.0
         model_failed = False
 
@@ -391,7 +390,7 @@ def run_benchmark(
             if _shutdown_event.is_set():
                 break
 
-            if progress_callback is not None:
+            if not parallel_models and progress_callback is not None:
                 progress_callback("fold", fold_idx + 1, len(splits))
 
             logger.debug(
@@ -402,6 +401,13 @@ def run_benchmark(
                 len(split.train),
                 len(split.test),
             )
+
+            # Check cache before running the model
+            if cache is not None and data_hash is not None:
+                cached = cache.get(data_hash, runner.name, split.fold)
+                if cached is not None:
+                    fold_results_inner.append(cached)
+                    continue
 
             try:
                 output = _fit_predict_with_retry(
@@ -428,15 +434,16 @@ def run_benchmark(
             total_runtime += output.runtime_sec
 
             # Capture forecast vs actual data for report visualizations
-            test_sorted = split.test.sort_values(["unique_id", "ds"])
+            # Invariant: splits are pre-sorted by (unique_id, ds)
+            # from make_expanding_splits, so no re-sorting needed.
+            test_sorted = split.test
             tail_len = min(2 * horizon, len(split.train))
             train_tail = (
-                split.train.sort_values(["unique_id", "ds"])
-                .groupby("unique_id")
+                split.train
+                .groupby("unique_id", sort=False)
                 .tail(tail_len)
-                .sort_values(["unique_id", "ds"])
             )
-            all_forecast_data.append(
+            forecast_data.append(
                 ForecastData(
                     model_name=runner.name,
                     fold=split.fold,
@@ -444,7 +451,9 @@ def run_benchmark(
                     ds=output.ds,
                     y_hat=output.y_hat,
                     y_actual=test_sorted["y"].tolist(),
-                    ds_train_tail=[d.isoformat() for d in train_tail["ds"]],
+                    ds_train_tail=[
+                        d.isoformat() for d in train_tail["ds"]
+                    ],
                     y_train_tail=train_tail["y"].tolist(),
                 )
             )
@@ -490,17 +499,24 @@ def run_benchmark(
             )
             fold_mae = float(np.mean(list(mae_scores.values())))
 
-            fold_results.append(
-                FoldResult(
-                    fold=split.fold,
-                    cutoff=split.cutoff.isoformat(),
-                    mase=round(fold_mase, 6),
-                    smape=round(fold_smape, 4),
-                    rmsse=round(fold_rmsse, 6),
-                    mae=round(fold_mae, 6),
-                    series_scores={k: round(v, 6) for k, v in series_scores.items()},
-                )
+            fold_result = FoldResult(
+                fold=split.fold,
+                cutoff=split.cutoff.isoformat(),
+                mase=round(fold_mase, 6),
+                smape=round(fold_smape, 4),
+                rmsse=round(fold_rmsse, 6),
+                mae=round(fold_mae, 6),
+                series_scores={
+                    k: round(v, 6) for k, v in series_scores.items()
+                },
             )
+            fold_results_inner.append(fold_result)
+
+            # Store in cache
+            if cache is not None and data_hash is not None:
+                cache.put(
+                    data_hash, runner.name, split.fold, fold_result
+                )
 
             logger.debug(
                 "  %s fold %d MASE=%.6f (%.4fs)",
@@ -510,9 +526,8 @@ def run_benchmark(
                 output.runtime_sec,
             )
 
-        if model_failed or not fold_results:
-            # Record failed model with NaN metrics
-            model_results.append(
+        if model_failed or not fold_results_inner:
+            return (
                 ModelResult(
                     name=runner.name,
                     runtime_sec=round(total_runtime, 4),
@@ -522,23 +537,27 @@ def run_benchmark(
                     mean_smape=float("nan"),
                     mean_rmsse=float("nan"),
                     mean_mae=float("nan"),
-                )
+                ),
+                forecast_data,
             )
-            continue
 
-        mase_values = [f.mase for f in fold_results]
+        mase_values = [f.mase for f in fold_results_inner]
         mean_val = round(float(np.mean(mase_values)), 6)
-        model_results.append(
-            ModelResult(
-                name=runner.name,
-                runtime_sec=round(total_runtime, 4),
-                folds=fold_results,
-                mean_mase=mean_val,
-                std_mase=round(float(np.std(mase_values)), 6),
-                mean_smape=round(float(np.mean([f.smape for f in fold_results])), 4),
-                mean_rmsse=round(float(np.mean([f.rmsse for f in fold_results])), 6),
-                mean_mae=round(float(np.mean([f.mae for f in fold_results])), 6),
-            )
+        mr = ModelResult(
+            name=runner.name,
+            runtime_sec=round(total_runtime, 4),
+            folds=fold_results_inner,
+            mean_mase=mean_val,
+            std_mase=round(float(np.std(mase_values)), 6),
+            mean_smape=round(
+                float(np.mean([f.smape for f in fold_results_inner])), 4
+            ),
+            mean_rmsse=round(
+                float(np.mean([f.rmsse for f in fold_results_inner])), 6
+            ),
+            mean_mae=round(
+                float(np.mean([f.mae for f in fold_results_inner])), 6
+            ),
         )
 
         logger.info(
@@ -548,6 +567,43 @@ def run_benchmark(
             mean_val,
             total_runtime,
         )
+        return mr, forecast_data
+
+    # Run models: parallel or sequential
+    if parallel_models and len(runners) > 1:
+        logger.info(
+            "[run_id=%s] Running %d models in parallel",
+            run_id,
+            len(runners),
+        )
+        with ThreadPoolExecutor(max_workers=len(runners)) as executor:
+            futures = {
+                executor.submit(_run_single_model, runner, idx): runner
+                for idx, runner in enumerate(runners)
+            }
+            for future in as_completed(futures):
+                if _shutdown_event.is_set():
+                    break
+                mr, fds = future.result()
+                model_results.append(mr)
+                all_forecast_data.extend(fds)
+    else:
+        for runner_idx, runner in enumerate(runners):
+            if _shutdown_event.is_set():
+                logger.warning(
+                    "[run_id=%s] Shutdown requested after %d/%d models",
+                    run_id,
+                    runner_idx,
+                    len(runners),
+                )
+                break
+
+            if progress_callback is not None:
+                progress_callback("model", runner_idx + 1, len(runners))
+
+            mr, fds = _run_single_model(runner, runner_idx)
+            model_results.append(mr)
+            all_forecast_data.extend(fds)
 
     pipeline_elapsed = time.perf_counter() - pipeline_t0
 
@@ -644,6 +700,9 @@ def run_from_csv(
     memory_limit_mb: int = 2048,
     allow_private_urls: bool = False,
     run_id: str | None = None,
+    no_cache: bool = False,
+    cache_dir: Path | None = None,
+    parallel_models: bool = False,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html.
 
@@ -692,6 +751,23 @@ def run_from_csv(
                 [r.name for r in tollama_runners],
             )
 
+    # Set up result cache
+    cache_instance: ResultCache | None = None
+    computed_hash: str | None = None
+    if not no_cache:
+        from ts_autopilot.cache import ResultCache as _ResultCache
+        from ts_autopilot.cache import _compute_data_hash
+
+        effective_cache_dir = cache_dir or (output_dir / ".cache")
+        cache_instance = _ResultCache(effective_cache_dir)
+        computed_hash = _compute_data_hash(df, horizon, n_folds)
+        logger.info(
+            "[run_id=%s] Cache enabled: dir=%s, hash=%s",
+            run_id,
+            effective_cache_dir,
+            computed_hash,
+        )
+
     result = run_benchmark(
         df,
         horizon=horizon,
@@ -704,6 +780,9 @@ def run_from_csv(
         retry_backoff=retry_backoff,
         model_timeout_sec=model_timeout_sec,
         run_id=run_id,
+        cache=cache_instance,
+        data_hash=computed_hash,
+        parallel_models=parallel_models,
     )
 
     # Attach metadata
