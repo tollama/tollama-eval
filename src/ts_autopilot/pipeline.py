@@ -46,21 +46,20 @@ from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
 from ts_autopilot.runners.optional import get_optional_runners
 from ts_autopilot.runners.statistical import (
-    AutoARIMARunner,
-    AutoCESRunner,
-    AutoETSRunner,
-    AutoThetaRunner,
-    SeasonalNaiveRunner,
+    ALL_STATISTICAL_RUNNERS,
+    CORE_RUNNERS,
 )
 
 logger = get_logger("pipeline")
 
 DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
-    SeasonalNaiveRunner(),
-    AutoETSRunner(),
-    AutoARIMARunner(),
-    AutoThetaRunner(),
-    AutoCESRunner(),
+    *CORE_RUNNERS,
+    *get_optional_runners(),
+)
+
+# Extended runner set (includes all statistical + optional)
+EXTENDED_DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
+    *ALL_STATISTICAL_RUNNERS,
     *get_optional_runners(),
 )
 

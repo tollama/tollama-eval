@@ -80,3 +80,19 @@ def _guess_season_length(freq: str) -> int:
     # Strip suffix variants: 'W-SUN' → 'W'
     base = freq.split("-")[0] if "-" in freq else freq
     return FREQ_TO_SEASON.get(base, 1)
+
+
+def detect_zero_ratio(df: pd.DataFrame) -> float:
+    """Compute the ratio of zero values in the target column.
+
+    Useful for detecting intermittent demand patterns.
+
+    Args:
+        df: Canonical long-format DataFrame.
+
+    Returns:
+        Fraction of zero values (0.0 to 1.0).
+    """
+    if df.empty or "y" not in df.columns:
+        return 0.0
+    return float((df["y"] == 0).mean())

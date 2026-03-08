@@ -107,8 +107,15 @@ lightgbm = [
     "lightgbm>=4.0",
     "mlforecast>=0.10",
 ]
+xgboost = [
+    "xgboost>=2.0",
+    "mlforecast>=0.10",
+]
 neural = [
     "neuralforecast>=1.6",
+]
+hierarchical = [
+    "hierarchicalforecast>=0.4",
 ]
 pdf = [
     "weasyprint>=60.0",
@@ -123,7 +130,9 @@ tracing = [
 all = [
     "ts-autopilot[prophet]",
     "ts-autopilot[lightgbm]",
+    "ts-autopilot[xgboost]",
     "ts-autopilot[neural]",
+    "ts-autopilot[hierarchical]",
     "ts-autopilot[pdf]",
     "ts-autopilot[dashboard]",
     "ts-autopilot[tracing]",
