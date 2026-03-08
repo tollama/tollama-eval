@@ -28,6 +28,9 @@ class FileConfig(BaseModel):
     retry_backoff: float | None = Field(None, gt=0)
     report_title: str | None = None
     report_lang: str | None = None
+    report_logo_url: str | None = None
+    report_company: str | None = None
+    report_confidential: bool = False
     model_timeout_sec: float | None = Field(None, gt=0)
     memory_limit_mb: int | None = Field(None, ge=1)
     allow_private_urls: bool = False

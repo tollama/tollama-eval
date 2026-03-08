@@ -486,6 +486,214 @@
             .toc-links a { font-size: 0.7rem; padding: 0.2rem 0.5rem; }
         }
 
+        /* Significance section */
+        .sig-result {
+            display: inline-block;
+            padding: 0.3rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .sig-result.significant {
+            background: var(--success-bg);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        .sig-result.not-significant {
+            background: var(--gray-100);
+            color: var(--gray-600);
+            border: 1px solid var(--gray-300);
+        }
+        .pairwise-matrix td.sig-yes {
+            background: var(--success-bg);
+            color: var(--success);
+            font-weight: 600;
+            text-align: center;
+        }
+        .pairwise-matrix td.sig-no {
+            background: var(--gray-50);
+            color: var(--gray-400);
+            text-align: center;
+        }
+        .cd-diagram {
+            margin: 1rem 0;
+            overflow-x: auto;
+        }
+        .cd-diagram svg {
+            color: var(--gray-700);
+        }
+
+        /* CI display */
+        .ci-range {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            font-weight: 400;
+        }
+
+        /* Winner callout */
+        .winner-callout {
+            background: var(--success-bg);
+            border: 1px solid var(--success);
+            border-radius: var(--radius);
+            padding: 1rem 1.5rem;
+            margin: 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .winner-callout .winner-icon {
+            font-size: 1.5rem;
+            background: var(--success);
+            color: white;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .winner-callout .winner-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--gray-900);
+        }
+        .winner-callout .winner-metric {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+
+        /* Recommendations */
+        .recommendations {
+            list-style: none;
+            padding: 0;
+            counter-reset: rec-counter;
+        }
+        .recommendations li {
+            counter-increment: rec-counter;
+            padding: 0.5rem 0 0.5rem 2.5rem;
+            position: relative;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--gray-700);
+        }
+        .recommendations li::before {
+            content: counter(rec-counter);
+            position: absolute;
+            left: 0;
+            top: 0.5rem;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Key findings */
+        .key-findings {
+            padding-left: 1.25rem;
+        }
+        .key-findings li {
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: var(--gray-700);
+            margin-bottom: 0.25rem;
+        }
+
+        /* Sortable table headers */
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        th.sortable:hover {
+            background: var(--gray-100);
+        }
+        th.sortable .sort-arrow {
+            font-size: 0.7em;
+            margin-left: 0.25rem;
+            opacity: 0.4;
+        }
+        th.sortable.sort-asc .sort-arrow,
+        th.sortable.sort-desc .sort-arrow {
+            opacity: 1;
+        }
+
+        /* Download button */
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.75rem;
+            background: var(--gray-100);
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.75rem;
+            cursor: pointer;
+            color: var(--gray-600);
+            transition: background 0.15s;
+        }
+        .download-btn:hover {
+            background: var(--gray-200);
+        }
+
+        /* Model filter */
+        .model-filter {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 0.75rem 0;
+            padding: 0.5rem;
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+        }
+        .model-filter label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 0.2rem 0.5rem;
+            border-radius: 9999px;
+            border: 1px solid var(--gray-200);
+            background: var(--card-bg);
+            transition: background 0.15s;
+        }
+        .model-filter label:hover {
+            background: var(--primary-bg);
+        }
+        .model-filter input[type="checkbox"] {
+            accent-color: var(--primary);
+        }
+
+        /* Data quality scorecard */
+        .quality-grade {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .grade-a { background: var(--success-bg); color: var(--success); border: 2px solid var(--success); }
+        .grade-b { background: #ecfdf5; color: #059669; border: 2px solid #059669; }
+        .grade-c { background: var(--warning-bg); color: var(--warning); border: 2px solid var(--warning); }
+        .grade-d { background: var(--danger-bg); color: var(--danger); border: 2px solid var(--danger); }
+
+        /* PDF cover page */
+        .pdf-cover {
+            display: none;
+        }
+
         /* Print styles */
         @media print {
             body { max-width: 100%; margin: 0; background: white; color: #111; }
@@ -493,22 +701,53 @@
             .toc { display: none; }
             .skip-link { display: none; }
             .theme-toggle { display: none; }
+            .download-btn { display: none; }
+            .model-filter { display: none; }
             .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
             tr:nth-child(even) { background: transparent !important; }
             th { background: transparent !important; border-bottom: 2px solid #000; }
             .chart-row { grid-template-columns: 1fr; }
             .report-footer { page-break-before: always; }
+            .pdf-cover {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 90vh;
+                text-align: center;
+                page-break-after: always;
+            }
+            .pdf-cover h1 { font-size: 2rem; color: var(--primary); margin-bottom: 0.5rem; }
+            .pdf-cover .cover-meta { color: var(--gray-500); font-size: 0.9rem; margin: 0.25rem 0; }
+            .pdf-cover .cover-logo { max-height: 80px; margin-bottom: 1.5rem; }
         }
     </style>
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
+    <!-- PDF Cover Page (print only) -->
+    <div class="pdf-cover">
+        {% if report_logo_url %}<img src="{{ report_logo_url }}" alt="Logo" class="cover-logo">{% endif %}
+        <h1>{{ report_title or 'Benchmark Report' }}</h1>
+        {% if report_company %}<p class="cover-meta">{{ report_company }}</p>{% endif %}
+        <p class="cover-meta">{{ generated_at }}</p>
+        {% if leaderboard %}<p class="cover-meta">Best Model: {{ leaderboard[0].name }} (MASE {{ "%.4f"|format(leaderboard[0].mean_mase) }})</p>{% endif %}
+        {% if run_id %}<p class="cover-meta">Report ID: {{ run_id }}</p>{% endif %}
+        {% if report_confidential %}<p class="cover-meta" style="margin-top:2rem;font-weight:600;color:var(--danger);">CONFIDENTIAL — For internal use only</p>{% endif %}
+    </div>
+
     <!-- 1. Header -->
     <header class="report-header" role="banner">
-        <div>
-            <h1>{{ report_title or 'Benchmark Report' }}</h1>
-            <div class="subtitle">Generated by ts-autopilot v{{ version }} | {{ generated_at }}</div>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            {% if report_logo_url %}<img src="{{ report_logo_url }}" alt="Logo" style="max-height:40px;">{% endif %}
+            <div>
+                <h1>{{ report_title or 'Benchmark Report' }}</h1>
+                <div class="subtitle">
+                    {% if report_company %}{{ report_company }} | {% endif %}Generated by ts-autopilot v{{ version }} | {{ generated_at }}
+                    {% if run_id %} | ID: {{ run_id[:8] }}{% endif %}
+                </div>
+            </div>
         </div>
         <div class="header-controls">
             <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
@@ -525,7 +764,9 @@
             <a href="#data-profile" data-section="data-profile">Data Profile</a>
             {% if warnings %}<a href="#data-quality" data-section="data-quality">Data Quality</a>{% endif %}
             <a href="#leaderboard" data-section="leaderboard">Leaderboard</a>
+            {% if significance %}<a href="#significance" data-section="significance">Significance</a>{% endif %}
             <a href="#model-comparison" data-section="model-comparison">Comparison</a>
+            {% if chart_data.pareto and chart_data.pareto.points %}<a href="#pareto" data-section="pareto">Speed vs Accuracy</a>{% endif %}
             {% if has_forecast_data %}<a href="#forecasts" data-section="forecasts">Forecasts</a>{% endif %}
             {% if has_diagnostics %}<a href="#diagnostics" data-section="diagnostics">Diagnostics</a>{% endif %}
             <a href="#model-details" data-section="model-details">Details</a>
@@ -538,7 +779,60 @@
         <!-- 3. Executive Summary -->
         <section id="executive-summary" class="card" aria-labelledby="exec-heading">
             <h2 id="exec-heading">Executive Summary</h2>
+            {% if executive_summary.overview is defined %}
+            <div class="exec-summary" role="region" aria-label="Executive summary text">{{ executive_summary.overview }}</div>
+
+            {% if leaderboard %}
+            <div class="winner-callout">
+                <div class="winner-icon">1</div>
+                <div>
+                    <div class="winner-name">{{ leaderboard[0].name }}</div>
+                    <div class="winner-metric">
+                        MASE {{ "%.4f"|format(leaderboard[0].mean_mase) }}
+                        {% if ci_data and leaderboard[0].name in ci_data %}
+                         <span class="ci-range">[{{ "%.4f"|format(ci_data[leaderboard[0].name].lower) }}, {{ "%.4f"|format(ci_data[leaderboard[0].name].upper) }}] 95% CI</span>
+                        {% endif %}
+                        {% if leaderboard[0].mean_mase < 1.0 %}
+                        &mdash; {{ "%.1f"|format((1.0 - leaderboard[0].mean_mase) * 100) }}% better than naive
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if executive_summary.key_findings %}
+            <h3>Key Findings</h3>
+            <ul class="key-findings">
+                {% for finding in executive_summary.key_findings %}
+                <li>{{ finding }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+            {% if executive_summary.risks %}
+            <div class="warnings-box" style="margin-top:1rem;">
+                <div class="warnings-title">Risks</div>
+                <ul>
+                {% for risk in executive_summary.risks %}
+                    <li>{{ risk }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if executive_summary.recommendations %}
+            <h3>Recommendations</h3>
+            <ol class="recommendations">
+                {% for rec in executive_summary.recommendations %}
+                <li>{{ rec }}</li>
+                {% endfor %}
+            </ol>
+            {% endif %}
+
+            {% else %}
+            {# Fallback for old-style flat string #}
             <div class="exec-summary" role="region" aria-label="Executive summary text">{{ executive_summary }}</div>
+            {% endif %}
         </section>
 
         <!-- 4. Data Profile -->
@@ -578,6 +872,88 @@
                     <div class="stat-label">CV Folds</div>
                 </div>
             </div>
+
+            <!-- Data Quality Scorecard -->
+            <h3>Data Quality Scorecard</h3>
+            <div class="stats-grid" role="list" aria-label="Data quality grades">
+                {# Series count grade #}
+                {% if profile.n_series > 10 %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-a">A</span></div>
+                    <div class="stat-label">Series Count</div>
+                </div>
+                {% elif profile.n_series >= 2 %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-b">B</span></div>
+                    <div class="stat-label">Series Count</div>
+                </div>
+                {% else %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-d">D</span></div>
+                    <div class="stat-label">Series Count</div>
+                </div>
+                {% endif %}
+
+                {# Missing ratio grade #}
+                {% if profile.missing_ratio < 0.01 %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-a">A</span></div>
+                    <div class="stat-label">Data Completeness</div>
+                </div>
+                {% elif profile.missing_ratio < 0.05 %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-b">B</span></div>
+                    <div class="stat-label">Data Completeness</div>
+                </div>
+                {% elif profile.missing_ratio < 0.15 %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-c">C</span></div>
+                    <div class="stat-label">Data Completeness</div>
+                </div>
+                {% else %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-d">D</span></div>
+                    <div class="stat-label">Data Completeness</div>
+                </div>
+                {% endif %}
+
+                {# Length adequacy grade (min_length vs horizon) #}
+                {% set length_ratio = profile.min_length / config.horizon if config.horizon > 0 else 0 %}
+                {% if length_ratio > 5 %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-a">A</span></div>
+                    <div class="stat-label">Length Adequacy</div>
+                </div>
+                {% elif length_ratio > 3 %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-b">B</span></div>
+                    <div class="stat-label">Length Adequacy</div>
+                </div>
+                {% else %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-c">C</span></div>
+                    <div class="stat-label">Length Adequacy</div>
+                </div>
+                {% endif %}
+
+                {# Zero ratio (intermittent demand) #}
+                {% if profile.zero_ratio is defined and profile.zero_ratio > 0.3 %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-c">C</span></div>
+                    <div class="stat-label">Intermittent ({{ "%.0f"|format(profile.zero_ratio * 100) }}% zeros)</div>
+                </div>
+                {% elif profile.zero_ratio is defined and profile.zero_ratio > 0 %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-b">B</span></div>
+                    <div class="stat-label">Zero Values ({{ "%.0f"|format(profile.zero_ratio * 100) }}%)</div>
+                </div>
+                {% else %}
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value"><span class="quality-grade grade-a">A</span></div>
+                    <div class="stat-label">No Intermittency</div>
+                </div>
+                {% endif %}
+            </div>
         </section>
 
         <!-- 5. Data Quality Warnings -->
@@ -601,16 +977,19 @@
             <figure class="chart-container" role="img" aria-label="Bar chart comparing MASE scores across models">
                 <div id="chart-mase"></div>
             </figure>
+            <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem;">
+                <button class="download-btn" onclick="downloadLeaderboardCSV()" title="Download leaderboard as CSV">&#8615; CSV</button>
+            </div>
             <div class="table-wrapper">
-            <table aria-label="Model leaderboard ranked by MASE">
+            <table id="leaderboard-table" aria-label="Model leaderboard ranked by MASE">
                 <thead>
                 <tr>
-                    <th scope="col">Rank</th>
-                    <th scope="col">Model</th>
-                    <th scope="col">MASE</th>
-                    <th scope="col">SMAPE</th>
-                    <th scope="col">RMSSE</th>
-                    <th scope="col">MAE</th>
+                    <th scope="col" class="sortable" data-sort="num">Rank <span class="sort-arrow">&#9650;</span></th>
+                    <th scope="col" class="sortable" data-sort="str">Model <span class="sort-arrow">&#9650;</span></th>
+                    <th scope="col" class="sortable" data-sort="num">MASE <span class="sort-arrow">&#9650;</span></th>
+                    <th scope="col" class="sortable" data-sort="num">SMAPE <span class="sort-arrow">&#9650;</span></th>
+                    <th scope="col" class="sortable" data-sort="num">RMSSE <span class="sort-arrow">&#9650;</span></th>
+                    <th scope="col" class="sortable" data-sort="num">MAE <span class="sort-arrow">&#9650;</span></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -618,7 +997,12 @@
                 <tr class="{% if entry.rank <= 3 %}rank-{{ entry.rank }}{% endif %}">
                     <td><span class="rank-badge" aria-label="Rank {{ entry.rank }}">{{ entry.rank }}</span></td>
                     <td>{{ entry.name }}</td>
-                    <td class="{% if entry.mean_mase < 1.0 %}metric-good{% elif entry.mean_mase > 1.0 %}metric-bad{% endif %}">{{ "%.4f"|format(entry.mean_mase) }}</td>
+                    <td class="{% if entry.mean_mase < 1.0 %}metric-good{% elif entry.mean_mase > 1.0 %}metric-bad{% endif %}">
+                        {{ "%.4f"|format(entry.mean_mase) }}
+                        {% if ci_data and entry.name in ci_data %}
+                        <span class="ci-range">[{{ "%.4f"|format(ci_data[entry.name].lower) }}, {{ "%.4f"|format(ci_data[entry.name].upper) }}]</span>
+                        {% endif %}
+                    </td>
                     <td>{{ "%.2f"|format(entry.mean_smape) }}%</td>
                     <td class="{% if entry.mean_rmsse < 1.0 %}metric-good{% elif entry.mean_rmsse > 1.0 %}metric-bad{% endif %}">{{ "%.4f"|format(entry.mean_rmsse) }}</td>
                     <td>{{ "%.4f"|format(entry.mean_mae) }}</td>
@@ -629,9 +1013,72 @@
             </div>
         </section>
 
+        <!-- 6b. Statistical Significance -->
+        {% if significance %}
+        <section id="significance" class="card" aria-labelledby="sig-heading">
+            <h2 id="sig-heading">Statistical Significance</h2>
+            <p style="font-size:0.85rem;color:var(--gray-600);">
+                Friedman test with Nemenyi post-hoc ({{ significance.n_series }} series, {{ significance.n_models }} models).
+            </p>
+            <div style="margin:0.75rem 0;">
+                {% if significance.is_significant %}
+                <span class="sig-result significant">Significant (p {{ "< 0.001" if significance.friedman_p_value < 0.001 else "= %.4f"|format(significance.friedman_p_value) }})</span>
+                {% else %}
+                <span class="sig-result not-significant">Not Significant (p = {{ "%.4f"|format(significance.friedman_p_value) }})</span>
+                {% endif %}
+            </div>
+
+            <h3>Mean Ranks</h3>
+            <div class="table-wrapper">
+            <table aria-label="Model mean ranks from Friedman test">
+                <thead><tr><th scope="col">Model</th><th scope="col">Mean Rank</th></tr></thead>
+                <tbody>
+                {% for name, rank in significance.mean_ranks %}
+                <tr><td>{{ name }}</td><td>{{ "%.3f"|format(rank) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+
+            {% if significance.cd_svg %}
+            <h3>Critical Difference Diagram</h3>
+            <p style="font-size:0.82rem;color:var(--gray-500);">
+                Models connected by a bar are NOT significantly different (CD = {{ significance.cd }}).
+            </p>
+            <div class="cd-diagram">{{ significance.cd_svg | safe }}</div>
+            {% endif %}
+
+            {% if significance.pairwise %}
+            <h3>Pairwise Comparisons</h3>
+            <div class="table-wrapper">
+            <table class="pairwise-matrix" aria-label="Pairwise significance comparisons">
+                <thead><tr><th scope="col">Model A</th><th scope="col">Model B</th><th scope="col">Rank Diff</th><th scope="col">Significant?</th></tr></thead>
+                <tbody>
+                {% for p in significance.pairwise %}
+                <tr>
+                    <td>{{ p.model_a }}</td>
+                    <td>{{ p.model_b }}</td>
+                    <td>{{ p.rank_diff }}</td>
+                    <td class="{% if p.significant %}sig-yes{% else %}sig-no{% endif %}">{% if p.significant %}Yes{% else %}No{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
         <!-- 7. Model Comparison -->
         <section id="model-comparison" class="card" aria-labelledby="comp-heading">
             <h2 id="comp-heading">Model Comparison</h2>
+            {% if models|length > 1 %}
+            <div class="model-filter" role="group" aria-label="Filter models in charts">
+                {% for model in models %}
+                <label><input type="checkbox" checked data-model-filter="{{ model.name }}"> {{ model.name }}</label>
+                {% endfor %}
+            </div>
+            {% endif %}
             <div class="chart-row">
                 <figure class="chart-container" role="img" aria-label="Radar chart showing multi-metric profile for each model">
                     <div id="chart-radar"></div>
@@ -651,6 +1098,42 @@
             </figure>
             {% endif %}
         </section>
+
+        <!-- 7b. Speed vs Accuracy (Pareto) -->
+        {% if chart_data.pareto and chart_data.pareto.points %}
+        <section id="pareto" class="card" aria-labelledby="pareto-heading">
+            <h2 id="pareto-heading">Speed vs Accuracy</h2>
+            <figure class="chart-container" role="img" aria-label="Pareto frontier chart showing accuracy vs runtime tradeoff">
+                <div id="chart-pareto"></div>
+            </figure>
+
+            {% if runtime_data %}
+            <h3>Runtime Comparison</h3>
+            <div class="table-wrapper">
+            <table aria-label="Model runtime comparison">
+                <thead>
+                <tr>
+                    <th scope="col">Model</th>
+                    <th scope="col">Total (s)</th>
+                    <th scope="col">Avg/Series (s)</th>
+                    <th scope="col">Throughput (series/s)</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for r in runtime_data %}
+                <tr>
+                    <td>{{ r.name }}</td>
+                    <td>{{ r.total_sec }}</td>
+                    <td>{{ r.avg_per_series }}</td>
+                    <td>{{ r.throughput }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% endif %}
+        </section>
+        {% endif %}
 
         <!-- 8. Forecast Visualization -->
         {% if has_forecast_data and chart_data.forecast.series %}
@@ -834,6 +1317,9 @@
     <!-- Footer -->
     <footer class="report-footer" role="contentinfo">
         Generated by ts-autopilot v{{ version }} | {{ generated_at }}
+        {% if run_id %} | Report ID: {{ run_id[:8] }}{% endif %}
+        {% if report_company %}<br>{{ report_company }}{% endif %}
+        {% if report_confidential %}<br><strong style="color:var(--danger);">CONFIDENTIAL — For internal use only</strong>{% endif %}
     </footer>
 
     <script>
@@ -1197,9 +1683,56 @@
             }
         }
 
+            // 8. Pareto Chart
+            if (chartData.pareto && chartData.pareto.points && chartData.pareto.points.length > 0) {
+                var paretoEl = document.getElementById('chart-pareto');
+                if (paretoEl) {
+                    var dominated = chartData.pareto.points.filter(function(p) { return !p.is_pareto; });
+                    var frontier = chartData.pareto.points.filter(function(p) { return p.is_pareto; });
+                    var paretoTraces = [];
+                    if (dominated.length > 0) {
+                        paretoTraces.push({
+                            type: 'scatter', mode: 'markers+text',
+                            x: dominated.map(function(p) { return p.runtime; }),
+                            y: dominated.map(function(p) { return p.mase; }),
+                            text: dominated.map(function(p) { return p.name; }),
+                            textposition: 'top center',
+                            textfont: { size: 10 },
+                            marker: { color: '#9ca3af', size: 8 },
+                            name: 'Dominated',
+                            hovertemplate: '%{text}<br>MASE: %{y:.4f}<br>Runtime: %{x:.2f}s<extra></extra>'
+                        });
+                    }
+                    if (frontier.length > 0) {
+                        paretoTraces.push({
+                            type: 'scatter', mode: 'markers+text+lines',
+                            x: frontier.map(function(p) { return p.runtime; }),
+                            y: frontier.map(function(p) { return p.mase; }),
+                            text: frontier.map(function(p) { return p.name; }),
+                            textposition: 'top center',
+                            textfont: { size: 10, color: '#2563eb' },
+                            marker: { color: '#2563eb', size: 10, symbol: 'star' },
+                            line: { color: '#2563eb', width: 1, dash: 'dot' },
+                            name: 'Pareto Optimal',
+                            hovertemplate: '%{text}<br>MASE: %{y:.4f}<br>Runtime: %{x:.2f}s<extra></extra>'
+                        });
+                    }
+                    Plotly.newPlot('chart-pareto', paretoTraces, makeLayout({
+                        title: { text: 'Accuracy vs Speed Tradeoff', font: { size: 14 } },
+                        xaxis: { title: 'Total Runtime (seconds)', gridcolor: pc.grid, type: 'log' },
+                        yaxis: { title: 'MASE (lower is better)', gridcolor: pc.grid },
+                        showlegend: true,
+                        legend: { font: { size: 10 }, orientation: 'h', y: -0.2 },
+                        height: 400,
+                        margin: { l: 60, r: 40, t: 50, b: 60 }
+                    }), plotlyConfig);
+                }
+            }
+        }
+
         function replotAllCharts() {
             // Purge existing charts and re-render
-            var chartIds = ['chart-mase', 'chart-radar', 'chart-fold-stability', 'chart-heatmap', 'chart-boxplot', 'chart-resid-hist', 'chart-resid-acf', 'chart-resid-scatter'];
+            var chartIds = ['chart-mase', 'chart-radar', 'chart-fold-stability', 'chart-heatmap', 'chart-boxplot', 'chart-resid-hist', 'chart-resid-acf', 'chart-resid-scatter', 'chart-pareto'];
             if (chartData.forecast && chartData.forecast.series) {
                 chartData.forecast.series.forEach(function(s, idx) {
                     chartIds.push('chart-forecast-' + (idx + 1));
@@ -1213,6 +1746,99 @@
         }
 
         renderAllCharts();
+
+        /* ===== Sortable Table ===== */
+        document.querySelectorAll('th.sortable').forEach(function(th) {
+            th.addEventListener('click', function() {
+                var table = th.closest('table');
+                var tbody = table.querySelector('tbody');
+                var rows = Array.from(tbody.querySelectorAll('tr'));
+                var colIdx = Array.from(th.parentElement.children).indexOf(th);
+                var sortType = th.getAttribute('data-sort') || 'str';
+                var isAsc = th.classList.contains('sort-asc');
+
+                // Reset other headers
+                table.querySelectorAll('th.sortable').forEach(function(h) {
+                    h.classList.remove('sort-asc', 'sort-desc');
+                });
+
+                rows.sort(function(a, b) {
+                    var aText = a.children[colIdx].textContent.trim();
+                    var bText = b.children[colIdx].textContent.trim();
+                    if (sortType === 'num') {
+                        var aVal = parseFloat(aText.replace(/[^0-9.\-]/g, '')) || 0;
+                        var bVal = parseFloat(bText.replace(/[^0-9.\-]/g, '')) || 0;
+                        return isAsc ? bVal - aVal : aVal - bVal;
+                    }
+                    return isAsc ? bText.localeCompare(aText) : aText.localeCompare(bText);
+                });
+
+                th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+                rows.forEach(function(row) { tbody.appendChild(row); });
+            });
+        });
+
+        /* ===== CSV Download ===== */
+        window.downloadLeaderboardCSV = function() {
+            var table = document.getElementById('leaderboard-table');
+            if (!table) return;
+            var rows = table.querySelectorAll('tr');
+            var csv = [];
+            rows.forEach(function(row) {
+                var cols = [];
+                row.querySelectorAll('th, td').forEach(function(cell) {
+                    var text = cell.textContent.trim().replace(/"/g, '""');
+                    // Remove CI ranges and sort arrows for clean CSV
+                    text = text.replace(/\[[\d., ]+\]/g, '').replace(/[▲▼]/g, '').trim();
+                    cols.push('"' + text + '"');
+                });
+                csv.push(cols.join(','));
+            });
+            var blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'leaderboard.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        };
+
+        /* ===== Model Filter ===== */
+        document.querySelectorAll('[data-model-filter]').forEach(function(checkbox) {
+            checkbox.addEventListener('change', function() {
+                var modelName = checkbox.getAttribute('data-model-filter');
+                var visible = checkbox.checked;
+
+                // Update radar chart
+                var radarEl = document.getElementById('chart-radar');
+                if (radarEl && radarEl.data) {
+                    radarEl.data.forEach(function(trace, i) {
+                        if (trace.name === modelName) {
+                            Plotly.restyle('chart-radar', { visible: visible }, [i]);
+                        }
+                    });
+                }
+
+                // Update fold stability chart
+                var stabEl = document.getElementById('chart-fold-stability');
+                if (stabEl && stabEl.data) {
+                    stabEl.data.forEach(function(trace, i) {
+                        if (trace.name === modelName) {
+                            Plotly.restyle('chart-fold-stability', { visible: visible }, [i]);
+                        }
+                    });
+                }
+
+                // Update box plot
+                var boxEl = document.getElementById('chart-boxplot');
+                if (boxEl && boxEl.data) {
+                    boxEl.data.forEach(function(trace, i) {
+                        if (trace.name === modelName) {
+                            Plotly.restyle('chart-boxplot', { visible: visible }, [i]);
+                        }
+                    });
+                }
+            });
+        });
     })();
     </script>
 </body>

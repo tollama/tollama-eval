@@ -24,12 +24,18 @@ class DataProfile:
     max_length: int
     total_rows: int
     exog_columns: list[str] = field(default_factory=list)
+    series_length_distribution: list[int] = field(default_factory=list)
+    zero_ratio: float = 0.0  # fraction of zero values (intermittent demand indicator)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
-        # Omit empty exog_columns for backward compat
+        # Omit empty optional fields for backward compat
         if not d.get("exog_columns"):
             d.pop("exog_columns", None)
+        if not d.get("series_length_distribution"):
+            d.pop("series_length_distribution", None)
+        if d.get("zero_ratio", 0) == 0:
+            d.pop("zero_ratio", None)
         return d
 
     @classmethod
@@ -43,6 +49,8 @@ class DataProfile:
             max_length=d["max_length"],
             total_rows=d["total_rows"],
             exog_columns=d.get("exog_columns", []),
+            series_length_distribution=d.get("series_length_distribution", []),
+            zero_ratio=d.get("zero_ratio", 0.0),
         )
 
 

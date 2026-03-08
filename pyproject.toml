@@ -119,6 +119,13 @@ hierarchical = [
 ]
 pdf = [
     "weasyprint>=60.0",
+    "kaleido>=0.2",
+]
+excel = [
+    "openpyxl>=3.0",
+]
+significance = [
+    "scipy>=1.10",
 ]
 dashboard = [
     "streamlit>=1.28",
@@ -141,6 +148,8 @@ all = [
     "ts-autopilot[neural]",
     "ts-autopilot[hierarchical]",
     "ts-autopilot[pdf]",
+    "ts-autopilot[excel]",
+    "ts-autopilot[significance]",
     "ts-autopilot[dashboard]",
     "ts-autopilot[tracing]",
     "ts-autopilot[server]",

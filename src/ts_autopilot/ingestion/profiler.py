@@ -38,6 +38,19 @@ def profile_dataframe(df: pd.DataFrame) -> DataProfile:
     series_lengths = df.groupby("unique_id").size()
     freq = _infer_frequency(df)
 
+    # Series length distribution (histogram bin counts)
+    length_dist: list[int] = []
+    if len(series_lengths) > 1:
+        import numpy as np
+
+        counts, _ = np.histogram(
+            series_lengths.values, bins=min(10, len(series_lengths))
+        )
+        length_dist = [int(c) for c in counts]
+
+    # Zero ratio for intermittent demand detection
+    zero_ratio = detect_zero_ratio(df)
+
     return DataProfile(
         n_series=int(df["unique_id"].nunique()),
         frequency=freq,
@@ -46,6 +59,8 @@ def profile_dataframe(df: pd.DataFrame) -> DataProfile:
         min_length=int(series_lengths.min()),
         max_length=int(series_lengths.max()),
         total_rows=len(df),
+        series_length_distribution=length_dist,
+        zero_ratio=zero_ratio,
     )
 
 

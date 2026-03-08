@@ -327,6 +327,11 @@ def run(
         "--pdf",
         help="Generate PDF report (requires weasyprint).",
     ),
+    excel: bool = typer.Option(
+        False,
+        "--excel",
+        help="Generate Excel workbook (requires openpyxl).",
+    ),
     log_json: bool = typer.Option(
         False,
         "--log-json",
@@ -698,6 +703,23 @@ def run(
         typer.echo(f"  Season length: {p.season_length_guess}")
         typer.echo(f"  Series lengths: {p.min_length}\u2013{p.max_length}")
         typer.echo(f"  Missing ratio: {p.missing_ratio:.2%}")
+
+    # Excel export
+    if excel:
+        try:
+            from ts_autopilot.reporting.export import export_excel
+
+            xlsx_path = output / "report.xlsx"
+            export_excel(result, xlsx_path)
+            if not quiet:
+                typer.echo(f"Excel workbook written to {xlsx_path.resolve()}")
+        except ImportError:
+            typer.secho(
+                "openpyxl not installed. Install with: "
+                'pip install "ts-autopilot[excel]"',
+                fg=typer.colors.YELLOW,
+                err=True,
+            )
 
     abs_output = output.resolve()
     typer.echo("")

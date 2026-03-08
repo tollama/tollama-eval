@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,7 +10,10 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ts_autopilot import __version__
 from ts_autopilot.contracts import BenchmarkResult
+from ts_autopilot.logging_config import get_logger
 from ts_autopilot.reporting.executive_summary import generate_executive_summary
+
+logger = get_logger("html_report")
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -18,6 +22,9 @@ def render_report(
     result: BenchmarkResult,
     report_title: str | None = None,
     report_lang: str | None = None,
+    report_logo_url: str | None = None,
+    report_company: str | None = None,
+    report_confidential: bool = False,
 ) -> str:
     """Render an HTML report from a BenchmarkResult.
 
@@ -25,6 +32,9 @@ def render_report(
         result: Fully populated BenchmarkResult.
         report_title: Custom title for the report header.
         report_lang: Language code for the HTML lang attribute (e.g. 'ko', 'ja').
+        report_logo_url: URL or base64 data URI for a company logo.
+        report_company: Company name for header/footer branding.
+        report_confidential: Show confidentiality notice in footer.
 
     Returns:
         HTML string.
@@ -44,9 +54,21 @@ def render_report(
     chart_data["pareto"] = pareto_data
     executive_summary = generate_executive_summary(result)
 
+    # Significance testing
+    significance_data = _build_significance_data(result)
+
+    # Confidence intervals for leaderboard
+    ci_data = _build_confidence_intervals(result)
+
+    # Runtime comparison table
+    runtime_data = _build_runtime_table_data(result)
+
     # Detect if any tollama TSFM models are in the results
     tollama_models = [m for m in result.models if m.name.startswith("tollama/")]
     has_tsfm = len(tollama_models) > 0
+
+    # Report traceability
+    run_id = getattr(result.metadata, "run_id", None) if result.metadata else None
 
     return str(
         template.render(
@@ -67,6 +89,13 @@ def render_report(
             tollama_models=tollama_models,
             report_title=report_title,
             lang=report_lang or "en",
+            report_logo_url=report_logo_url,
+            report_company=report_company,
+            report_confidential=report_confidential,
+            significance=significance_data,
+            ci_data=ci_data,
+            runtime_data=runtime_data,
+            run_id=run_id,
         )
     )
 
@@ -297,3 +326,121 @@ def _build_pareto_chart_data(result: BenchmarkResult) -> dict:
     frontier.sort(key=lambda p: p["runtime"])
 
     return {"points": points, "frontier": frontier}
+
+
+def _build_significance_data(result: BenchmarkResult) -> dict:
+    """Build statistical significance data (Friedman + Nemenyi)."""
+    from ts_autopilot.evaluation.significance import (
+        friedman_test,
+        render_critical_difference_svg,
+    )
+
+    if len(result.models) < 2:
+        return {}
+
+    # Collect per-series MASE scores averaged across folds
+    per_series_scores: dict[str, dict[str, float]] = {}
+    for model in result.models:
+        series_totals: dict[str, list[float]] = {}
+        for fold in model.folds:
+            for sid, score in fold.series_scores.items():
+                series_totals.setdefault(sid, []).append(score)
+        if series_totals:
+            per_series_scores[model.name] = {
+                sid: sum(scores) / len(scores)
+                for sid, scores in series_totals.items()
+            }
+
+    if len(per_series_scores) < 2:
+        return {}
+
+    report = friedman_test(per_series_scores)
+    if report is None:
+        return {}
+
+    cd_svg = ""
+    if report.critical_difference > 0:
+        cd_svg = render_critical_difference_svg(
+            report.mean_ranks, report.critical_difference
+        )
+
+    # Build pairwise matrix for template
+    pairwise_matrix: list[dict] = []
+    for p in report.pairwise:
+        pairwise_matrix.append(
+            {
+                "model_a": p.model_a,
+                "model_b": p.model_b,
+                "rank_diff": round(p.rank_diff, 3),
+                "significant": p.significant,
+            }
+        )
+
+    # Sort mean ranks by rank value
+    sorted_ranks = sorted(report.mean_ranks.items(), key=lambda x: x[1])
+
+    return {
+        "friedman_statistic": round(report.friedman_statistic, 4),
+        "friedman_p_value": report.friedman_p_value,
+        "n_models": report.n_models,
+        "n_series": report.n_series,
+        "mean_ranks": sorted_ranks,
+        "pairwise": pairwise_matrix,
+        "cd": round(report.critical_difference, 4),
+        "cd_svg": cd_svg,
+        "is_significant": report.friedman_p_value < 0.05,
+    }
+
+
+def _build_confidence_intervals(result: BenchmarkResult) -> dict[str, dict]:
+    """Compute 95% confidence intervals on MASE for each model."""
+    ci: dict[str, dict] = {}
+
+    for model in result.models:
+        if not model.folds:
+            continue
+        n = len(model.folds)
+        if n < 2:
+            ci[model.name] = {
+                "lower": model.mean_mase,
+                "upper": model.mean_mase,
+            }
+            continue
+
+        # t-distribution critical value for 95% CI
+        # For small n, use approximate t values
+        t_values = {
+            2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776,
+            6: 2.571, 7: 2.447, 8: 2.365, 9: 2.306,
+            10: 2.262,
+        }
+        t_val = t_values.get(n, 1.96)  # fallback to z for large n
+
+        margin = t_val * model.std_mase / math.sqrt(n)
+        ci[model.name] = {
+            "lower": round(model.mean_mase - margin, 4),
+            "upper": round(model.mean_mase + margin, 4),
+        }
+
+    return ci
+
+
+def _build_runtime_table_data(result: BenchmarkResult) -> list[dict]:
+    """Build runtime comparison table data."""
+    from ts_autopilot.evaluation.speed_benchmark import compute_speed_report
+
+    if not result.models:
+        return []
+
+    report = compute_speed_report(result)
+    rows = []
+    for p in sorted(report.profiles, key=lambda x: x.total_runtime_sec):
+        rows.append(
+            {
+                "name": p.model_name,
+                "total_sec": round(p.total_runtime_sec, 2),
+                "avg_per_series": round(p.avg_sec_per_series, 3),
+                "throughput": round(p.throughput_series_per_sec, 1),
+            }
+        )
+    return rows
