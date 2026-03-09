@@ -934,6 +934,20 @@ def doctor() -> None:
     except OSError as exc:
         checks.append(("Output dir writable", False, str(exc)))
 
+    # Accelerator check (GPU/MPS)
+    try:
+        import torch
+
+        acc = "cpu"
+        if torch.backends.mps.is_available():
+            acc = "MPS (Metal)"
+        elif torch.cuda.is_available():
+            acc = f"CUDA ({torch.cuda.get_device_name(0)})"
+        checks.append(("Hardware acceleration", True, acc))
+    except ImportError:
+        checks.append(("Hardware acceleration", True, "cpu (torch not installed)"))
+
+
     # Print results
     typer.secho("\nts-autopilot doctor", bold=True)
     typer.secho("=" * 50)

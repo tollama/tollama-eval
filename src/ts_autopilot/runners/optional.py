@@ -162,6 +162,21 @@ class XGBoostRunner(BaseRunner):
         )
 
 
+def get_best_accelerator() -> str:
+    """Detect best available hardware accelerator."""
+    try:
+        import torch
+
+        if torch.backends.mps.is_available():
+            # MPS can be unstable with float64, usually requires float32
+            return "mps"
+        if torch.cuda.is_available():
+            return "cuda"
+    except ImportError:
+        pass
+    return "cpu"
+
+
 class NHITSRunner(BaseRunner):
     """N-HiTS neural model runner via neuralforecast.
 
@@ -185,12 +200,17 @@ class NHITSRunner(BaseRunner):
         from neuralforecast.models import NHITS
 
         t0 = time.perf_counter()
+        acc = get_best_accelerator()
+
+        # Neural models on MPS/GPU prefer float32
+        train = train.copy()
+        train["y"] = train["y"].astype("float32")
 
         model = NHITS(
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator="cpu",
+            accelerator=acc,
             start_padding_enabled=True,
             enable_progress_bar=False,
         )
@@ -232,12 +252,16 @@ class NBEATSRunner(BaseRunner):
         from neuralforecast.models import NBEATS
 
         t0 = time.perf_counter()
+        acc = get_best_accelerator()
+
+        train = train.copy()
+        train["y"] = train["y"].astype("float32")
 
         model = NBEATS(
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator="cpu",
+            accelerator=acc,
             start_padding_enabled=True,
             enable_progress_bar=False,
         )
@@ -279,12 +303,16 @@ class TiDERunner(BaseRunner):
         from neuralforecast.models import TiDE
 
         t0 = time.perf_counter()
+        acc = get_best_accelerator()
+
+        train = train.copy()
+        train["y"] = train["y"].astype("float32")
 
         model = TiDE(
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator="cpu",
+            accelerator=acc,
             enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)
@@ -325,12 +353,16 @@ class DeepARRunner(BaseRunner):
         from neuralforecast.models import DeepAR
 
         t0 = time.perf_counter()
+        acc = get_best_accelerator()
+
+        train = train.copy()
+        train["y"] = train["y"].astype("float32")
 
         model = DeepAR(
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator="cpu",
+            accelerator=acc,
             enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)
@@ -371,12 +403,16 @@ class PatchTSTRunner(BaseRunner):
         from neuralforecast.models import PatchTST
 
         t0 = time.perf_counter()
+        acc = get_best_accelerator()
+
+        train = train.copy()
+        train["y"] = train["y"].astype("float32")
 
         model = PatchTST(
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator="cpu",
+            accelerator=acc,
             enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)
@@ -417,12 +453,16 @@ class TFTRunner(BaseRunner):
         from neuralforecast.models import TFT
 
         t0 = time.perf_counter()
+        acc = get_best_accelerator()
+
+        train = train.copy()
+        train["y"] = train["y"].astype("float32")
 
         model = TFT(
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator="cpu",
+            accelerator=acc,
             enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)
@@ -438,6 +478,7 @@ class TFTRunner(BaseRunner):
             model_name=self.name,
             runtime_sec=round(elapsed, 4),
         )
+
 
 
 def get_optional_runners() -> list[BaseRunner]:
