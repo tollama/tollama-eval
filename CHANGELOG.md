@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CSV parser fuzz testing
 
 ### Changed
+- Added LICENSE file (MIT) and CODE_OF_CONDUCT.md for public OSS release
+- Removed internal development scripts and generated data files
+- Aligned coverage gate to 80% across CI, pyproject.toml, and Makefile
 - Tollama URL validation now blocks private/internal IPs by default (SSRF prevention)
 - Failed models now recorded with NaN metrics instead of crashing the pipeline
 - Coverage gate remains at 80% (to be increased incrementally)

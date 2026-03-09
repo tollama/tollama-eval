@@ -19,7 +19,7 @@ If input has timezones, strip to naive. If `unique_id` is missing, use `"series_
 
 ## Dependency Policy
 - No new dependencies without updating `pyproject.toml` and adding at least one test that would fail without the new dependency.
-- **Prohibited in MVP**: torch, neuralforecast, lightgbm, salesforce-merlion, stumpy, polars, plotly.
+- Optional deps (torch, neuralforecast, lightgbm, plotly, etc.) live behind install extras; the core package must work without them.
 
 ## Tollama Integration (TSFM)
 tollama is a **Time Series Foundation Model platform** (https://github.com/tollama/tollama),

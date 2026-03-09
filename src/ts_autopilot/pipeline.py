@@ -45,10 +45,7 @@ from ts_autopilot.exceptions import ModelFitError, ModelTimeoutError
 from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
 from ts_autopilot.runners.optional import get_optional_runners
-from ts_autopilot.runners.statistical import (
-    ALL_STATISTICAL_RUNNERS,
-    CORE_RUNNERS,
-)
+from ts_autopilot.runners.statistical import ALL_STATISTICAL_RUNNERS
 
 logger = get_logger("pipeline")
 

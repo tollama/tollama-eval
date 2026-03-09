@@ -23,7 +23,7 @@ test:  ## Run tests with verbose output
 	python -m pytest tests/ -v
 
 coverage:  ## Run tests with coverage report
-	python -m pytest tests/ --cov=ts_autopilot --cov-report=term-missing --cov-fail-under=90
+	python -m pytest tests/ --cov=ts_autopilot --cov-report=term-missing --cov-fail-under=80
 
 all:  ## Run lint, typecheck, and tests
 	$(MAKE) lint
