@@ -203,11 +203,16 @@ def generate_executive_summary(result: BenchmarkResult) -> ExecutiveSummary:
                 winner_model.runtime_sec / fastest.runtime_sec if winner_model else 0
             )
             if speedup > 5:
-                recommendations.append(
-                    f"If latency is critical, {fastest.name} runs "
-                    f"{speedup:.0f}x faster with MASE "
-                    f"{next(e.mean_mase for e in lb if e.name == fastest.name):.4f}."
+                fastest_entry = next(
+                    (entry for entry in lb if entry.name == fastest.name),
+                    None,
                 )
+                if fastest_entry is not None:
+                    recommendations.append(
+                        f"If latency is critical, {fastest.name} runs "
+                        f"{speedup:.0f}x faster with MASE "
+                        f"{fastest_entry.mean_mase:.4f}."
+                    )
 
     if not recommendations:
         recommendations.append(
