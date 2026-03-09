@@ -3,6 +3,7 @@
 from ts_autopilot.contracts import (
     BenchmarkConfig,
     BenchmarkResult,
+    DataCharacteristics,
     DataProfile,
     FoldResult,
     ForecastOutput,
@@ -130,3 +131,40 @@ def test_benchmark_result_schema_keys():
         "mean_mae",
     }
     assert set(d["config"].keys()) == {"horizon", "n_folds"}
+
+
+def test_data_characteristics_round_trip():
+    dc = DataCharacteristics(
+        y_mean=10.5,
+        y_std=3.2,
+        y_min=1.0,
+        y_max=25.0,
+        y_median=10.0,
+        y_skewness=0.5,
+        y_kurtosis=-0.3,
+        mean_cv=0.3,
+        trend_strength=0.7,
+        seasonality_strength=0.4,
+        series_heterogeneity=0.8,
+    )
+    assert DataCharacteristics.from_dict(dc.to_dict()) == dc
+
+
+def test_benchmark_result_details_with_data_chars():
+    """BenchmarkResult includes data_characteristics in details dict."""
+    result = _make_benchmark_result()
+    result.data_characteristics = DataCharacteristics(
+        y_mean=10.0,
+        trend_strength=0.5,
+    )
+    details = result.to_details_dict()
+    assert "data_characteristics" in details
+    assert details["data_characteristics"]["y_mean"] == 10.0
+
+
+def test_benchmark_result_from_dict_without_data_chars():
+    """Old results.json without data_characteristics still loads."""
+    result = _make_benchmark_result()
+    d = result.to_dict()
+    restored = BenchmarkResult.from_dict(d)
+    assert restored.data_characteristics is None

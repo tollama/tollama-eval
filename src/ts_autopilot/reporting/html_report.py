@@ -104,6 +104,7 @@ def render_report(
             ci_data=ci_data,
             runtime_data=runtime_data,
             run_id=run_id,
+            data_chars=result.data_characteristics,
         )
     )
 

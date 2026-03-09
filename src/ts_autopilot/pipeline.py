@@ -346,6 +346,7 @@ def run_benchmark(
     validation_warnings = _validate_dataframe(df)
 
     profile = profile_dataframe(df)
+    data_chars = compute_data_characteristics(df, profile.season_length_guess)
     config = BenchmarkConfig(horizon=horizon, n_folds=n_folds)
     warnings = generate_warnings(profile, horizon, n_folds)
     warnings.extend(validation_warnings)
@@ -648,6 +649,7 @@ def run_benchmark(
         warnings=warnings,
         forecast_data=all_forecast_data,
         diagnostics=all_diagnostics,
+        data_characteristics=data_chars,
     )
 
 
@@ -831,7 +833,10 @@ def run_from_csv(
 
 # Re-import for backward compatibility (used by cli.py)
 from ts_autopilot.ingestion.loader import load_csv  # noqa: E402
-from ts_autopilot.ingestion.profiler import profile_dataframe  # noqa: E402
+from ts_autopilot.ingestion.profiler import (  # noqa: E402
+    compute_data_characteristics,
+    profile_dataframe,
+)
 
 __all__ = [
     "DEFAULT_MAX_RETRIES",

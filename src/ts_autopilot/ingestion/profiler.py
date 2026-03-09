@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from ts_autopilot.contracts import DataProfile
+from ts_autopilot.contracts import DataCharacteristics, DataProfile
 
 # Mapping from pandas inferred freq strings to integer season lengths
 FREQ_TO_SEASON: dict[str, int] = {
@@ -95,6 +95,113 @@ def _guess_season_length(freq: str) -> int:
     # Strip suffix variants: 'W-SUN' → 'W'
     base = freq.split("-")[0] if "-" in freq else freq
     return FREQ_TO_SEASON.get(base, 1)
+
+
+def compute_data_characteristics(
+    df: pd.DataFrame,
+    season_length: int,
+) -> DataCharacteristics:
+    """Compute descriptive data characteristics from a canonical DataFrame.
+
+    Args:
+        df: DataFrame with columns (unique_id, ds, y).
+        season_length: Guessed season length from profile.
+
+    Returns:
+        DataCharacteristics with distribution stats and complexity measures.
+    """
+    import numpy as np
+
+    y = df["y"].dropna().values.astype(np.float64)
+    n = len(y)
+
+    if n == 0:
+        return DataCharacteristics()
+
+    # 1. Value distribution (global)
+    y_mean = float(np.mean(y))
+    y_std = float(np.std(y, ddof=1)) if n > 1 else 0.0
+    y_min = float(np.min(y))
+    y_max = float(np.max(y))
+    y_median = float(np.median(y))
+
+    # Skewness & kurtosis (numpy-only)
+    if y_std > 0 and n > 2:
+        centered = y - y_mean
+        y_skewness = float(np.mean(centered**3) / y_std**3)
+        y_kurtosis = float(np.mean(centered**4) / y_std**4 - 3.0)
+    else:
+        y_skewness = 0.0
+        y_kurtosis = 0.0
+
+    # Per-series statistics
+    grouped = df.groupby("unique_id")["y"]
+    series_means: list[float] = []
+    series_cvs: list[float] = []
+    trend_r2s: list[float] = []
+    season_acfs: list[float] = []
+
+    for _uid, group_y in grouped:
+        vals = group_y.dropna().values.astype(np.float64)
+        m = len(vals)
+        if m < 2:
+            continue
+
+        s_mean = float(np.mean(vals))
+        s_std = float(np.std(vals, ddof=1))
+        series_means.append(s_mean)
+
+        # Per-series CV
+        if abs(s_mean) > 1e-12:
+            series_cvs.append(s_std / abs(s_mean))
+
+        # Trend: R-squared of linear regression y ~ t
+        t = np.arange(m, dtype=np.float64)
+        t_mean = np.mean(t)
+        y_mean_s = np.mean(vals)
+        ss_tt = float(np.sum((t - t_mean) ** 2))
+        ss_yy = float(np.sum((vals - y_mean_s) ** 2))
+        if ss_tt > 0 and ss_yy > 0:
+            ss_ty = float(np.sum((t - t_mean) * (vals - y_mean_s)))
+            r2 = (ss_ty**2) / (ss_tt * ss_yy)
+            trend_r2s.append(float(np.clip(r2, 0.0, 1.0)))
+
+        # Seasonality: autocorrelation at seasonal lag
+        if m > season_length and season_length > 0:
+            centered_s = vals - np.mean(vals)
+            var_s = float(np.sum(centered_s**2) / m)
+            if var_s > 0:
+                acf_lag = float(
+                    np.sum(centered_s[season_length:] * centered_s[:-season_length])
+                    / (m * var_s)
+                )
+                season_acfs.append(float(np.clip(acf_lag, 0.0, 1.0)))
+
+    mean_cv = float(np.mean(series_cvs)) if series_cvs else 0.0
+    trend_strength = float(np.mean(trend_r2s)) if trend_r2s else 0.0
+    seasonality_strength = float(np.mean(season_acfs)) if season_acfs else 0.0
+
+    # Series heterogeneity: CV of series means
+    series_heterogeneity = 0.0
+    if len(series_means) > 1:
+        sm_arr = np.array(series_means)
+        sm_mean = float(np.mean(sm_arr))
+        if abs(sm_mean) > 1e-12:
+            series_heterogeneity = float(np.std(sm_arr, ddof=1) / abs(sm_mean))
+
+    return DataCharacteristics(
+        y_mean=round(y_mean, 4),
+        y_std=round(y_std, 4),
+        y_min=round(y_min, 4),
+        y_max=round(y_max, 4),
+        y_median=round(y_median, 4),
+        y_skewness=round(y_skewness, 4),
+        y_kurtosis=round(y_kurtosis, 4),
+        mean_cv=round(mean_cv, 4),
+        trend_strength=round(trend_strength, 4),
+        seasonality_strength=round(seasonality_strength, 4),
+        series_heterogeneity=round(series_heterogeneity, 4),
+    )
 
 
 def detect_zero_ratio(df: pd.DataFrame) -> float:

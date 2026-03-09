@@ -226,6 +226,39 @@ class DiagnosticsResult:
 
 
 @dataclass
+class DataCharacteristics:
+    """Descriptive statistics and complexity measures of the input data."""
+
+    # Value distribution (across all y values)
+    y_mean: float = 0.0
+    y_std: float = 0.0
+    y_min: float = 0.0
+    y_max: float = 0.0
+    y_median: float = 0.0
+    y_skewness: float = 0.0
+    y_kurtosis: float = 0.0
+
+    # Coefficient of Variation: average per-series CV
+    mean_cv: float = 0.0
+
+    # Trend strength: average R-squared of linear fit (0-1)
+    trend_strength: float = 0.0
+
+    # Seasonality strength: avg autocorrelation at seasonal lag (0-1)
+    seasonality_strength: float = 0.0
+
+    # Series heterogeneity: CV of series means
+    series_heterogeneity: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> DataCharacteristics:
+        return cls(**{k: d[k] for k in d if k in cls.__dataclass_fields__})
+
+
+@dataclass
 class BenchmarkConfig:
     horizon: int
     n_folds: int
@@ -280,6 +313,7 @@ class BenchmarkResult:
     metadata: ResultMetadata | None = None
     forecast_data: list[ForecastData] = field(default_factory=list)
     diagnostics: list[DiagnosticsResult] = field(default_factory=list)
+    data_characteristics: DataCharacteristics | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {}
@@ -308,6 +342,8 @@ class BenchmarkResult:
             d["forecast_data"] = [fd.to_dict() for fd in self.forecast_data]
         if self.diagnostics:
             d["diagnostics"] = [diag.to_dict() for diag in self.diagnostics]
+        if self.data_characteristics is not None:
+            d["data_characteristics"] = self.data_characteristics.to_dict()
         return d
 
     def to_details_json(self, indent: int = 2) -> str:
@@ -318,6 +354,9 @@ class BenchmarkResult:
         metadata = None
         if "metadata" in d:
             metadata = ResultMetadata.from_dict(d["metadata"])
+        data_chars = None
+        if "data_characteristics" in d:
+            data_chars = DataCharacteristics.from_dict(d["data_characteristics"])
         return cls(
             profile=DataProfile.from_dict(d["profile"]),
             config=BenchmarkConfig.from_dict(d["config"]),
@@ -331,6 +370,7 @@ class BenchmarkResult:
             diagnostics=[
                 DiagnosticsResult.from_dict(diag) for diag in d.get("diagnostics", [])
             ],
+            data_characteristics=data_chars,
         )
 
     @classmethod

@@ -3,6 +3,7 @@
 from ts_autopilot.contracts import (
     BenchmarkConfig,
     BenchmarkResult,
+    DataCharacteristics,
     DataProfile,
     DiagnosticsResult,
     FoldResult,
@@ -179,3 +180,34 @@ def test_report_no_diagnostics_without_data():
     html = render_report(result)
     assert 'id="diagnostics"' not in html
     assert 'id="forecasts"' not in html
+
+
+def test_report_has_data_characteristics():
+    result = _make_enriched_result()
+    result.data_characteristics = DataCharacteristics(
+        y_mean=10.0,
+        y_std=2.5,
+        y_min=1.0,
+        y_max=25.0,
+        y_median=9.5,
+        y_skewness=0.3,
+        y_kurtosis=-0.1,
+        mean_cv=0.25,
+        trend_strength=0.6,
+        seasonality_strength=0.4,
+        series_heterogeneity=0.8,
+    )
+    html = render_report(result)
+    assert "Data Characteristics" in html
+    assert "Trend Strength" in html
+    assert "Seasonality Strength" in html
+    assert "Series Heterogeneity" in html
+    assert "Avg CV" in html
+
+
+def test_report_no_data_characteristics_without_data():
+    """Report omits data characteristics section when data is None."""
+    result = _make_enriched_result()
+    result.data_characteristics = None
+    html = render_report(result)
+    assert "Data Characteristics" not in html

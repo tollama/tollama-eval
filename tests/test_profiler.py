@@ -3,7 +3,11 @@
 import numpy as np
 import pandas as pd
 
-from ts_autopilot.ingestion.profiler import _guess_season_length, profile_dataframe
+from ts_autopilot.ingestion.profiler import (
+    _guess_season_length,
+    compute_data_characteristics,
+    profile_dataframe,
+)
 
 
 def test_profile_n_series(tiny_long_df):
@@ -103,3 +107,55 @@ def test_frequency_fallback_logs_warning(caplog):
         assert any("defaulting" in r.message.lower() for r in caplog.records)
     finally:
         root_logger.propagate = old_propagate
+
+
+# --- Data Characteristics tests ---
+
+
+def test_data_characteristics_basic(tiny_long_df):
+    """Data characteristics computes all fields from a 2-series daily DataFrame."""
+    chars = compute_data_characteristics(tiny_long_df, season_length=7)
+    assert chars.y_mean != 0.0
+    assert chars.y_std > 0.0
+    assert chars.y_min < chars.y_max
+    assert chars.y_median != 0.0
+    assert chars.mean_cv > 0.0
+    assert chars.series_heterogeneity >= 0.0
+
+
+def test_data_characteristics_single_row():
+    """Handles edge case of single-row series."""
+    df = pd.DataFrame(
+        {
+            "unique_id": ["s1"],
+            "ds": pd.to_datetime(["2020-01-01"]),
+            "y": [5.0],
+        }
+    )
+    chars = compute_data_characteristics(df, season_length=7)
+    assert chars.y_mean == 5.0
+    assert chars.y_std == 0.0
+    assert chars.trend_strength == 0.0
+
+
+def test_data_characteristics_empty():
+    """Handles empty DataFrame."""
+    df = pd.DataFrame({
+        "unique_id": pd.Series([], dtype=str),
+        "ds": pd.Series([], dtype="datetime64[ns]"),
+        "y": pd.Series([], dtype=float),
+    })
+    chars = compute_data_characteristics(df, season_length=7)
+    assert chars.y_mean == 0.0
+    assert chars.trend_strength == 0.0
+
+
+def test_data_characteristics_constant_series():
+    """Constant series should have zero CV, zero trend, zero seasonality."""
+    dates = pd.date_range("2020-01-01", periods=100, freq="D")
+    df = pd.DataFrame({"unique_id": "s1", "ds": dates, "y": 42.0})
+    chars = compute_data_characteristics(df, season_length=7)
+    assert chars.y_std == 0.0
+    assert chars.mean_cv == 0.0
+    assert chars.trend_strength == 0.0
+    assert chars.seasonality_strength == 0.0

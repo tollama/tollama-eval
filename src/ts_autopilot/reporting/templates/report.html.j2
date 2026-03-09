@@ -954,6 +954,85 @@
                 </div>
                 {% endif %}
             </div>
+
+            {% if data_chars %}
+            <!-- Data Characteristics -->
+            <h3>Data Characteristics</h3>
+
+            <!-- Value Distribution -->
+            <h4 style="font-size: 0.85rem; color: var(--gray-500); margin: 0.75rem 0 0.25rem;">Value Distribution</h4>
+            <div class="stats-grid" role="list" aria-label="Value distribution statistics">
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Mean">{{ "%.2f"|format(data_chars.y_mean) }}</div>
+                    <div class="stat-label">Mean</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Standard deviation">{{ "%.2f"|format(data_chars.y_std) }}</div>
+                    <div class="stat-label">Std Dev</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Minimum">{{ "%.2f"|format(data_chars.y_min) }}</div>
+                    <div class="stat-label">Min</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Maximum">{{ "%.2f"|format(data_chars.y_max) }}</div>
+                    <div class="stat-label">Max</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Median">{{ "%.2f"|format(data_chars.y_median) }}</div>
+                    <div class="stat-label">Median</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Skewness">{{ "%.2f"|format(data_chars.y_skewness) }}</div>
+                    <div class="stat-label">Skewness</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Kurtosis">{{ "%.2f"|format(data_chars.y_kurtosis) }}</div>
+                    <div class="stat-label">Kurtosis</div>
+                </div>
+            </div>
+
+            <!-- Complexity Measures -->
+            <h4 style="font-size: 0.85rem; color: var(--gray-500); margin: 0.75rem 0 0.25rem;">Complexity Measures</h4>
+            <div class="stats-grid" role="list" aria-label="Complexity measure statistics">
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Mean coefficient of variation">
+                        {{ "%.2f"|format(data_chars.mean_cv) }}
+                    </div>
+                    <div class="stat-label">Avg CV (Difficulty)</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Trend strength">
+                        {% if data_chars.trend_strength > 0.7 %}
+                        <span class="quality-grade grade-a" style="width:auto;height:auto;border-radius:var(--radius);padding:0.15rem 0.5rem;">{{ "%.2f"|format(data_chars.trend_strength) }}</span>
+                        {% elif data_chars.trend_strength > 0.3 %}
+                        <span class="quality-grade grade-b" style="width:auto;height:auto;border-radius:var(--radius);padding:0.15rem 0.5rem;">{{ "%.2f"|format(data_chars.trend_strength) }}</span>
+                        {% else %}
+                        <span class="quality-grade grade-c" style="width:auto;height:auto;border-radius:var(--radius);padding:0.15rem 0.5rem;">{{ "%.2f"|format(data_chars.trend_strength) }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="stat-label">Trend Strength (R&sup2;)</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Seasonality strength">
+                        {% if data_chars.seasonality_strength > 0.5 %}
+                        <span class="quality-grade grade-a" style="width:auto;height:auto;border-radius:var(--radius);padding:0.15rem 0.5rem;">{{ "%.2f"|format(data_chars.seasonality_strength) }}</span>
+                        {% elif data_chars.seasonality_strength > 0.2 %}
+                        <span class="quality-grade grade-b" style="width:auto;height:auto;border-radius:var(--radius);padding:0.15rem 0.5rem;">{{ "%.2f"|format(data_chars.seasonality_strength) }}</span>
+                        {% else %}
+                        <span class="quality-grade grade-c" style="width:auto;height:auto;border-radius:var(--radius);padding:0.15rem 0.5rem;">{{ "%.2f"|format(data_chars.seasonality_strength) }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="stat-label">Seasonality Strength</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value" aria-label="Series heterogeneity">
+                        {{ "%.2f"|format(data_chars.series_heterogeneity) }}
+                    </div>
+                    <div class="stat-label">Series Heterogeneity</div>
+                </div>
+            </div>
+            {% endif %}
         </section>
 
         <!-- 5. Data Quality Warnings -->

@@ -130,6 +130,7 @@ def _run_distributed(
         per_series_rmsse,
         per_series_smape,
     )
+    from ts_autopilot.ingestion.profiler import compute_data_characteristics
     from ts_autopilot.pipeline import (
         DEFAULT_RUNNERS,
         generate_warnings,
@@ -150,6 +151,7 @@ def _run_distributed(
         runners = [r for r in runners if r.name in model_names]
 
     profile = profile_dataframe(df)
+    data_chars = compute_data_characteristics(df, profile.season_length_guess)
     splits = make_expanding_splits(df, horizon=horizon, n_folds=n_folds)
     warnings = generate_warnings(profile, horizon, n_folds)
 
@@ -315,4 +317,5 @@ def _run_distributed(
         models=model_results,
         leaderboard=leaderboard,
         warnings=warnings,
+        data_characteristics=data_chars,
     )

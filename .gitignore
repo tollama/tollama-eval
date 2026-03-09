@@ -1,6 +1,8 @@
 # ts-autopilot output
 out/
 .ts_autopilot_cache/
+out_e2e_all/
+out_e2e_stats/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
