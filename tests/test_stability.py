@@ -31,9 +31,7 @@ def _make_result(models, leaderboard=None):
             key=lambda m: m.mean_mase,
         )
         leaderboard = [
-            LeaderboardEntry(
-                rank=i + 1, name=m.name, mean_mase=m.mean_mase
-            )
+            LeaderboardEntry(rank=i + 1, name=m.name, mean_mase=m.mean_mase)
             for i, m in enumerate(sorted_models)
         ]
     return BenchmarkResult(
@@ -56,16 +54,22 @@ class TestStability:
             runtime_sec=1.0,
             folds=[
                 FoldResult(
-                    fold=1, cutoff="2020-01-01",
-                    mase=1.0, series_scores=_scores(1.0, 1.0),
+                    fold=1,
+                    cutoff="2020-01-01",
+                    mase=1.0,
+                    series_scores=_scores(1.0, 1.0),
                 ),
                 FoldResult(
-                    fold=2, cutoff="2020-01-08",
-                    mase=1.0, series_scores=_scores(1.0, 1.0),
+                    fold=2,
+                    cutoff="2020-01-08",
+                    mase=1.0,
+                    series_scores=_scores(1.0, 1.0),
                 ),
                 FoldResult(
-                    fold=3, cutoff="2020-01-15",
-                    mase=1.0, series_scores=_scores(1.0, 1.0),
+                    fold=3,
+                    cutoff="2020-01-15",
+                    mase=1.0,
+                    series_scores=_scores(1.0, 1.0),
                 ),
             ],
             mean_mase=1.0,
@@ -83,16 +87,22 @@ class TestStability:
             runtime_sec=1.0,
             folds=[
                 FoldResult(
-                    fold=1, cutoff="2020-01-01",
-                    mase=0.5, series_scores=_scores(0.1, 5.0),
+                    fold=1,
+                    cutoff="2020-01-01",
+                    mase=0.5,
+                    series_scores=_scores(0.1, 5.0),
                 ),
                 FoldResult(
-                    fold=2, cutoff="2020-01-08",
-                    mase=3.0, series_scores=_scores(0.5, 3.0),
+                    fold=2,
+                    cutoff="2020-01-08",
+                    mase=3.0,
+                    series_scores=_scores(0.5, 3.0),
                 ),
                 FoldResult(
-                    fold=3, cutoff="2020-01-15",
-                    mase=0.1, series_scores=_scores(4.0, 0.1),
+                    fold=3,
+                    cutoff="2020-01-15",
+                    mase=0.1,
+                    series_scores=_scores(4.0, 0.1),
                 ),
             ],
             mean_mase=1.2,
@@ -121,8 +131,10 @@ class TestStability:
             runtime_sec=1.0,
             folds=[
                 FoldResult(
-                    fold=1, cutoff="2020-01-01",
-                    mase=1.0, series_scores={"s1": 1.0},
+                    fold=1,
+                    cutoff="2020-01-01",
+                    mase=1.0,
+                    series_scores={"s1": 1.0},
                 ),
             ],
             mean_mase=1.0,

@@ -480,7 +480,6 @@ class TFTRunner(BaseRunner):
         )
 
 
-
 def get_optional_runners() -> list[BaseRunner]:
     """Return list of available optional runners (only if deps are installed)."""
     runners: list[BaseRunner] = []

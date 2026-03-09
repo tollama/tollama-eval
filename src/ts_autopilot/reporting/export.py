@@ -139,7 +139,6 @@ def export_excel(result: BenchmarkResult, output_path: str | Path) -> Path:
         )
         raise
 
-
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -208,9 +207,7 @@ def export_excel(result: BenchmarkResult, output_path: str | Path) -> Path:
         row += 2
 
     if summary.key_findings:
-        cell = ws_summary.cell(
-            row=row, column=1, value="Key Findings"
-        )
+        cell = ws_summary.cell(row=row, column=1, value="Key Findings")
         cell.font = Font(bold=True, size=12)
         row += 1
         for finding in summary.key_findings:
@@ -219,9 +216,7 @@ def export_excel(result: BenchmarkResult, output_path: str | Path) -> Path:
         row += 1
 
     if summary.recommendations:
-        cell = ws_summary.cell(
-            row=row, column=1, value="Recommendations"
-        )
+        cell = ws_summary.cell(row=row, column=1, value="Recommendations")
         cell.font = Font(bold=True, size=12)
         row += 1
         for i, rec in enumerate(summary.recommendations, 1):

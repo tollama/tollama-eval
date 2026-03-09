@@ -56,9 +56,7 @@ def mock_result() -> BenchmarkResult:
     ]
     leaderboard = [
         LeaderboardEntry(rank=1, name="AutoETS", mean_mase=0.85, mean_smape=16.5),
-        LeaderboardEntry(
-            rank=2, name="SeasonalNaive", mean_mase=1.05, mean_smape=21.0
-        ),
+        LeaderboardEntry(rank=2, name="SeasonalNaive", mean_mase=1.05, mean_smape=21.0),
     ]
     return BenchmarkResult(
         profile=profile,

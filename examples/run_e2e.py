@@ -15,14 +15,14 @@ from time import perf_counter
 from typing import Any
 
 # ─────────────────────────────────────────────────────────────
-REPO_DIR    = Path("/Users/yongchoelchoi/Documents/GitHub/tollama")
+REPO_DIR = Path("/Users/yongchoelchoi/Documents/GitHub/tollama")
 HF_DATA_DIR = REPO_DIR / "hf_data"
-BASE_URL    = "http://127.0.0.1:11435"
-SEED        = 42
+BASE_URL = "http://127.0.0.1:11435"
+SEED = 42
 NUM_DATASETS = 10
-CONTEXT_CAP  = 512
-HORIZON      = 24
-MIN_ROWS     = CONTEXT_CAP + HORIZON
+CONTEXT_CAP = 512
+HORIZON = 24
+MIN_ROWS = CONTEXT_CAP + HORIZON
 
 TSFM_MODELS = [
     "chronos2",
@@ -49,25 +49,30 @@ MODEL_CONTEXT_CAPS: dict[str, int] = {
     "nbeatsx": 512,
 }
 
-GREEN  = "\033[0;32m"
-RED    = "\033[0;31m"
+GREEN = "\033[0;32m"
+RED = "\033[0;31m"
 YELLOW = "\033[1;33m"
-CYAN   = "\033[0;36m"
-NC     = "\033[0m"
+CYAN = "\033[0;36m"
+NC = "\033[0m"
+
 
 def log(msg: str) -> None:
     ts = datetime.now().strftime("%H:%M:%S")
     print(f"{CYAN}[{ts}]{NC} {msg}", flush=True)
 
+
 def ok(msg: str) -> None:
     print(f"{GREEN}[PASS]{NC} {msg}", flush=True)
+
 
 def err(msg: str) -> None:
     print(f"{RED}[FAIL]{NC} {msg}", flush=True)
 
+
 # ─────────────────────────────────────────────────────────────
 # Parsing helpers
 # ─────────────────────────────────────────────────────────────
+
 
 def _parse_ts(raw: Any) -> datetime | None:
     if raw is None:
@@ -90,10 +95,17 @@ def _parse_ts(raw: Any) -> datetime | None:
     except ValueError:
         pass
     for fmt in (
-        "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d",
-        "%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M", "%Y/%m/%d",
-        "%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M", "%m/%d/%Y",
-        "%d-%m-%Y", "%d/%m/%Y",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y/%m/%d %H:%M",
+        "%Y/%m/%d",
+        "%m/%d/%Y %H:%M:%S",
+        "%m/%d/%Y %H:%M",
+        "%m/%d/%Y",
+        "%d-%m-%Y",
+        "%d/%m/%Y",
     ):
         try:
             return datetime.strptime(text, fmt)
@@ -140,12 +152,30 @@ def _infer_freq(points: list[datetime]) -> str:
 
 
 TIMESTAMP_HINTS = (
-    "timestamp", "datetime", "date_time", "dateutc", "date", "time",
-    "dt", "period", "start", "ds", "tstmp",
+    "timestamp",
+    "datetime",
+    "date_time",
+    "dateutc",
+    "date",
+    "time",
+    "dt",
+    "period",
+    "start",
+    "ds",
+    "tstmp",
 )
 TARGET_HINTS = (
-    "target", "value", "actual", "actuals", "y", "close", "price",
-    "demand", "sales", "sale_amount", "label",
+    "target",
+    "value",
+    "actual",
+    "actuals",
+    "y",
+    "close",
+    "price",
+    "demand",
+    "sales",
+    "sale_amount",
+    "label",
 )
 
 
@@ -182,7 +212,7 @@ def _detect_columns(sample_rows: list[dict]) -> tuple[str | None, str | None]:
     ts_scores.sort(key=lambda x: (-x[1], x[2], x[0]))
     tgt_scores.sort(key=lambda x: (-x[1], x[2], x[0]))
 
-    ts_col  = ts_scores[0][0]  if ts_scores and ts_scores[0][1] >= 0.5 else None
+    ts_col = ts_scores[0][0] if ts_scores and ts_scores[0][1] >= 0.5 else None
     tgt_col = None
     for col, ratio, _ in tgt_scores:
         if col != ts_col and ratio >= 0.5:
@@ -208,11 +238,12 @@ def _read_first_rows(raw_file: Path, n: int = 50) -> list[dict]:
     return rows
 
 
-def load_local_series(hf_id: str, meta: dict, raw_file: Path,
-                      context_cap: int, horizon: int) -> list[dict]:
+def load_local_series(
+    hf_id: str, meta: dict, raw_file: Path, context_cap: int, horizon: int
+) -> list[dict]:
     """Read rows.jsonl → normalized series list for the daemon."""
     # First determine columns to use
-    meta_ts  = meta.get("timestamp_column")
+    meta_ts = meta.get("timestamp_column")
     meta_tgt = meta.get("target_column")
 
     # Sample rows to verify / detect columns
@@ -230,7 +261,7 @@ def load_local_series(hf_id: str, meta: dict, raw_file: Path,
         return []
 
     # Verify ts_col parses as timestamps and tgt_col as floats
-    ts_ok  = sum(1 for r in sample[:20] if _parse_ts(r.get(ts_col)) is not None)
+    ts_ok = sum(1 for r in sample[:20] if _parse_ts(r.get(ts_col)) is not None)
     tgt_ok = sum(1 for r in sample[:20] if _parse_float(r.get(tgt_col)) is not None)
     if ts_ok < 10 or tgt_ok < 10:
         return []
@@ -246,7 +277,7 @@ def load_local_series(hf_id: str, meta: dict, raw_file: Path,
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            dt  = _parse_ts(obj.get(ts_col))
+            dt = _parse_ts(obj.get(ts_col))
             val = _parse_float(obj.get(tgt_col))
             if dt is not None and val is not None:
                 rows.append((dt, val))
@@ -267,25 +298,27 @@ def load_local_series(hf_id: str, meta: dict, raw_file: Path,
     if len(rows) < context_cap + horizon:
         return []
 
-    window  = rows[-(context_cap + horizon):]
+    window = rows[-(context_cap + horizon) :]
     history = window[:-horizon]
-    future  = window[-horizon:]
+    future = window[-horizon:]
 
-    freq       = _infer_freq([pt[0] for pt in history])
+    freq = _infer_freq([pt[0] for pt in history])
     timestamps = [pt[0].isoformat() for pt in history]
-    target     = [pt[1] for pt in history]
-    actuals    = [pt[1] for pt in future]
-    series_id  = f"local:{hf_id.split('/')[-1].lower()}_0"
+    target = [pt[1] for pt in history]
+    actuals = [pt[1] for pt in future]
+    series_id = f"local:{hf_id.split('/')[-1].lower()}_0"
 
-    return [{
-        "id": series_id,
-        "freq": freq,
-        "timestamps": timestamps,
-        "target": target,
-        "actuals": actuals,
-        "ts_col": ts_col,
-        "tgt_col": tgt_col,
-    }]
+    return [
+        {
+            "id": series_id,
+            "freq": freq,
+            "timestamps": timestamps,
+            "target": target,
+            "actuals": actuals,
+            "ts_col": ts_col,
+            "tgt_col": tgt_col,
+        }
+    ]
 
 
 def pick_10_datasets() -> list[dict]:
@@ -294,21 +327,23 @@ def pick_10_datasets() -> list[dict]:
     candidates = []
     for item in index["items"]:
         meta_path = HF_DATA_DIR / item["meta_file"]
-        raw_path  = HF_DATA_DIR / item["raw_file"]
+        raw_path = HF_DATA_DIR / item["raw_file"]
         if not meta_path.exists() or not raw_path.exists():
             continue
-        meta   = json.loads(meta_path.read_text())
-        rows   = meta.get("num_rows_saved", 0)
+        meta = json.loads(meta_path.read_text())
+        rows = meta.get("num_rows_saved", 0)
         bucket = meta.get("interval_bucket", "unknown")
         # Accept hourly/daily/weekly/monthly; exclude weird ones
         if rows >= MIN_ROWS and bucket in ("hourly", "daily", "weekly", "monthly"):
-            candidates.append({
-                "hf_id": item["hf_id"],
-                "meta": meta,
-                "raw_file": raw_path,
-                "rows": rows,
-                "bucket": bucket,
-            })
+            candidates.append(
+                {
+                    "hf_id": item["hf_id"],
+                    "meta": meta,
+                    "raw_file": raw_path,
+                    "rows": rows,
+                    "bucket": bucket,
+                }
+            )
 
     candidates.sort(key=lambda x: -x["rows"])
     rng = random.Random(SEED)
@@ -321,6 +356,7 @@ def pick_10_datasets() -> list[dict]:
 # HTTP helpers
 # ─────────────────────────────────────────────────────────────
 
+
 def _http(
     method: str,
     url: str,
@@ -330,8 +366,11 @@ def _http(
     """HTTP call that handles both plain JSON and NDJSON streaming responses."""
     import urllib.error
     import urllib.request
+
     req = urllib.request.Request(
-        url, data=body, method=method,
+        url,
+        data=body,
+        method=method,
         headers={"Content-Type": "application/json", "Accept": "application/json"},
     )
     try:
@@ -409,12 +448,14 @@ def build_payload(model: str, series: dict, horizon: int) -> dict:
         "model": model,
         "horizon": horizon,
         "quantiles": [],
-        "series": [{
-            "id": series["id"],
-            "freq": series["freq"],
-            "timestamps": list(series["timestamps"][-cap:]),
-            "target": list(series["target"][-cap:]),
-        }],
+        "series": [
+            {
+                "id": series["id"],
+                "freq": series["freq"],
+                "timestamps": list(series["timestamps"][-cap:]),
+                "target": list(series["target"][-cap:]),
+            }
+        ],
         "options": {},
     }
 
@@ -422,6 +463,7 @@ def build_payload(model: str, series: dict, horizon: int) -> dict:
 # ─────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────
+
 
 def main() -> int:
     log("Checking daemon health...")
@@ -463,7 +505,7 @@ def main() -> int:
     results: list[dict] = []
 
     for model in ALL_MODELS:
-        log(f"{'─'*60}")
+        log(f"{'─' * 60}")
         log(f"Model: {model}")
 
         pull_err = pull_model(model)
@@ -492,9 +534,16 @@ def main() -> int:
                 latency_ms = round((perf_counter() - t0) * 1000)
 
                 # Accept 200 with valid response dict that has 'forecasts' key
-                if code == 200 and isinstance(resp, dict) and (
-                    "forecasts" in resp or "predictions" in resp or "response" in resp
-                    or "series" in resp or len(resp) > 0
+                if (
+                    code == 200
+                    and isinstance(resp, dict)
+                    and (
+                        "forecasts" in resp
+                        or "predictions" in resp
+                        or "response" in resp
+                        or "series" in resp
+                        or len(resp) > 0
+                    )
                 ):
                     status = "PASS"
                     error = None
@@ -503,18 +552,20 @@ def main() -> int:
                     error = None
                 else:
                     status = "FAIL"
-                    error = (exc or f"HTTP {code}")
+                    error = exc or f"HTTP {code}"
 
-                results.append({
-                    "model": model,
-                    "dataset": hf_id,
-                    "series": s["id"],
-                    "status": status,
-                    "error": error,
-                    "latency_ms": latency_ms,
-                    "http_code": code,
-                    "freq": s["freq"],
-                })
+                results.append(
+                    {
+                        "model": model,
+                        "dataset": hf_id,
+                        "series": s["id"],
+                        "status": status,
+                        "error": error,
+                        "latency_ms": latency_ms,
+                        "http_code": code,
+                        "freq": s["freq"],
+                    }
+                )
 
                 tag = (
                     f"  {model[:22]:<22} | "
@@ -535,11 +586,11 @@ def main() -> int:
     print("  " + "─" * 60)
     for model in ALL_MODELS:
         mr = [r for r in results if r["model"] == model]
-        total  = len(mr)
+        total = len(mr)
         passed = sum(1 for r in mr if r["status"] == "PASS")
         failed = total - passed
         avg_ms = (sum(r["latency_ms"] for r in mr) // total) if total else 0
-        line   = f"  {model:<28}  {passed:>5}  {failed:>5}  {total:>6}  {avg_ms:>8}"
+        line = f"  {model:<28}  {passed:>5}  {failed:>5}  {total:>6}  {avg_ms:>8}"
         if failed == 0 and total > 0:
             print(f"{GREEN}{line}{NC}")
         elif passed == 0:

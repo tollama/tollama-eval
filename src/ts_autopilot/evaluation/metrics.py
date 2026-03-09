@@ -415,9 +415,7 @@ def parse_metric_weights(weights_str: str) -> dict[str, float]:
         try:
             weights[key] = float(val_str.strip())
         except ValueError as exc:
-            raise ValueError(
-                f"Invalid weight value for '{key}': '{val_str}'"
-            ) from exc
+            raise ValueError(f"Invalid weight value for '{key}': '{val_str}'") from exc
 
     valid_metrics = {"mase", "smape", "rmsse", "mae", "speed"}
     invalid = set(weights.keys()) - valid_metrics

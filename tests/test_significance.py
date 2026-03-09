@@ -1,6 +1,5 @@
 """Tests for statistical significance testing."""
 
-
 from ts_autopilot.evaluation.significance import (
     SignificanceReport,
     friedman_test,
@@ -45,9 +44,7 @@ def test_friedman_pairwise_comparisons():
     assert len(report.pairwise) == 3  # 3 choose 2
     # A vs C should be significantly different (large gap)
     a_vs_c = next(
-        p
-        for p in report.pairwise
-        if {p.model_a, p.model_b} == {"ModelA", "ModelC"}
+        p for p in report.pairwise if {p.model_a, p.model_b} == {"ModelA", "ModelC"}
     )
     assert a_vs_c.significant
 

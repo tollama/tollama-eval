@@ -95,7 +95,6 @@ def reconcile_forecasts(
             'Install with: pip install "ts-autopilot[hierarchical]"'
         )
 
-
     method_name = hierarchy_spec.method
     logger.info("Reconciling forecasts with method: %s", method_name)
 

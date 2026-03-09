@@ -172,7 +172,7 @@ def _inject_static_charts(html_content: str) -> str:
     # Inject static images after their corresponding chart divs
     for chart_id, img_html in static_images.items():
         pattern = f'<div id="{chart_id}"></div>'
-        replacement = f'{pattern}\n{img_html}'
+        replacement = f"{pattern}\n{img_html}"
         html_content = html_content.replace(pattern, replacement)
 
     return html_content

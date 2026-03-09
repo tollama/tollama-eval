@@ -26,9 +26,7 @@ class ExecutiveSummary:
         if self.risks:
             parts.append("Key risks: " + " ".join(self.risks))
         if self.recommendations:
-            parts.append(
-                "Recommendations: " + " ".join(self.recommendations)
-            )
+            parts.append("Recommendations: " + " ".join(self.recommendations))
         return " ".join(parts)
 
 
@@ -202,9 +200,7 @@ def generate_executive_summary(result: BenchmarkResult) -> ExecutiveSummary:
         fastest = min(models, key=lambda m: m.runtime_sec)
         if fastest.name != winner.name and fastest.runtime_sec > 0:
             speedup = (
-                winner_model.runtime_sec / fastest.runtime_sec
-                if winner_model
-                else 0
+                winner_model.runtime_sec / fastest.runtime_sec if winner_model else 0
             )
             if speedup > 5:
                 recommendations.append(

@@ -947,7 +947,6 @@ def doctor() -> None:
     except ImportError:
         checks.append(("Hardware acceleration", True, "cpu (torch not installed)"))
 
-
     # Print results
     typer.secho("\nts-autopilot doctor", bold=True)
     typer.secho("=" * 50)

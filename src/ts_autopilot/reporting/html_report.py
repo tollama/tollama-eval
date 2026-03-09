@@ -356,8 +356,7 @@ def _build_significance_data(result: BenchmarkResult) -> dict:
                 series_totals.setdefault(sid, []).append(score)
         if series_totals:
             per_series_scores[model.name] = {
-                sid: sum(scores) / len(scores)
-                for sid, scores in series_totals.items()
+                sid: sum(scores) / len(scores) for sid, scores in series_totals.items()
             }
 
     if len(per_series_scores) < 2:
@@ -419,8 +418,14 @@ def _build_confidence_intervals(result: BenchmarkResult) -> dict[str, dict]:
         # t-distribution critical value for 95% CI
         # For small n, use approximate t values
         t_values = {
-            2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776,
-            6: 2.571, 7: 2.447, 8: 2.365, 9: 2.306,
+            2: 12.706,
+            3: 4.303,
+            4: 3.182,
+            5: 2.776,
+            6: 2.571,
+            7: 2.447,
+            8: 2.365,
+            9: 2.306,
             10: 2.262,
         }
         t_val = t_values.get(n, 1.96)  # fallback to z for large n

@@ -284,15 +284,9 @@ def _run_distributed(
                 folds=fold_results,
                 mean_mase=round(float(np.mean(mase_values)), 6),
                 std_mase=round(float(np.std(mase_values)), 6),
-                mean_smape=round(
-                    float(np.mean([f.smape for f in fold_results])), 4
-                ),
-                mean_rmsse=round(
-                    float(np.mean([f.rmsse for f in fold_results])), 6
-                ),
-                mean_mae=round(
-                    float(np.mean([f.mae for f in fold_results])), 6
-                ),
+                mean_smape=round(float(np.mean([f.smape for f in fold_results])), 4),
+                mean_rmsse=round(float(np.mean([f.rmsse for f in fold_results])), 6),
+                mean_mae=round(float(np.mean([f.mae for f in fold_results])), 6),
             )
         )
 

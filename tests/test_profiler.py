@@ -140,11 +140,13 @@ def test_data_characteristics_single_row():
 
 def test_data_characteristics_empty():
     """Handles empty DataFrame."""
-    df = pd.DataFrame({
-        "unique_id": pd.Series([], dtype=str),
-        "ds": pd.Series([], dtype="datetime64[ns]"),
-        "y": pd.Series([], dtype=float),
-    })
+    df = pd.DataFrame(
+        {
+            "unique_id": pd.Series([], dtype=str),
+            "ds": pd.Series([], dtype="datetime64[ns]"),
+            "y": pd.Series([], dtype=float),
+        }
+    )
     chars = compute_data_characteristics(df, season_length=7)
     assert chars.y_mean == 0.0
     assert chars.trend_strength == 0.0

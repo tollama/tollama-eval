@@ -24,9 +24,7 @@ def test_discover_plugins_with_mock() -> None:
         def name(self) -> str:
             return "FakePlugin"
 
-        def fit_predict(
-            self, train, horizon, freq, season_length, n_jobs=1, exog=None
-        ):
+        def fit_predict(self, train, horizon, freq, season_length, n_jobs=1, exog=None):
             return ForecastOutput(
                 unique_id=["s1"],
                 ds=["2020-01-01"],

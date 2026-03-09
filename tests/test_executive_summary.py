@@ -45,9 +45,7 @@ def _make_result(
             ModelResult(
                 name="SeasonalNaive",
                 runtime_sec=0.5,
-                folds=[
-                    FoldResult(fold=1, cutoff="2020-06-01", mase=1.0)
-                ],
+                folds=[FoldResult(fold=1, cutoff="2020-06-01", mase=1.0)],
                 mean_mase=1.0,
                 std_mase=0.01,
             )
@@ -55,9 +53,7 @@ def _make_result(
 
     leaderboard = sorted(models, key=lambda m: m.mean_mase)
     lb_entries = [
-        LeaderboardEntry(
-            rank=i + 1, name=m.name, mean_mase=m.mean_mase
-        )
+        LeaderboardEntry(rank=i + 1, name=m.name, mean_mase=m.mean_mase)
         for i, m in enumerate(leaderboard)
     ]
 
@@ -196,16 +192,12 @@ def test_summary_model_comparison_3_models():
         ModelResult(
             name="AutoARIMA",
             runtime_sec=3.0,
-            folds=[
-                FoldResult(fold=1, cutoff="2020-06-01", mase=0.9)
-            ],
+            folds=[FoldResult(fold=1, cutoff="2020-06-01", mase=0.9)],
             mean_mase=0.9,
             std_mase=0.03,
         )
     )
-    result.leaderboard.append(
-        LeaderboardEntry(rank=3, name="AutoARIMA", mean_mase=0.9)
-    )
+    result.leaderboard.append(LeaderboardEntry(rank=3, name="AutoARIMA", mean_mase=0.9))
     summary = generate_executive_summary(result)
     text = summary.to_flat_text().lower()
     assert "beat" in text or "naive" in text

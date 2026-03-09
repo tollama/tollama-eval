@@ -1,6 +1,5 @@
 """Tests for the auto-model recommendation engine."""
 
-
 from ts_autopilot.automl.selector import (
     AutoSelector,
     detect_intermittency,

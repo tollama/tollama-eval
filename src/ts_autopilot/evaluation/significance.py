@@ -118,9 +118,7 @@ def friedman_test(
     series_ids = sorted(all_series)
     n = len(series_ids)
     if n < 3:
-        logger.info(
-            "Need at least 3 common series for Friedman test, got %d", n
-        )
+        logger.info("Need at least 3 common series for Friedman test, got %d", n)
         return None
 
     # Build score matrix: (n_series, n_models)
@@ -146,9 +144,7 @@ def friedman_test(
     mean_rank_dict = {model_names[j]: float(mean_ranks[j]) for j in range(k)}
 
     # Friedman chi-squared statistic
-    chi2_f = (12 * n / (k * (k + 1))) * np.sum(
-        (mean_ranks - (k + 1) / 2) ** 2
-    )
+    chi2_f = (12 * n / (k * (k + 1))) * np.sum((mean_ranks - (k + 1) / 2) ** 2)
     p_value = _chi2_sf(float(chi2_f), k - 1)
 
     report = SignificanceReport(
@@ -180,9 +176,7 @@ def friedman_test(
                 )
         report.pairwise = pairwise
     elif p_value < alpha and k > 20:
-        logger.info(
-            "Nemenyi post-hoc not available for k=%d models (max 20)", k
-        )
+        logger.info("Nemenyi post-hoc not available for k=%d models (max 20)", k)
 
     return report
 
@@ -303,11 +297,7 @@ def render_critical_difference_svg(
     bottom_label_start_y = axis_y + tick_height + n_cliques * clique_spacing + 10
 
     if height is None:
-        height = int(
-            bottom_label_start_y
-            + len(bottom_models) * model_spacing
-            + 20
-        )
+        height = int(bottom_label_start_y + len(bottom_models) * model_spacing + 20)
 
     lines: list[str] = []
     lines.append(
@@ -341,7 +331,7 @@ def render_critical_difference_svg(
     lines.append(
         f'<text x="{cd_x + cd_px / 2}" y="{cd_y - 6}" '
         f'text-anchor="middle" fill="currentColor" font-size="10">'
-        f'CD = {cd:.2f}</text>'
+        f"CD = {cd:.2f}</text>"
     )
 
     # Axis line
@@ -372,13 +362,11 @@ def render_critical_difference_svg(
             f'<line x1="{x}" y1="{axis_y - 4}" x2="{x}" y2="{label_y + 4}" '
             f'stroke="currentColor" stroke-width="0.8" stroke-dasharray="2,2"/>'
         )
-        lines.append(
-            f'<circle cx="{x}" cy="{axis_y}" r="3" fill="currentColor"/>'
-        )
+        lines.append(f'<circle cx="{x}" cy="{axis_y}" r="3" fill="currentColor"/>')
         lines.append(
             f'<text x="{x + 4}" y="{label_y}" fill="currentColor" '
             f'font-size="11" font-weight="{600 if idx == 0 else 400}">'
-            f'{esc_name}</text>'
+            f"{esc_name}</text>"
         )
 
     # Model labels — bottom models
@@ -390,9 +378,7 @@ def render_critical_difference_svg(
             f'<line x1="{x}" y1="{axis_y + 4}" x2="{x}" y2="{label_y - 8}" '
             f'stroke="currentColor" stroke-width="0.8" stroke-dasharray="2,2"/>'
         )
-        lines.append(
-            f'<circle cx="{x}" cy="{axis_y}" r="3" fill="currentColor"/>'
-        )
+        lines.append(f'<circle cx="{x}" cy="{axis_y}" r="3" fill="currentColor"/>')
         lines.append(
             f'<text x="{x + 4}" y="{label_y}" fill="currentColor" '
             f'font-size="11">{esc_name}</text>'
@@ -400,8 +386,14 @@ def render_critical_difference_svg(
 
     # Clique bars (horizontal bars connecting non-significantly-different models)
     bar_colors = [
-        "#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed",
-        "#db2777", "#0891b2", "#65a30d",
+        "#2563eb",
+        "#dc2626",
+        "#059669",
+        "#d97706",
+        "#7c3aed",
+        "#db2777",
+        "#0891b2",
+        "#65a30d",
     ]
     for ci, clique_set in enumerate(final_cliques):
         clique_rank_values = sorted(mean_ranks[name] for name in clique_set)

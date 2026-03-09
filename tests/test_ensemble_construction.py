@@ -41,10 +41,14 @@ def forecast_data():
 
 def _zip_ens(ensemble):
     """Zip ensemble fields with strict=False."""
-    return list(zip(
-        ensemble.unique_id, ensemble.ds, ensemble.y_hat,
-        strict=False,
-    ))
+    return list(
+        zip(
+            ensemble.unique_id,
+            ensemble.ds,
+            ensemble.y_hat,
+            strict=False,
+        )
+    )
 
 
 class TestAverageEnsemble:
@@ -53,9 +57,13 @@ class TestAverageEnsemble:
         assert ensemble.method == "average"
         assert len(ensemble.y_hat) == 4
         # First point: avg(10, 14) = 12
-        pairs = list(zip(
-            ensemble.unique_id, ensemble.ds, strict=False,
-        ))
+        pairs = list(
+            zip(
+                ensemble.unique_id,
+                ensemble.ds,
+                strict=False,
+            )
+        )
         idx = pairs.index(("s1", "2020-01-01"))
         assert ensemble.y_hat[idx] == pytest.approx(12.0)
 
@@ -74,7 +82,9 @@ class TestWeightedEnsemble:
     def test_weighted_predictions(self, forecast_data):
         scores = {"ModelA": 0.5, "ModelB": 1.5}
         ensemble = build_weighted_ensemble(
-            forecast_data, scores, fold=1,
+            forecast_data,
+            scores,
+            fold=1,
         )
         assert ensemble.method == "weighted"
         assert ensemble.weights["ModelA"] > ensemble.weights["ModelB"]
@@ -107,7 +117,9 @@ class TestBestPerSeriesEnsemble:
             avg_ensemble_mase=0.65,
         )
         ensemble = build_best_per_series_ensemble(
-            forecast_data, recommendation, fold=1,
+            forecast_data,
+            recommendation,
+            fold=1,
         )
         assert ensemble.method == "best_per_series"
         assert len(ensemble.y_hat) == 4

@@ -1,6 +1,5 @@
 """Tests for speed benchmarking and Pareto analysis."""
 
-
 from ts_autopilot.contracts import (
     BenchmarkConfig,
     BenchmarkResult,
