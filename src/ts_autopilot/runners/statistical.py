@@ -145,7 +145,7 @@ class RandomWalkWithDriftRunner(StatsForecastRunner):
 
     @property
     def name(self) -> str:
-        return "RandomWalkWithDrift"
+        return "RWD"
 
     def _make_model(self, season_length: int) -> object:
         from statsforecast.models import RandomWalkWithDrift
@@ -171,7 +171,7 @@ class SeasonalWindowAverageRunner(StatsForecastRunner):
 
     @property
     def name(self) -> str:
-        return "SeasonalWindowAverage"
+        return "SeasWA"
 
     def _make_model(self, season_length: int) -> object:
         from statsforecast.models import SeasonalWindowAverage

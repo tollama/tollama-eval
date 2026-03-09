@@ -53,7 +53,7 @@ from ts_autopilot.runners.statistical import (
 logger = get_logger("pipeline")
 
 DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
-    *CORE_RUNNERS,
+    *ALL_STATISTICAL_RUNNERS,
     *get_optional_runners(),
 )
 
