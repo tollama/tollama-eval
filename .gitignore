@@ -3,6 +3,7 @@ out/
 .ts_autopilot_cache/
 out_e2e_all/
 out_e2e_stats/
+out_e2e_hf/
 
 # macOS
 .DS_Store
@@ -149,6 +150,7 @@ celerybeat.pid
 .venv
 env/
 venv/
+venv2/
 ENV/
 env.bak/
 venv.bak/
