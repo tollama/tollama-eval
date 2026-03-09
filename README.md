@@ -72,6 +72,18 @@ Add `--pdf` to also generate a PDF report.
 
 ---
 
+## Documentation
+
+Use these guides for common workflows:
+
+- [Troubleshooting](docs/troubleshooting.md)
+- [Output Interpretation](docs/output-interpretation.md)
+- [Recipe Cookbook](docs/recipes.md)
+- [Tollama Setup Guide](docs/tollama-setup.md)
+- [Feature Inventory](FEATURES.md)
+
+---
+
 ## Installation Extras
 
 The base install includes 20 built-in statistical models. Install optional extras for more:
