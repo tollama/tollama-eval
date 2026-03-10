@@ -363,7 +363,7 @@ class DeepARRunner(BaseRunner):
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator="cpu",
+            accelerator=acc,
             start_padding_enabled=True,
             enable_progress_bar=False,
         )
@@ -414,7 +414,7 @@ class PatchTSTRunner(BaseRunner):
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator="cpu",
+            accelerator=acc,
             start_padding_enabled=True,
             enable_progress_bar=False,
         )
@@ -465,7 +465,7 @@ class TFTRunner(BaseRunner):
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator="cpu",
+            accelerator=acc,
             start_padding_enabled=True,
             enable_progress_bar=False,
         )
