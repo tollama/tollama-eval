@@ -313,6 +313,7 @@ class TiDERunner(BaseRunner):
             h=horizon,
             max_steps=100,
             accelerator=acc,
+            start_padding_enabled=True,
             enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)
@@ -362,7 +363,8 @@ class DeepARRunner(BaseRunner):
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator=acc,
+            accelerator="cpu",
+            start_padding_enabled=True,
             enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)
@@ -412,7 +414,8 @@ class PatchTSTRunner(BaseRunner):
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator=acc,
+            accelerator="cpu",
+            start_padding_enabled=True,
             enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)
@@ -462,7 +465,8 @@ class TFTRunner(BaseRunner):
             input_size=2 * horizon,
             h=horizon,
             max_steps=100,
-            accelerator=acc,
+            accelerator="cpu",
+            start_padding_enabled=True,
             enable_progress_bar=False,
         )
         nf = NeuralForecast(models=[model], freq=freq)

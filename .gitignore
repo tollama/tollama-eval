@@ -4,6 +4,7 @@ out/
 out_e2e_all/
 out_e2e_stats/
 out_e2e_hf/
+e2e_out/
 
 # macOS
 .DS_Store
