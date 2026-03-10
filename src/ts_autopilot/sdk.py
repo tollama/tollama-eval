@@ -1,4 +1,4 @@
-"""Fluent Python SDK for ts-autopilot.
+"""Fluent Python SDK for tollama-eval.
 
 Usage::
 

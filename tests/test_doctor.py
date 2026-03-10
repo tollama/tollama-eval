@@ -12,7 +12,7 @@ runner = CliRunner()
 def test_doctor_runs_successfully():
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
-    assert "ts-autopilot doctor" in result.output
+    assert "tollama-eval doctor" in result.output
     assert "PASS" in result.output
     assert "Python version" in result.output
 

@@ -1,4 +1,4 @@
-"""YAML/JSON config file loading for ts-autopilot."""
+"""YAML/JSON config file loading for tollama-eval."""
 
 from __future__ import annotations
 

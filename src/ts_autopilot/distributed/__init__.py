@@ -1,1 +1,1 @@
-"""Distributed execution backends for ts-autopilot."""
+"""Distributed execution backends for tollama-eval."""

@@ -822,7 +822,7 @@ def run_from_csv(
         else:
             logger.info(
                 "PDF export requested but weasyprint not installed. "
-                'Install with: pip install "ts-autopilot[pdf]"'
+                'Install with: pip install "tollama-eval[pdf]"'
             )
 
     return result

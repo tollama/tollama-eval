@@ -2,7 +2,7 @@
 
 Distributes CV folds across Ray workers for parallel execution.
 
-Requires: ``pip install "ts-autopilot[distributed]"``
+Requires: ``pip install "tollama-eval[distributed]"``
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ def run_benchmark_distributed(
     if not HAS_RAY:
         logger.warning(
             "Ray not installed, falling back to local execution. "
-            'Install with: pip install "ts-autopilot[distributed]"'
+            'Install with: pip install "tollama-eval[distributed]"'
         )
         from ts_autopilot.pipeline import run_benchmark
 

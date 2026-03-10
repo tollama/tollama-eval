@@ -83,14 +83,14 @@ def test_cli_help_shows_reserved_flags(monkeypatch):
 def test_cli_version_flag():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "ts-autopilot" in result.output
+    assert "tollama-eval" in result.output
     assert "0.2.0" in result.output
 
 
 def test_cli_version_short_flag():
     result = runner.invoke(app, ["-V"])
     assert result.exit_code == 0
-    assert "ts-autopilot" in result.output
+    assert "tollama-eval" in result.output
 
 
 def test_cli_quiet_suppresses_output(tmp_path):

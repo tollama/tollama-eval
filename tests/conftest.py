@@ -1,4 +1,4 @@
-"""Shared test fixtures for ts-autopilot."""
+"""Shared test fixtures for tollama-eval."""
 
 import numpy as np
 import pandas as pd

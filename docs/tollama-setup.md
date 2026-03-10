@@ -1,6 +1,6 @@
 # Tollama Setup Guide
 
-This guide explains how to benchmark Tollama TSFM models with `ts-autopilot`.
+This guide explains how to benchmark Tollama TSFM models with `tollama-eval`.
 
 Tollama is a time series foundation model platform, not an LLM service.
 
@@ -13,14 +13,14 @@ Tollama is a time series foundation model platform, not an LLM service.
 Example:
 
 ```bash
-ts-autopilot run -i data.csv \
+tollama-eval run -i data.csv \
   --tollama-url https://your-tollama.example.com \
   --tollama-models chronos2,timesfm
 ```
 
 ## Request Path and Payload
 
-`ts-autopilot` calls:
+`tollama-eval` calls:
 
 - `POST /v1/forecast`
 
@@ -50,7 +50,7 @@ Use model IDs supported by your Tollama server deployment.
 
 ## Local and Private URL Note
 
-`ts-autopilot` blocks private/local URLs by default for SSRF safety.
+`tollama-eval` blocks private/local URLs by default for SSRF safety.
 
 If your Tollama server is local (for example `http://127.0.0.1:8000`), use a config file and set:
 
@@ -75,16 +75,16 @@ allow_private_urls: true
 Run:
 
 ```bash
-ts-autopilot run -c local_tollama.yaml
+tollama-eval run -c local_tollama.yaml
 ```
 
 ## Failure Behavior
 
-Tollama models are zero-shot. There is no model fitting step in `ts-autopilot`.
+Tollama models are zero-shot. There is no model fitting step in `tollama-eval`.
 
 If a per-series Tollama request fails:
 
-- `ts-autopilot` logs a warning
+- `tollama-eval` logs a warning
 - That series prediction falls back to NaN values
 - The overall benchmark run can continue
 

@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory guard for large datasets with configurable `memory_limit_mb`
 - Run ID / correlation ID for log tracing across pipeline execution
 - Structured event emission for external monitoring integration
-- `ts-autopilot doctor` command for environment diagnostics
+- `tollama-eval doctor` command for environment diagnostics
 - Dependency vulnerability scanning in CI (pip-audit)
 - SBOM generation in CI pipeline
 - Release automation via GitHub Actions (tag-triggered PyPI publish)
@@ -71,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SeasonalNaive and AutoETS model runners
 - Expanding-window cross-validation
 - MASE metric computation
-- CLI entry point (`ts-autopilot run`)
+- CLI entry point (`tollama-eval run`)
 - results.json output with frozen schema
 - Basic HTML report generation
 - CSV ingestion with long/wide format auto-detection

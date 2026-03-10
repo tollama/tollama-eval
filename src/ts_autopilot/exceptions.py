@@ -1,10 +1,10 @@
-"""Centralized exception hierarchy for ts-autopilot."""
+"""Centralized exception hierarchy for tollama-eval."""
 
 from __future__ import annotations
 
 
 class AutopilotError(Exception):
-    """Base exception for all ts-autopilot errors."""
+    """Base exception for all tollama-eval errors."""
 
 
 class SchemaError(AutopilotError, ValueError):

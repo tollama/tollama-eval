@@ -93,7 +93,7 @@ def _inject_static_charts(html_content: str) -> str:
     if not _kaleido_available():
         logger.info(
             "kaleido not available for static chart rendering. "
-            'Install with: pip install "ts-autopilot[pdf]"'
+            'Install with: pip install "tollama-eval[pdf]"'
         )
         return html_content
 
@@ -196,7 +196,7 @@ def generate_pdf(html_path: str | Path, output_path: str | Path) -> bool:
         from weasyprint import CSS, HTML
     except ImportError:
         logger.info(
-            'weasyprint not installed. Install with: pip install "ts-autopilot[pdf]"'
+            'weasyprint not installed. Install with: pip install "tollama-eval[pdf]"'
         )
         return False
 

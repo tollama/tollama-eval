@@ -3,7 +3,7 @@
 This module provides tracing spans for pipeline operations.
 If opentelemetry-api is not installed, all operations are no-ops.
 
-Install with: pip install "ts-autopilot[tracing]"
+Install with: pip install "tollama-eval[tracing]"
 """
 
 from __future__ import annotations

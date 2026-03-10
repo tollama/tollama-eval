@@ -1,4 +1,4 @@
-"""CLI entry point for ts-autopilot."""
+"""CLI entry point for tollama-eval."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import typer
 from ts_autopilot import __version__
 
 app = typer.Typer(
-    name="ts-autopilot",
+    name="tollama-eval",
     help="Automated time series benchmarking.",
     no_args_is_help=True,
 )
@@ -37,7 +37,7 @@ class ExitCode(IntEnum):
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"ts-autopilot {__version__}")
+        typer.echo(f"tollama-eval {__version__}")
         raise typer.Exit()
 
 
@@ -501,7 +501,7 @@ def run(
                         f"[bold]input[/bold]={input}  "
                         f"[bold]horizon[/bold]={horizon}  "
                         f"[bold]n_folds[/bold]={n_folds}",
-                        title="[bold blue]ts-autopilot benchmark[/bold blue]",
+                        title="[bold blue]tollama-eval benchmark[/bold blue]",
                         border_style="blue",
                     )
                 )
@@ -718,7 +718,7 @@ def run(
         except ImportError:
             typer.secho(
                 "openpyxl not installed. Install with: "
-                'pip install "ts-autopilot[excel]"',
+                'pip install "tollama-eval[excel]"',
                 fg=typer.colors.YELLOW,
                 err=True,
             )
@@ -948,7 +948,7 @@ def doctor() -> None:
         checks.append(("Hardware acceleration", True, "cpu (torch not installed)"))
 
     # Print results
-    typer.secho("\nts-autopilot doctor", bold=True)
+    typer.secho("\ntollama-eval doctor", bold=True)
     typer.secho("=" * 50)
     passed = 0
     failed = 0
@@ -996,7 +996,7 @@ def serve(
             err=True,
         )
         typer.echo(
-            'Install with: pip install "ts-autopilot[server]"',
+            'Install with: pip install "tollama-eval[server]"',
             err=True,
         )
         raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
@@ -1010,14 +1010,14 @@ def serve(
             err=True,
         )
         typer.echo(
-            'Install with: pip install "ts-autopilot[server]"',
+            'Install with: pip install "tollama-eval[server]"',
             err=True,
         )
         raise typer.Exit(code=ExitCode.UNEXPECTED_ERROR) from exc
 
     app_instance = create_app(results_dir=output_dir)
     typer.secho(
-        f"Starting ts-autopilot server on {host}:{port}",
+        f"Starting tollama-eval server on {host}:{port}",
         bold=True,
     )
     uvicorn.run(app_instance, host=host, port=port)

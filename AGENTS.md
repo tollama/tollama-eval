@@ -1,7 +1,7 @@
 # AGENTS.md — Instructions for AI Coding Agents
 
 ## Project
-ts-autopilot: automated time series benchmarking pipeline.
+tollama-eval: automated time series benchmarking pipeline.
 CSV in → model comparison → results.json + report.html out.
 
 ## Commands

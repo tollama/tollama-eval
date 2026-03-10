@@ -1,4 +1,4 @@
-"""Interactive Streamlit dashboard for ts-autopilot.
+"""Interactive Streamlit dashboard for tollama-eval.
 
 Launch with:
     streamlit run -m ts_autopilot.reporting.dashboard -- --input data.csv
@@ -28,7 +28,7 @@ def main() -> None:
     if not _check_streamlit():
         print(
             "Streamlit is required for the dashboard. "
-            'Install with: pip install "ts-autopilot[dashboard]"',
+            'Install with: pip install "tollama-eval[dashboard]"',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -36,12 +36,12 @@ def main() -> None:
     import streamlit as st
 
     st.set_page_config(
-        page_title="ts-autopilot Dashboard",
+        page_title="tollama-eval Dashboard",
         page_icon="📈",
         layout="wide",
     )
 
-    st.title("ts-autopilot Interactive Dashboard")
+    st.title("tollama-eval Interactive Dashboard")
     st.markdown("Upload a CSV to run benchmarks interactively.")
 
     # Sidebar configuration

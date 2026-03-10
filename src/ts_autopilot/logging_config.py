@@ -1,4 +1,4 @@
-"""Structured logging configuration for ts-autopilot."""
+"""Structured logging configuration for tollama-eval."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def setup_logging(
     quiet: bool = False,
     log_json: bool = False,
 ) -> None:
-    """Configure root logger for ts-autopilot.
+    """Configure root logger for tollama-eval.
 
     Args:
         verbose: Set DEBUG level and show detailed output.

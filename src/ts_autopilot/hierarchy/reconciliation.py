@@ -92,7 +92,7 @@ def reconcile_forecasts(
     if not is_available():
         raise ImportError(
             "hierarchicalforecast is required for hierarchical reconciliation. "
-            'Install with: pip install "ts-autopilot[hierarchical]"'
+            'Install with: pip install "tollama-eval[hierarchical]"'
         )
 
     method_name = hierarchy_spec.method

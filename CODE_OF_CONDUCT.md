@@ -33,7 +33,7 @@ this project.
 ## Enforcement
 
 Instances of unacceptable behavior may be reported by opening an issue at
-https://github.com/ychoi-atop/ts-autopilot/issues or by contacting the
+https://github.com/tollama/tollama-eval/issues or by contacting the
 project maintainers directly.
 
 All reports will be reviewed and investigated. The project team reserves the

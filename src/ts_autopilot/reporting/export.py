@@ -120,7 +120,7 @@ def export_excel(result: BenchmarkResult, output_path: str | Path) -> Path:
     Creates sheets: Executive Summary, Leaderboard, Fold Details,
     Per-Series Scores, Data Profile.
 
-    Requires openpyxl. Install with: pip install "ts-autopilot[excel]"
+    Requires openpyxl. Install with: pip install "tollama-eval[excel]"
 
     Args:
         result: Benchmark result.
@@ -135,7 +135,7 @@ def export_excel(result: BenchmarkResult, output_path: str | Path) -> Path:
         from openpyxl.utils import get_column_letter
     except ImportError:
         logger.info(
-            'openpyxl not installed. Install with: pip install "ts-autopilot[excel]"'
+            'openpyxl not installed. Install with: pip install "tollama-eval[excel]"'
         )
         raise
 

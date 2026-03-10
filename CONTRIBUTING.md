@@ -1,21 +1,21 @@
-# Contributing to ts-autopilot
+# Contributing to tollama-eval
 
-Thank you for considering contributing to ts-autopilot! This document provides
+Thank you for considering contributing to tollama-eval! This document provides
 guidelines and instructions for contributing.
 
 ## Development Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/ychoi-atop/ts-autopilot.git
-cd ts-autopilot
+git clone https://github.com/tollama/tollama-eval.git
+cd tollama-eval
 
 # Install in development mode with all dev dependencies
 pip install -e ".[dev]"
 
 # Verify installation
-ts-autopilot --version
-ts-autopilot doctor
+tollama-eval --version
+tollama-eval doctor
 ```
 
 ## Development Workflow
@@ -112,4 +112,4 @@ src/ts_autopilot/
 ## Reporting Issues
 
 Please report bugs and feature requests via
-[GitHub Issues](https://github.com/ychoi-atop/ts-autopilot/issues).
+[GitHub Issues](https://github.com/tollama/tollama-eval/issues).

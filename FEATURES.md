@@ -1,11 +1,11 @@
-# ts-autopilot Feature Inventory (v0.2.0)
+# tollama-eval Feature Inventory (v0.2.0)
 
 Automated time series benchmarking — drop in a CSV, get ranked model results
 with cross-validated metrics and a visual report.
 
 ## Current Features
 
-### 1. CLI Interface (`ts-autopilot run`)
+### 1. CLI Interface (`tollama-eval run`)
 - Input CSV (`-i`), output directory (`-o`), forecast horizon (`-H`), CV folds (`-k`)
 - Model selection (`-m`), parallel workers (`-j`)
 - YAML/JSON config file support (`-c`)
@@ -59,11 +59,11 @@ with cross-validated metrics and a visual report.
 - **TSB** — Teunter-Syntetos-Babai method
 
 #### Optional ML Models (extras)
-- **Prophet** — Facebook Prophet (`pip install "ts-autopilot[prophet]"`)
-- **LightGBM** — gradient boosting via mlforecast (`pip install "ts-autopilot[lightgbm]"`)
-- **XGBoost** — gradient boosting via mlforecast (`pip install "ts-autopilot[xgboost]"`)
+- **Prophet** — Facebook Prophet (`pip install "tollama-eval[prophet]"`)
+- **LightGBM** — gradient boosting via mlforecast (`pip install "tollama-eval[lightgbm]"`)
+- **XGBoost** — gradient boosting via mlforecast (`pip install "tollama-eval[xgboost]"`)
 
-#### Optional Neural Models (extras, `pip install "ts-autopilot[neural]"`)
+#### Optional Neural Models (extras, `pip install "tollama-eval[neural]"`)
 - **NHITS** — N-HiTS neural model
 - **NBEATS** — N-BEATS neural model
 - **TiDE** — Time-series Dense Encoder

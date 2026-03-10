@@ -1,7 +1,7 @@
 """Optional model runners requiring extra dependencies.
 
 These runners gracefully degrade if their dependencies are not installed.
-Install extras: pip install ts-autopilot[prophet], [lightgbm], or [neural]
+Install extras: pip install tollama-eval[prophet], [lightgbm], or [neural]
 """
 
 from __future__ import annotations

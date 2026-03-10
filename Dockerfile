@@ -14,11 +14,12 @@ FROM python:3.12-slim AS runtime
 WORKDIR /app
 
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin/tollama-eval /usr/local/bin/tollama-eval
 COPY --from=builder /usr/local/bin/ts-autopilot /usr/local/bin/ts-autopilot
 COPY --from=builder /app/src /app/src
 
 RUN useradd --create-home autopilot
 USER autopilot
 
-ENTRYPOINT ["ts-autopilot"]
+ENTRYPOINT ["tollama-eval"]
 CMD ["--help"]

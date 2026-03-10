@@ -1,4 +1,4 @@
-"""Core data contracts for ts-autopilot.
+"""Core data contracts for tollama-eval.
 
 All modules import shared types from here. Do not rename fields —
 the results.json schema is frozen.

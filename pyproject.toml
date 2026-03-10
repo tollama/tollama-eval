@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ts-autopilot"
+name = "tollama-eval"
 version = "0.2.0"
 description = "Automated time series benchmarking — drop in a CSV, get ranked model results"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "ts-autopilot contributors"},
+    {name = "tollama-eval contributors"},
 ]
 keywords = ["time-series", "forecasting", "benchmarking", "automl"]
 classifiers = [
@@ -38,12 +38,13 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ychoi-atop/ts-autopilot"
-Repository = "https://github.com/ychoi-atop/ts-autopilot"
-Issues = "https://github.com/ychoi-atop/ts-autopilot/issues"
-Changelog = "https://github.com/ychoi-atop/ts-autopilot/blob/main/CHANGELOG.md"
+Homepage = "https://www.tollama.com/"
+Repository = "https://github.com/tollama/tollama-eval"
+Issues = "https://github.com/tollama/tollama-eval/issues"
+Changelog = "https://github.com/tollama/tollama-eval/blob/main/CHANGELOG.md"
 
 [project.scripts]
+tollama-eval = "ts_autopilot.cli:app"
 ts-autopilot = "ts_autopilot.cli:app"
 
 [tool.hatch.build.targets.wheel]
@@ -142,18 +143,18 @@ distributed = [
     "ray[default]>=2.0",
 ]
 all = [
-    "ts-autopilot[prophet]",
-    "ts-autopilot[lightgbm]",
-    "ts-autopilot[xgboost]",
-    "ts-autopilot[neural]",
-    "ts-autopilot[hierarchical]",
-    "ts-autopilot[pdf]",
-    "ts-autopilot[excel]",
-    "ts-autopilot[significance]",
-    "ts-autopilot[dashboard]",
-    "ts-autopilot[tracing]",
-    "ts-autopilot[server]",
-    "ts-autopilot[distributed]",
+    "tollama-eval[prophet]",
+    "tollama-eval[lightgbm]",
+    "tollama-eval[xgboost]",
+    "tollama-eval[neural]",
+    "tollama-eval[hierarchical]",
+    "tollama-eval[pdf]",
+    "tollama-eval[excel]",
+    "tollama-eval[significance]",
+    "tollama-eval[dashboard]",
+    "tollama-eval[tracing]",
+    "tollama-eval[server]",
+    "tollama-eval[distributed]",
 ]
 
 [dependency-groups]

@@ -1,34 +1,37 @@
 <p align="center">
-  <h1 align="center">ts-autopilot</h1>
+  <h1 align="center">tollama-eval</h1>
   <p align="center">
     <strong>Stop guessing which forecasting model to use. Let the data decide.</strong>
   </p>
   <p align="center">
-    <a href="https://pypi.org/project/ts-autopilot/"><img src="https://img.shields.io/pypi/v/ts-autopilot.svg" alt="PyPI version"></a>
+    Part of the <a href="https://www.tollama.com/">Tollama</a> time series platform.
+  </p>
+  <p align="center">
+    <a href="https://pypi.org/project/tollama-eval/"><img src="https://img.shields.io/pypi/v/tollama-eval.svg" alt="PyPI version"></a>
     <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
-    <a href="https://github.com/ychoi-atop/ts-autopilot/actions"><img src="https://img.shields.io/github/actions/workflow/status/ychoi-atop/ts-autopilot/ci.yml?label=CI" alt="CI"></a>
+    <a href="https://github.com/tollama/tollama-eval/actions"><img src="https://img.shields.io/github/actions/workflow/status/tollama/tollama-eval/ci.yml?label=CI" alt="CI"></a>
   </p>
 </p>
 
 ---
 
-**ts-autopilot** is a zero-config time series benchmarking tool. Drop in a CSV, get a ranked leaderboard of 36+ forecasting models — complete with cross-validated metrics and a visual report. No boilerplate. No notebook spaghetti. One command.
+**tollama-eval** is a zero-config time series benchmarking tool. Drop in a CSV, get a ranked leaderboard of 36+ forecasting models — complete with cross-validated metrics and a visual report. No boilerplate. No notebook spaghetti. One command.
 
 ```bash
-pip install ts-autopilot
-ts-autopilot run -i sales.csv
+pip install tollama-eval
+tollama-eval run -i sales.csv
 ```
 
 That's it. Open `out/report.html` and see which model wins.
 
 ---
 
-## Why ts-autopilot?
+## Why tollama-eval?
 
-Forecasting teams waste weeks on the same loop: load data, wrangle formats, fit models one at a time, compute metrics manually, copy results into slides. **ts-autopilot collapses that entire workflow into a single command.**
+Forecasting teams waste weeks on the same loop: load data, wrangle formats, fit models one at a time, compute metrics manually, copy results into slides. **tollama-eval collapses that entire workflow into a single command.**
 
-| The old way | With ts-autopilot |
+| The old way | With tollama-eval |
 |---|---|
 | Write custom ingestion for every dataset | Auto-detects long & wide CSV formats |
 | Manually split train/test, hope it's fair | Expanding-window cross-validation, configurable folds |
@@ -51,13 +54,13 @@ Forecasting teams waste weeks on the same loop: load data, wrangle formats, fit 
 ### 1. Install
 
 ```bash
-pip install ts-autopilot
+pip install tollama-eval
 ```
 
 ### 2. Run
 
 ```bash
-ts-autopilot run -i your_data.csv
+tollama-eval run -i your_data.csv
 ```
 
 ### 3. Read the results
@@ -89,23 +92,23 @@ Use these guides for common workflows:
 The base install includes 20 built-in statistical models. Install optional extras for more:
 
 ```bash
-pip install "ts-autopilot[all]"          # Everything
-pip install "ts-autopilot[prophet]"      # Facebook Prophet
-pip install "ts-autopilot[lightgbm]"     # LightGBM via mlforecast
-pip install "ts-autopilot[xgboost]"      # XGBoost via mlforecast
-pip install "ts-autopilot[neural]"       # NHITS, NBEATS, TiDE, DeepAR, PatchTST, TFT
-pip install "ts-autopilot[pdf]"          # PDF report export
-pip install "ts-autopilot[server]"       # REST API server (FastAPI)
-pip install "ts-autopilot[distributed]"  # Ray distributed execution
-pip install "ts-autopilot[dashboard]"    # Streamlit interactive dashboard
-pip install "ts-autopilot[hierarchical]" # Hierarchical forecast reconciliation
+pip install "tollama-eval[all]"          # Everything
+pip install "tollama-eval[prophet]"      # Facebook Prophet
+pip install "tollama-eval[lightgbm]"     # LightGBM via mlforecast
+pip install "tollama-eval[xgboost]"      # XGBoost via mlforecast
+pip install "tollama-eval[neural]"       # NHITS, NBEATS, TiDE, DeepAR, PatchTST, TFT
+pip install "tollama-eval[pdf]"          # PDF report export
+pip install "tollama-eval[server]"       # REST API server (FastAPI)
+pip install "tollama-eval[distributed]"  # Ray distributed execution
+pip install "tollama-eval[dashboard]"    # Streamlit interactive dashboard
+pip install "tollama-eval[hierarchical]" # Hierarchical forecast reconciliation
 ```
 
 ---
 
 ## Input Formats
 
-ts-autopilot auto-detects your CSV format. No configuration needed.
+tollama-eval auto-detects your CSV format. No configuration needed.
 
 **Long format** (recommended):
 
@@ -128,7 +131,7 @@ Timezone-aware timestamps are handled automatically (stripped to naive UTC). Ext
 
 ## Models
 
-ts-autopilot ships with 36+ models spanning from classical baselines to foundation models.
+tollama-eval ships with 36+ models spanning from classical baselines to foundation models.
 
 ### Core Statistical (5 models) — Built-in
 
@@ -175,11 +178,11 @@ ts-autopilot ships with 36+ models spanning from classical baselines to foundati
 
 | Model | Install |
 |---|---|
-| Prophet | `pip install "ts-autopilot[prophet]"` |
-| LightGBM | `pip install "ts-autopilot[lightgbm]"` |
-| XGBoost | `pip install "ts-autopilot[xgboost]"` |
+| Prophet | `pip install "tollama-eval[prophet]"` |
+| LightGBM | `pip install "tollama-eval[lightgbm]"` |
+| XGBoost | `pip install "tollama-eval[xgboost]"` |
 
-### Neural Models (6 models) — `pip install "ts-autopilot[neural]"`
+### Neural Models (6 models) — `pip install "tollama-eval[neural]"`
 
 | Model | Description |
 |---|---|
@@ -197,7 +200,7 @@ Zero-shot forecasting through time series foundation models via the Tollama TSFM
 Chronos-2, TimesFM, Moirai, Granite-TTM, Lag-Llama, PatchTST, TIDE
 
 ```bash
-ts-autopilot run -i data.csv --tollama-url http://localhost:8000 --tollama-models chronos2,timesfm
+tollama-eval run -i data.csv --tollama-url http://localhost:8000 --tollama-models chronos2,timesfm
 ```
 
 ---
@@ -205,10 +208,10 @@ ts-autopilot run -i data.csv --tollama-url http://localhost:8000 --tollama-model
 Run specific models with `-m`:
 
 ```bash
-ts-autopilot run -i data.csv -m SeasonalNaive,AutoETS,Prophet
+tollama-eval run -i data.csv -m SeasonalNaive,AutoETS,Prophet
 ```
 
-Want everything? `pip install "ts-autopilot[all]"`
+Want everything? `pip install "tollama-eval[all]"`
 
 ---
 
@@ -230,7 +233,7 @@ All metrics are computed per series, per fold, then aggregated — giving you ho
 Combine metrics with custom weights for composite scoring:
 
 ```bash
-ts-autopilot run -i data.csv --metric-weights 'mase=0.5,smape=0.3,speed=0.2'
+tollama-eval run -i data.csv --metric-weights 'mase=0.5,smape=0.3,speed=0.2'
 ```
 
 ---
@@ -239,7 +242,7 @@ ts-autopilot run -i data.csv --metric-weights 'mase=0.5,smape=0.3,speed=0.2'
 
 ### AutoML
 
-Use `--auto-select` to let ts-autopilot analyze your data profile (series length, frequency, intermittency) and automatically recommend the best subset of models. Intermittent demand patterns are detected using Syntetos-Boylan Classification.
+Use `--auto-select` to let tollama-eval analyze your data profile (series length, frequency, intermittency) and automatically recommend the best subset of models. Intermittent demand patterns are detected using Syntetos-Boylan Classification.
 
 ### Anomaly Detection
 
@@ -247,7 +250,7 @@ Use `--detect-anomalies` to run 4 detection methods on your input data: Z-score,
 
 ### Ensemble Construction
 
-After benchmarking, ts-autopilot can construct ensembles using 3 strategies: simple average, inverse-MASE weighted average, and best-per-series selection. Per-series model recommendations show which model wins for each series.
+After benchmarking, tollama-eval can construct ensembles using 3 strategies: simple average, inverse-MASE weighted average, and best-per-series selection. Per-series model recommendations show which model wins for each series.
 
 ### Stability Analysis
 
@@ -263,10 +266,10 @@ See [FEATURES.md](FEATURES.md) for full details on all features.
 
 ## CLI Reference
 
-### `ts-autopilot run`
+### `tollama-eval run`
 
 ```
-ts-autopilot run [OPTIONS]
+tollama-eval run [OPTIONS]
 
 Core:
   -i, --input PATH         Input CSV file (required)
@@ -298,31 +301,31 @@ Integration:
   --no-tollama             Disable tollama integration
 ```
 
-### `ts-autopilot campaign`
+### `tollama-eval campaign`
 
 Benchmark across multiple CSV files in a directory. Outputs a `campaign_summary.csv` with per-dataset results.
 
 ```bash
-ts-autopilot campaign -d data_dir/ -o results/ -H 14 -k 3
+tollama-eval campaign -d data_dir/ -o results/ -H 14 -k 3
 ```
 
-### `ts-autopilot doctor`
+### `tollama-eval doctor`
 
 Run diagnostic checks on your environment — verifies Python version, core/optional dependencies, and output directory writability.
 
 ```bash
-ts-autopilot doctor
+tollama-eval doctor
 ```
 
-### `ts-autopilot serve`
+### `tollama-eval serve`
 
 Start a REST API server for remote benchmarking.
 
 ```bash
-ts-autopilot serve --port 8000 --host 0.0.0.0 --output-dir out/server
+tollama-eval serve --port 8000 --host 0.0.0.0 --output-dir out/server
 ```
 
-Requires `pip install "ts-autopilot[server]"`. Endpoints: `POST /benchmark`, `GET /status/{run_id}`, `GET /results/{run_id}`, `GET /health`.
+Requires `pip install "tollama-eval[server]"`. Endpoints: `POST /benchmark`, `GET /status/{run_id}`, `GET /results/{run_id}`, `GET /health`.
 
 Or run as a Python module:
 
@@ -354,7 +357,7 @@ report_title: "Q1 Forecast Benchmark"
 ```
 
 ```bash
-ts-autopilot run -c benchmark.yaml
+tollama-eval run -c benchmark.yaml
 ```
 
 CLI flags override config file values when both are provided.
@@ -365,7 +368,7 @@ CLI flags override config file values when both are provided.
 
 ### Fluent SDK
 
-The recommended way to use ts-autopilot as a library:
+The recommended way to use tollama-eval as a library:
 
 ```python
 from ts_autopilot.sdk import TSAutopilot
@@ -415,7 +418,7 @@ loaded = BenchmarkResult.from_json(json_str)
 
 ### Custom Runners
 
-Extend ts-autopilot with your own models:
+Extend tollama-eval with your own models:
 
 ```python
 from ts_autopilot.runners.base import BaseRunner
@@ -458,7 +461,7 @@ print(f"MAE:   {mae(y_true, y_pred):.4f}")
 Start a server and submit benchmarks programmatically:
 
 ```bash
-ts-autopilot serve --port 8000
+tollama-eval serve --port 8000
 ```
 
 ```python
@@ -588,7 +591,7 @@ ruff check src/ tests/
 ruff format src/ tests/
 
 # Check environment
-ts-autopilot doctor
+tollama-eval doctor
 ```
 
 Powered by the [Nixtla](https://github.com/nixtla) ecosystem — statsforecast, mlforecast, and neuralforecast.

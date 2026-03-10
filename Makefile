@@ -34,7 +34,7 @@ audit:  ## Run dependency vulnerability scan
 	pip-audit --strict -r requirements-lock.txt
 
 docker:  ## Build Docker image
-	docker build -t ts-autopilot:latest .
+	docker build -t tollama-eval:latest .
 
 lock:  ## Regenerate dependency lock file
 	uv pip compile pyproject.toml -o requirements-lock.txt

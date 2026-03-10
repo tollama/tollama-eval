@@ -9,7 +9,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in ts-autopilot, please report it
+If you discover a security vulnerability in tollama-eval, please report it
 responsibly:
 
 1. **Do NOT** open a public GitHub issue for security vulnerabilities.
@@ -20,7 +20,7 @@ responsibly:
 
 ## Security Measures
 
-ts-autopilot implements the following security measures:
+tollama-eval implements the following security measures:
 
 - **Input validation**: File paths are resolved and validated against symlink
   and path traversal attacks.

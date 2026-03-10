@@ -1,1 +1,1 @@
-"""REST API server for ts-autopilot."""
+"""REST API server for tollama-eval."""

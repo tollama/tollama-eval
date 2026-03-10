@@ -1,8 +1,8 @@
-"""FastAPI REST server for ts-autopilot benchmarking.
+"""FastAPI REST server for tollama-eval benchmarking.
 
-Start with: ``ts-autopilot serve --port 8000``
+Start with: ``tollama-eval serve --port 8000``
 
-Requires: ``pip install "ts-autopilot[server]"``
+Requires: ``pip install "tollama-eval[server]"``
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def create_app(results_dir: Path | None = None) -> Any:
     if not HAS_FASTAPI:
         raise ImportError(
             "FastAPI is required for the REST server. "
-            'Install with: pip install "ts-autopilot[server]"'
+            'Install with: pip install "tollama-eval[server]"'
         )
 
     global _RESULTS_DIR
@@ -55,7 +55,7 @@ def create_app(results_dir: Path | None = None) -> Any:
         _RESULTS_DIR = results_dir
 
     app = FastAPI(
-        title="ts-autopilot API",
+        title="tollama-eval API",
         description="Automated time series benchmarking as a service",
         version="0.2.0",
     )

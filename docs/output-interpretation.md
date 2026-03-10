@@ -1,6 +1,6 @@
 # Output Interpretation
 
-After a run, `ts-autopilot` writes files to your output directory (default: `out/`).
+After a run, `tollama-eval` writes files to your output directory (default: `out/`).
 
 ## Output Files
 
@@ -84,7 +84,7 @@ If you see NaNs in forecasts or aggregate metrics:
 Investigate with:
 
 ```bash
-ts-autopilot run -i your_data.csv -v --no-cache
+tollama-eval run -i your_data.csv -v --no-cache
 ```
 
 ## Choosing a Winner
