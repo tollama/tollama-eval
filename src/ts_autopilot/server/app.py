@@ -7,11 +7,15 @@ Requires: ``pip install "tollama-eval[server]"``
 
 from __future__ import annotations
 
+import json
 import threading
 import uuid
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+from ts_autopilot.contracts import BenchmarkResult
+from ts_autopilot.reporting.explainability import build_model_selection_explanation
 
 try:
     from fastapi import FastAPI, HTTPException, UploadFile
@@ -132,9 +136,27 @@ def create_app(results_dir: Path | None = None) -> Any:
         if not results_path.exists():
             raise HTTPException(status_code=404, detail="Results file not found")
 
-        import json
-
         return JSONResponse(content=json.loads(results_path.read_text()))
+
+    @app.get("/results/{run_id}/explanation")
+    async def get_results_explanation(run_id: str) -> JSONResponse:
+        if run_id not in _JOBS:
+            raise HTTPException(status_code=404, detail="Run not found")
+        job = _JOBS[run_id]
+        if job["status"] != JobStatus.COMPLETED:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Job is {job['status']}, not completed yet",
+            )
+
+        results_path = _RESULTS_DIR / run_id / "results.json"
+        if not results_path.exists():
+            raise HTTPException(status_code=404, detail="Results file not found")
+
+        payload = json.loads(results_path.read_text())
+        benchmark = BenchmarkResult.from_dict(payload)
+        explanation = build_model_selection_explanation(benchmark)
+        return JSONResponse(content=explanation.to_dict())
 
     return app
 
