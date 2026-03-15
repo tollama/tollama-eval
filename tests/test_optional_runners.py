@@ -1,5 +1,4 @@
 """Tests for optional model runners — import fallback and runner properties."""
-
 from unittest.mock import patch
 
 from ts_autopilot.runners.optional import (
@@ -64,3 +63,35 @@ def test_runner_classes_are_base_runner_subclasses():
     assert issubclass(LightGBMRunner, BaseRunner)
     assert issubclass(NHITSRunner, BaseRunner)
     assert issubclass(NBEATSRunner, BaseRunner)
+
+
+def test_get_optional_runners_skips_unhealthy_neural_stack(monkeypatch):
+    monkeypatch.setattr(
+        "ts_autopilot.runners.optional._module_available",
+        lambda name: name == "neuralforecast",
+    )
+    monkeypatch.setattr(
+        "ts_autopilot.runners.optional._module_imports_safely",
+        lambda name, timeout_sec=10.0: False,
+    )
+
+    runners = get_optional_runners(include_neural=True, safe_mode=True)
+
+    assert runners == []
+
+
+def test_get_optional_runners_includes_neural_when_probe_passes(monkeypatch):
+    monkeypatch.setattr(
+        "ts_autopilot.runners.optional._module_available",
+        lambda name: name == "neuralforecast",
+    )
+    monkeypatch.setattr(
+        "ts_autopilot.runners.optional._module_imports_safely",
+        lambda name, timeout_sec=10.0: True,
+    )
+
+    runners = get_optional_runners(include_neural=True, safe_mode=True)
+    names = [runner.name for runner in runners]
+
+    assert "NHITS" in names
+    assert "NBEATS" in names

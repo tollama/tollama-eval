@@ -6,6 +6,9 @@ Install extras: pip install tollama-eval[prophet], [lightgbm], or [neural]
 
 from __future__ import annotations
 
+import importlib.util
+import subprocess
+import sys
 import time
 
 import pandas as pd
@@ -15,6 +18,40 @@ from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
 
 logger = get_logger("runners.optional")
+
+
+def _module_available(module_name: str) -> bool:
+    """Check whether a module can be resolved without importing it."""
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _module_imports_safely(module_name: str, timeout_sec: float = 10.0) -> bool:
+    """Probe a module import in a subprocess to avoid crashing the main process."""
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-c", f"import {module_name}"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.debug("Optional dependency probe failed for %s: %s", module_name, exc)
+        return False
+
+    if completed.returncode != 0:
+        stderr = completed.stderr.strip().splitlines()
+        reason = stderr[-1] if stderr else f"exit code {completed.returncode}"
+        logger.info(
+            "Skipping optional dependency %s because health check failed: %s",
+            module_name,
+            reason,
+        )
+        return False
+    return True
 
 
 class ProphetRunner(BaseRunner):
@@ -484,39 +521,42 @@ class TFTRunner(BaseRunner):
         )
 
 
-def get_optional_runners() -> list[BaseRunner]:
-    """Return list of available optional runners (only if deps are installed)."""
+def get_optional_runners(
+    *,
+    include_neural: bool = True,
+    safe_mode: bool = True,
+) -> list[BaseRunner]:
+    """Return list of available optional runners.
+
+    Availability checks avoid importing heavy optional stacks in-process.
+    Neural runners can additionally be health-checked in a subprocess to
+    prevent unstable installs from crashing the main process.
+    """
     runners: list[BaseRunner] = []
 
-    try:
-        import prophet  # noqa: F401
-
+    if _module_available("prophet"):
         runners.append(ProphetRunner())
         logger.debug("Prophet runner available")
-    except ImportError:
+    else:
         logger.debug("Prophet not installed, skipping")
 
-    try:
-        import lightgbm  # noqa: F401
-        import mlforecast
-
+    if _module_available("lightgbm") and _module_available("mlforecast"):
         runners.append(LightGBMRunner())
         logger.debug("LightGBM runner available")
-    except ImportError:
+    else:
         logger.debug("LightGBM/mlforecast not installed, skipping")
 
-    try:
-        import mlforecast  # noqa: F401
-        import xgboost  # noqa: F401
-
+    if _module_available("xgboost") and _module_available("mlforecast"):
         runners.append(XGBoostRunner())
         logger.debug("XGBoost runner available")
-    except ImportError:
+    else:
         logger.debug("XGBoost/mlforecast not installed, skipping")
 
-    try:
-        import neuralforecast  # noqa: F401
+    neural_available = include_neural and _module_available("neuralforecast")
+    if neural_available and safe_mode:
+        neural_available = _module_imports_safely("neuralforecast")
 
+    if neural_available:
         runners.append(NHITSRunner())
         runners.append(NBEATSRunner())
         runners.append(TiDERunner())
@@ -527,7 +567,7 @@ def get_optional_runners() -> list[BaseRunner]:
             "NeuralForecast runners available"
             " (NHITS, NBEATS, TiDE, DeepAR, PatchTST, TFT)"
         )
-    except ImportError:
+    elif include_neural:
         logger.debug("neuralforecast not installed, skipping")
 
     return runners

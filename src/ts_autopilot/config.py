@@ -37,6 +37,8 @@ class FileConfig(BaseModel):
     parallel_models: bool = False
     cache_dir: str | None = None
     no_cache: bool = False
+    include_optional_models: bool = False
+    include_neural_models: bool = False
 
     @field_validator("models", "tollama_models", mode="before")
     @classmethod

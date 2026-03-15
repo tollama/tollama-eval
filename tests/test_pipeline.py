@@ -187,6 +187,30 @@ def test_default_runners_is_immutable():
     assert isinstance(DEFAULT_RUNNERS, tuple)
 
 
+def test_resolve_default_runners_opt_in_optional(monkeypatch):
+    from ts_autopilot.pipeline import resolve_default_runners
+    from ts_autopilot.runners.base import BaseRunner
+
+    class DummyRunner(BaseRunner):
+        @property
+        def name(self) -> str:
+            return "DummyOptional"
+
+        def fit_predict(self, train, horizon, freq, season_length, n_jobs=1, exog=None):
+            raise NotImplementedError
+
+    monkeypatch.setattr(
+        "ts_autopilot.pipeline.get_optional_runners",
+        lambda include_neural=False, safe_mode=True: [DummyRunner()],
+    )
+
+    core = resolve_default_runners()
+    extended = resolve_default_runners(include_optional=True)
+
+    assert all(r.name != "DummyOptional" for r in core)
+    assert any(r.name == "DummyOptional" for r in extended)
+
+
 def test_pipeline_import_is_safe_when_optional_discovery_breaks(monkeypatch):
     """Reloading pipeline should not execute optional runner discovery."""
     import ts_autopilot.pipeline as pipeline_mod

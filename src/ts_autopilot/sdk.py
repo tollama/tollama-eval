@@ -42,6 +42,8 @@ class TSAutopilot:
         self._auto_select: bool = False
         self._metric_weights: dict[str, float] | None = None
         self._parallel_models: bool = False
+        self._include_optional_models: bool = False
+        self._include_neural_models: bool = False
 
     def with_models(self, models: list[str]) -> TSAutopilot:
         """Specify which models to benchmark."""
@@ -78,13 +80,23 @@ class TSAutopilot:
         self._parallel_models = True
         return self
 
+    def with_optional_models(
+        self,
+        *,
+        include_neural: bool = False,
+    ) -> TSAutopilot:
+        """Opt in to safe discovery of optional models."""
+        self._include_optional_models = True
+        self._include_neural_models = include_neural
+        return self
+
     def run(self) -> BenchmarkResult:
         """Execute the benchmark and return results.
 
         Returns:
             BenchmarkResult with models, leaderboard, forecasts, etc.
         """
-        from ts_autopilot.pipeline import EXTENDED_DEFAULT_RUNNERS, run_benchmark
+        from ts_autopilot.pipeline import resolve_default_runners, run_benchmark
 
         df = self._df.copy()
 
@@ -101,9 +113,26 @@ class TSAutopilot:
             from ts_autopilot.ingestion.profiler import profile_dataframe
 
             profile = profile_dataframe(df)
-            selector = AutoSelector(profile=profile)
+            selector = AutoSelector(
+                profile=profile,
+                include_neural=self._include_neural_models,
+            )
             model_names = selector.recommended_model_names()
-            runners = list(EXTENDED_DEFAULT_RUNNERS)
+            runners = list(
+                resolve_default_runners(
+                    include_optional=(
+                        self._include_optional_models or self._include_neural_models
+                    ),
+                    include_neural=self._include_neural_models,
+                )
+            )
+        elif self._include_optional_models or self._include_neural_models:
+            runners = list(
+                resolve_default_runners(
+                    include_optional=True,
+                    include_neural=self._include_neural_models,
+                )
+            )
 
         return run_benchmark(
             df=df,

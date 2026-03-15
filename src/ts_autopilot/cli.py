@@ -161,6 +161,8 @@ def _merge_config(
     cli_no_cache: bool,
     cli_cache_dir: Path | None,
     cli_parallel_models: bool,
+    cli_include_optional_models: bool,
+    cli_include_neural_models: bool,
     default_timeout: float,
 ) -> dict[str, Any]:
     """Merge file config with CLI args. CLI non-default values win."""
@@ -260,6 +262,12 @@ def _merge_config(
 
     # Parallel models: CLI wins if set
     merged["parallel_models"] = cli_parallel_models or file_cfg.parallel_models
+    merged["include_optional_models"] = (
+        cli_include_optional_models or file_cfg.include_optional_models
+    )
+    merged["include_neural_models"] = (
+        cli_include_neural_models or file_cfg.include_neural_models
+    )
 
     return merged
 
@@ -331,6 +339,16 @@ def run(
         False,
         "--excel",
         help="Generate Excel workbook (requires openpyxl).",
+    ),
+    include_optional: bool = typer.Option(
+        False,
+        "--include-optional",
+        help="Opt in to safe discovery of optional non-core models.",
+    ),
+    include_neural: bool = typer.Option(
+        False,
+        "--include-neural",
+        help="Opt in to safe discovery of neural optional models.",
     ),
     log_json: bool = typer.Option(
         False,
@@ -418,6 +436,8 @@ def run(
             cli_no_cache=no_cache,
             cli_cache_dir=cache_dir,
             cli_parallel_models=parallel_models,
+            cli_include_optional_models=include_optional,
+            cli_include_neural_models=include_neural,
             default_timeout=DEFAULT_MODEL_TIMEOUT_SEC,
         )
         input = merged_cfg["input"]
@@ -438,6 +458,8 @@ def run(
         no_cache = merged_cfg["no_cache"]
         cache_dir = merged_cfg["cache_dir"]
         parallel_models = merged_cfg["parallel_models"]
+        include_optional = merged_cfg["include_optional_models"]
+        include_neural = merged_cfg["include_neural_models"]
     else:
         report_title = None
         report_lang = None
@@ -521,18 +543,24 @@ def run(
         from ts_autopilot.automl.selector import AutoSelector
         from ts_autopilot.ingestion.loader import load_csv as _load_csv
         from ts_autopilot.ingestion.profiler import profile_dataframe
-        from ts_autopilot.pipeline import DEFAULT_RUNNERS
+        from ts_autopilot.pipeline import resolve_default_runners
 
         _df_tmp = _load_csv(input, max_memory_mb=memory_limit_mb)
         _profile_tmp = profile_dataframe(_df_tmp)
         selector = AutoSelector(
             profile=_profile_tmp,
             include_extended=True,
-            include_neural=False,
+            include_neural=include_neural,
         )
         recommended = selector.recommended_model_names()
         # Filter to models available in the default runner set
-        available = {r.name for r in DEFAULT_RUNNERS}
+        available = {
+            r.name
+            for r in resolve_default_runners(
+                include_optional=include_optional or include_neural,
+                include_neural=include_neural,
+            )
+        }
         model_names = [m for m in recommended if m in available]
         if not quiet:
             typer.echo(selector.summary())
@@ -557,24 +585,91 @@ def run(
                     run_benchmark_distributed,
                 )
                 from ts_autopilot.ingestion.loader import load_csv as _load_csv3
+                from ts_autopilot.pipeline import resolve_default_runners
 
                 if not ray_available():
                     typer.secho(
                         "Warning: Ray not installed, falling back to local.",
                         fg=typer.colors.YELLOW,
                     )
+                else:
+                    try:
+                        _dist_df = _load_csv3(input, max_memory_mb=memory_limit_mb)
+                        result = run_benchmark_distributed(
+                            df=_dist_df,
+                            horizon=horizon,
+                            n_folds=n_folds,
+                            runners=list(
+                                resolve_default_runners(
+                                    include_optional=(
+                                        include_optional or include_neural
+                                    ),
+                                    include_neural=include_neural,
+                                )
+                            ),
+                            model_names=model_names,
+                            n_jobs=n_jobs,
+                        )
+                        from ts_autopilot.pipeline import write_output_artifacts
 
-                _dist_df = _load_csv3(input, max_memory_mb=memory_limit_mb)
-                result = run_benchmark_distributed(
-                    df=_dist_df,
-                    horizon=horizon,
-                    n_folds=n_folds,
-                    model_names=model_names,
-                    n_jobs=n_jobs,
-                )
-                from ts_autopilot.pipeline import write_output_artifacts
-
-                write_output_artifacts(result, output)
+                        write_output_artifacts(result, output)
+                    except Exception as exc:
+                        typer.secho(
+                            (
+                                "Warning: Distributed execution failed, "
+                                f"falling back to local. ({exc})"
+                            ),
+                            fg=typer.colors.YELLOW,
+                        )
+                        result = run_from_csv(
+                            csv_path=input,
+                            horizon=horizon,
+                            n_folds=n_folds,
+                            output_dir=output,
+                            model_names=model_names,
+                            progress_callback=progress_cb,
+                            tollama_url=effective_tollama_url,
+                            tollama_models=effective_tollama_models,
+                            n_jobs=n_jobs,
+                            generate_pdf=pdf,
+                            max_retries=max_retries,
+                            retry_backoff=retry_backoff,
+                            report_title=report_title,
+                            report_lang=report_lang,
+                            model_timeout_sec=model_timeout_sec,
+                            memory_limit_mb=memory_limit_mb,
+                            allow_private_urls=allow_private_urls,
+                            no_cache=no_cache,
+                            cache_dir=cache_dir,
+                            parallel_models=parallel_models,
+                            include_optional_models=include_optional or include_neural,
+                            include_neural_models=include_neural,
+                        )
+                if not ray_available():
+                    result = run_from_csv(
+                        csv_path=input,
+                        horizon=horizon,
+                        n_folds=n_folds,
+                        output_dir=output,
+                        model_names=model_names,
+                        progress_callback=progress_cb,
+                        tollama_url=effective_tollama_url,
+                        tollama_models=effective_tollama_models,
+                        n_jobs=n_jobs,
+                        generate_pdf=pdf,
+                        max_retries=max_retries,
+                        retry_backoff=retry_backoff,
+                        report_title=report_title,
+                        report_lang=report_lang,
+                        model_timeout_sec=model_timeout_sec,
+                        memory_limit_mb=memory_limit_mb,
+                        allow_private_urls=allow_private_urls,
+                        no_cache=no_cache,
+                        cache_dir=cache_dir,
+                        parallel_models=parallel_models,
+                        include_optional_models=include_optional or include_neural,
+                        include_neural_models=include_neural,
+                    )
             else:
                 result = run_from_csv(
                     csv_path=input,
@@ -597,6 +692,8 @@ def run(
                     no_cache=no_cache,
                     cache_dir=cache_dir,
                     parallel_models=parallel_models,
+                    include_optional_models=include_optional or include_neural,
+                    include_neural_models=include_neural,
                 )
         finally:
             if progress is not None:

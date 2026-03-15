@@ -44,6 +44,7 @@ from ts_autopilot.evaluation.metrics import (
 from ts_autopilot.exceptions import ModelFitError, ModelTimeoutError
 from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
+from ts_autopilot.runners.optional import get_optional_runners
 from ts_autopilot.runners.statistical import ALL_STATISTICAL_RUNNERS
 
 logger = get_logger("pipeline")
@@ -666,6 +667,23 @@ def _atomic_write(path: Path, content: str) -> None:
         raise
 
 
+def resolve_default_runners(
+    *,
+    include_optional: bool = False,
+    include_neural: bool = False,
+) -> tuple[BaseRunner, ...]:
+    """Resolve the runner set for a benchmark invocation."""
+    runners: list[BaseRunner] = list(ALL_STATISTICAL_RUNNERS)
+    if include_optional:
+        runners.extend(
+            get_optional_runners(
+                include_neural=include_neural,
+                safe_mode=True,
+            )
+        )
+    return tuple(runners)
+
+
 def write_output_artifacts(
     result: BenchmarkResult,
     output_dir: str | Path,
@@ -763,6 +781,8 @@ def run_from_csv(
     no_cache: bool = False,
     cache_dir: Path | None = None,
     parallel_models: bool = False,
+    include_optional_models: bool = False,
+    include_neural_models: bool = False,
 ) -> BenchmarkResult:
     """Full end-to-end pipeline: CSV → results.json + report.html.
 
@@ -789,7 +809,15 @@ def run_from_csv(
     )
 
     # Build extra tollama runners if configured
-    extra_runners: list[BaseRunner] | None = None
+    resolved_runners: list[BaseRunner] | None = None
+    if include_optional_models or include_neural_models:
+        resolved_runners = list(
+            resolve_default_runners(
+                include_optional=True,
+                include_neural=include_neural_models,
+            )
+        )
+
     if tollama_url and tollama_models:
         from ts_autopilot.tollama.client import validate_tollama_url
 
@@ -799,9 +827,9 @@ def run_from_csv(
 
         tollama_runners = get_tollama_runners(tollama_url, tollama_models)
         if tollama_runners:
-            base: list[BaseRunner] = list(DEFAULT_RUNNERS)
+            base: list[BaseRunner] = resolved_runners or list(DEFAULT_RUNNERS)
             base.extend(tollama_runners)
-            extra_runners = base
+            resolved_runners = base
             logger.info(
                 "[run_id=%s] Added %d tollama model(s): %s",
                 run_id,
@@ -830,7 +858,7 @@ def run_from_csv(
         df,
         horizon=horizon,
         n_folds=n_folds,
-        runners=extra_runners,
+        runners=resolved_runners,
         model_names=model_names,
         progress_callback=progress_callback,
         n_jobs=n_jobs,

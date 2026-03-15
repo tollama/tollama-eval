@@ -43,6 +43,14 @@ def test_sdk_chaining(sample_df: pd.DataFrame) -> None:
     assert result is ts
 
 
+def test_sdk_with_optional_models_chains(sample_df: pd.DataFrame) -> None:
+    from ts_autopilot.sdk import TSAutopilot
+
+    ts = TSAutopilot(sample_df)
+    result = ts.with_optional_models(include_neural=True)
+    assert result is ts
+
+
 def test_sdk_save(sample_df: pd.DataFrame, tmp_path: object) -> None:
     """save() should write the standard benchmark artifacts."""
     from pathlib import Path
