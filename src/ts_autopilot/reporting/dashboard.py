@@ -410,6 +410,42 @@ def _render_artifact_manifest(st: Any, manifest: dict[str, Any]) -> None:
     st.dataframe(manifest["rows"], use_container_width=True, hide_index=True)
 
 
+def _dashboard_snapshot_filename(result: Any) -> str:
+    """Build a stable filename for a filtered dashboard snapshot."""
+    leader = result.leaderboard[0].name if result.leaderboard else "snapshot"
+    safe_leader = "".join(
+        ch.lower() if ch.isalnum() else "-" for ch in leader
+    ).strip("-")
+    if not safe_leader:
+        safe_leader = "snapshot"
+    return f"dashboard-snapshot-{safe_leader}.html"
+
+
+def _build_dashboard_snapshot_html(result: Any) -> str:
+    """Build a static HTML snapshot for the current filtered dashboard view."""
+    from ts_autopilot.reporting.html_report import render_report
+
+    return render_report(
+        result,
+        report_title="Filtered Benchmark Snapshot",
+    )
+
+
+def _render_snapshot_export(st: Any, result: Any) -> None:
+    """Render a download for the current filtered dashboard snapshot."""
+    st.subheader("Snapshot Export")
+    st.caption(
+        "Download the current filtered dashboard view as a static HTML report "
+        "for sharing outside Streamlit."
+    )
+    st.download_button(
+        "Download filtered HTML snapshot",
+        data=_build_dashboard_snapshot_html(result),
+        file_name=_dashboard_snapshot_filename(result),
+        mime="text/html",
+    )
+
+
 def _ordered_dashboard_model_names(result: Any) -> list[str]:
     """Return model names in leaderboard order with unranked models appended."""
     ordered = [entry.name for entry in result.leaderboard]
@@ -546,6 +582,7 @@ def _render_result_dashboard(
 
     summary = generate_executive_summary(filtered_result)
     st.info(summary)
+    _render_snapshot_export(st, filtered_result)
 
     st.subheader("Dataset Profile")
     col1, col2, col3, col4 = st.columns(4)

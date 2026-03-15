@@ -14,6 +14,8 @@ from ts_autopilot.contracts import (
 from ts_autopilot.reporting.dashboard import (
     _artifact_manifest_summary,
     _artifact_source_label,
+    _build_dashboard_snapshot_html,
+    _dashboard_snapshot_filename,
     _filter_forecast_chart_data,
     _filter_per_series_chart_data,
     _filter_result_for_dashboard,
@@ -25,6 +27,7 @@ from ts_autopilot.reporting.dashboard import (
     _render_forecast_panels,
     _render_optional_model_environment,
     _render_per_series_panel,
+    _render_snapshot_export,
 )
 from ts_autopilot.runners.optional import OptionalRunnerStatus
 
@@ -82,6 +85,7 @@ class _FakeStreamlit:
         self.plotly_calls: int = 0
         self.warnings: list[str] = []
         self.info_messages: list[object] = []
+        self.downloads: list[dict[str, object]] = []
 
     def subheader(self, text: str) -> None:
         self.subheaders.append(text)
@@ -123,6 +127,23 @@ class _FakeStreamlit:
 
     def divider(self) -> None:
         return None
+
+    def download_button(
+        self,
+        label: str,
+        *,
+        data: object,
+        file_name: str,
+        mime: str,
+    ) -> None:
+        self.downloads.append(
+            {
+                "label": label,
+                "data": data,
+                "file_name": file_name,
+                "mime": mime,
+            }
+        )
 
 
 class _FakeUpload:
@@ -400,6 +421,60 @@ def test_artifact_source_label_uses_uploaded_name() -> None:
     assert label == "results.json"
 
 
+def test_dashboard_snapshot_filename_uses_leader_name() -> None:
+    result = _make_result()
+
+    filename = _dashboard_snapshot_filename(result)
+
+    assert filename == "dashboard-snapshot-seasonalnaive.html"
+
+
+def test_build_dashboard_snapshot_html_respects_filtered_models() -> None:
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=120,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[
+            ModelResult(
+                name="AutoETS",
+                runtime_sec=0.5,
+                folds=[],
+                mean_mase=0.875,
+                std_mase=0.025,
+            ),
+            ModelResult(
+                name="SeasonalNaive",
+                runtime_sec=0.1,
+                folds=[],
+                mean_mase=1.0,
+                std_mase=0.0,
+            ),
+        ],
+        leaderboard=[
+            LeaderboardEntry(rank=1, name="AutoETS", mean_mase=0.875),
+            LeaderboardEntry(rank=2, name="SeasonalNaive", mean_mase=1.0),
+        ],
+    )
+    filtered = _filter_result_for_dashboard(
+        result,
+        selected_model_names=["SeasonalNaive"],
+        max_rank=2,
+    )
+
+    html = _build_dashboard_snapshot_html(filtered)
+
+    assert "Filtered Benchmark Snapshot" in html
+    assert "SeasonalNaive" in html
+    assert "AutoETS" not in html
+
+
 def test_artifact_manifest_summary_marks_missing_details() -> None:
     result = _make_result()
 
@@ -478,6 +553,16 @@ def test_render_artifact_manifest_uses_streamlit_block() -> None:
     assert fake_st.columns_created[0].metrics == [("Artifacts Loaded", 1)]
     assert fake_st.columns_created[1].metrics == [("Artifacts Missing", 1)]
     assert fake_st.dataframes
+
+
+def test_render_snapshot_export_adds_download_button() -> None:
+    fake_st = _FakeStreamlit()
+
+    _render_snapshot_export(fake_st, _make_result())
+
+    assert fake_st.subheaders == ["Snapshot Export"]
+    assert fake_st.downloads[0]["file_name"] == "dashboard-snapshot-seasonalnaive.html"
+    assert fake_st.downloads[0]["mime"] == "text/html"
 
 
 def test_render_forecast_panels_outputs_chart_blocks() -> None:
