@@ -42,6 +42,7 @@ from ts_autopilot.reporting.dashboard import (
     _render_forecast_panels,
     _render_optional_model_environment,
     _render_per_series_panel,
+    _render_saved_artifact_sidebar,
     _render_shareable_link,
     _render_snapshot_export,
     _resolve_saved_result_sources,
@@ -95,6 +96,7 @@ class _FakeExpander:
 
 class _FakeStreamlit:
     def __init__(self) -> None:
+        self.headers: list[str] = []
         self.subheaders: list[str] = []
         self.markdowns: list[dict[str, object]] = []
         self.captions: list[str] = []
@@ -108,6 +110,9 @@ class _FakeStreamlit:
         self.downloads: list[dict[str, object]] = []
         self.query_params: dict[str, str] = {}
         self.text_inputs: list[dict[str, object]] = []
+
+    def header(self, text: str) -> None:
+        self.headers.append(text)
 
     def subheader(self, text: str) -> None:
         self.subheaders.append(text)
@@ -503,6 +508,19 @@ def test_saved_artifact_sidebar_rows_marks_missing_details_on_disk(tmp_path) -> 
     assert rows[0]["Status"] == "Loaded"
     assert rows[1]["Status"] == "Missing on Disk"
     assert rows[1]["Source"] == str(details_path)
+
+
+def test_render_saved_artifact_sidebar_uses_badges_and_sources(tmp_path) -> None:
+    fake_st = _FakeStreamlit()
+    results_path = tmp_path / "results.json"
+    results_path.write_text("{}", encoding="utf-8")
+
+    _render_saved_artifact_sidebar(fake_st, results_path, tmp_path / "details.json")
+
+    assert fake_st.headers == ["Loaded Artifacts"]
+    assert "results.json: Loaded" in fake_st.markdowns[0]["text"]
+    assert "details.json: Missing on Disk" in fake_st.markdowns[1]["text"]
+    assert fake_st.captions[-1] == str(tmp_path / "details.json")
 
 
 def test_resolve_saved_result_sources_stops_when_results_path_is_missing() -> None:

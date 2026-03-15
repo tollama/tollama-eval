@@ -81,13 +81,11 @@ def main() -> None:
             },
         )
         with st.sidebar:
-            st.header("Loaded Artifacts")
-            for row in _saved_artifact_sidebar_rows(
+            _render_saved_artifact_sidebar(
+                st,
                 resolved_results_path,
                 resolved_details_path,
-            ):
-                st.caption(f"{row['Artifact']}: {row['Status']}")
-                st.caption(row["Source"])
+            )
         _open_saved_results(resolved_results_path, resolved_details_path)
         return
 
@@ -456,6 +454,24 @@ def _saved_artifact_sidebar_rows(
         )
 
     return rows
+
+
+def _render_saved_artifact_sidebar(
+    st: Any,
+    results_source: Path,
+    details_source: Path | None,
+) -> None:
+    """Render saved artifact status rows in the sidebar."""
+    st.header("Loaded Artifacts")
+    for row in _saved_artifact_sidebar_rows(results_source, details_source):
+        if hasattr(st, "markdown"):
+            st.markdown(
+                _artifact_health_badge(row["Artifact"], row["Status"]),
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption(f"{row['Artifact']}: {row['Status']}")
+        st.caption(row["Source"])
 
 
 def _artifact_manifest_summary(
