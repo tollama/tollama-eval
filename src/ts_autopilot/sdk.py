@@ -96,7 +96,11 @@ class TSAutopilot:
         Returns:
             BenchmarkResult with models, leaderboard, forecasts, etc.
         """
-        from ts_autopilot.pipeline import resolve_default_runners, run_benchmark
+        from ts_autopilot.pipeline import (
+            attach_optional_runner_report_context,
+            resolve_default_runners,
+            run_benchmark,
+        )
 
         df = self._df.copy()
 
@@ -134,7 +138,7 @@ class TSAutopilot:
                 )
             )
 
-        return run_benchmark(
+        result = run_benchmark(
             df=df,
             horizon=self._horizon,
             n_folds=self._n_folds,
@@ -142,6 +146,11 @@ class TSAutopilot:
             model_names=model_names,
             n_jobs=self._n_jobs,
             parallel_models=self._parallel_models,
+        )
+        return attach_optional_runner_report_context(
+            result,
+            include_optional=self._include_optional_models,
+            include_neural=self._include_neural_models,
         )
 
     def save(self, output_dir: str | Path) -> Path:

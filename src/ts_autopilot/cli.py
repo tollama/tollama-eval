@@ -648,8 +648,16 @@ def run(
                             model_names=model_names,
                             n_jobs=n_jobs,
                         )
-                        from ts_autopilot.pipeline import write_output_artifacts
+                        from ts_autopilot.pipeline import (
+                            attach_optional_runner_report_context,
+                            write_output_artifacts,
+                        )
 
+                        attach_optional_runner_report_context(
+                            result,
+                            include_optional=include_optional or include_neural,
+                            include_neural=include_neural,
+                        )
                         write_output_artifacts(result, output)
                     except Exception as exc:
                         typer.secho(

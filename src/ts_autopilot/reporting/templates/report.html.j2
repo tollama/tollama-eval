@@ -764,6 +764,7 @@
             <a href="#data-profile" data-section="data-profile">Data Profile</a>
             {% if chart_data.data_overview and chart_data.data_overview.series %}<a href="#data-overview" data-section="data-overview">Data Overview</a>{% endif %}
             {% if warnings %}<a href="#data-quality" data-section="data-quality">Data Quality</a>{% endif %}
+            {% if optional_model_environment and optional_model_environment.rows %}<a href="#optional-model-environment" data-section="optional-model-environment">Optional Models</a>{% endif %}
             <a href="#leaderboard" data-section="leaderboard">Leaderboard</a>
             {% if significance %}<a href="#significance" data-section="significance">Significance</a>{% endif %}
             <a href="#model-comparison" data-section="model-comparison">Comparison</a>
@@ -1048,6 +1049,58 @@
                     <li>{{ w }}</li>
                 {% endfor %}
                 </ul>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if optional_model_environment and optional_model_environment.rows %}
+        <section id="optional-model-environment" class="card" aria-labelledby="optional-model-heading">
+            <h2 id="optional-model-heading">Optional Model Environment</h2>
+            <p style="color: var(--gray-500); font-size: 0.85rem;">
+                This summary records which optional dependency stacks were available when the report was generated.
+            </p>
+            <div class="stats-grid" role="list" aria-label="Optional model environment summary">
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value">{{ optional_model_environment.enabled_models }}</div>
+                    <div class="stat-label">Optional Models Enabled</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value">{{ optional_model_environment.enabled_groups }}</div>
+                    <div class="stat-label">Enabled Groups</div>
+                </div>
+                <div class="stat-card" role="listitem">
+                    <div class="stat-value">{{ optional_model_environment.skipped_groups }}</div>
+                    <div class="stat-label">Skipped Groups</div>
+                </div>
+            </div>
+            {% if optional_model_environment.insights %}
+            <ul class="key-findings">
+                {% for insight in optional_model_environment.insights %}
+                <li>{{ insight }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            <div class="table-wrapper">
+            <table aria-label="Optional model discovery status">
+                <thead>
+                <tr>
+                    <th scope="col">Group</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Models</th>
+                    <th scope="col">Detail</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in optional_model_environment.rows %}
+                <tr>
+                    <td>{{ row.label }}</td>
+                    <td class="{{ row.state_class }}">{{ row.state }}</td>
+                    <td>{{ row.models }}</td>
+                    <td>{{ row.detail }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
             </div>
         </section>
         {% endif %}

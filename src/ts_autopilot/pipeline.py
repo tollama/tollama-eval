@@ -44,7 +44,10 @@ from ts_autopilot.evaluation.metrics import (
 from ts_autopilot.exceptions import ModelFitError, ModelTimeoutError
 from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
-from ts_autopilot.runners.optional import get_optional_runners
+from ts_autopilot.runners.optional import (
+    get_optional_runners,
+    inspect_optional_runner_status,
+)
 from ts_autopilot.runners.statistical import ALL_STATISTICAL_RUNNERS
 
 logger = get_logger("pipeline")
@@ -684,6 +687,21 @@ def resolve_default_runners(
     return tuple(runners)
 
 
+def attach_optional_runner_report_context(
+    result: BenchmarkResult,
+    *,
+    include_optional: bool,
+    include_neural: bool,
+) -> BenchmarkResult:
+    """Attach optional runner discovery details for report rendering only."""
+    if include_optional or include_neural:
+        result._optional_runner_statuses = inspect_optional_runner_status(
+            include_neural=include_neural,
+            safe_mode=True,
+        )
+    return result
+
+
 def write_output_artifacts(
     result: BenchmarkResult,
     output_dir: str | Path,
@@ -877,6 +895,11 @@ def run_from_csv(
     metadata.total_runtime_sec = round(total_runtime, 4)
     metadata.run_id = run_id
     result.metadata = metadata
+    attach_optional_runner_report_context(
+        result,
+        include_optional=include_optional_models,
+        include_neural=include_neural_models,
+    )
 
     # Check if we were interrupted
     if _shutdown_event.is_set():

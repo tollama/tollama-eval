@@ -77,6 +77,7 @@ def render_report(
 
     # Report traceability
     run_id = getattr(result.metadata, "run_id", None) if result.metadata else None
+    optional_model_environment = _build_optional_model_environment_data(result)
 
     return str(
         template.render(
@@ -105,8 +106,74 @@ def render_report(
             runtime_data=runtime_data,
             run_id=run_id,
             data_chars=result.data_characteristics,
+            optional_model_environment=optional_model_environment,
         )
     )
+
+
+def _build_optional_model_environment_data(result: BenchmarkResult) -> dict:
+    """Build report context for optional model discovery status."""
+    raw_statuses = getattr(result, "_optional_runner_statuses", None)
+    if not raw_statuses:
+        return {}
+
+    rows = []
+    enabled_groups = 0
+    enabled_models = 0
+    skipped_groups: list[str] = []
+
+    for status in raw_statuses:
+        model_names = ", ".join(status.runner_names)
+        if status.available:
+            enabled_groups += 1
+            enabled_models += len(status.runner_names)
+            detail = "Dependency stack available"
+            state = "Enabled"
+            state_class = "metric-good"
+        else:
+            skipped_groups.append(status.label)
+            detail = status.reason
+            state = "Skipped"
+            state_class = "metric-bad"
+
+        rows.append(
+            {
+                "label": status.label,
+                "state": state,
+                "state_class": state_class,
+                "models": model_names,
+                "detail": detail,
+            }
+        )
+
+    insights = [
+        (
+            f"{enabled_models} optional model(s) across {enabled_groups} "
+            "dependency group(s) were available in this environment."
+        )
+    ]
+    if skipped_groups:
+        insights.append(
+            "Skipped groups were not benchmarked in this run: "
+            + ", ".join(skipped_groups)
+            + "."
+        )
+    if any(
+        row["label"] == "NeuralForecast" and row["detail"] == "failed health check"
+        for row in rows
+    ):
+        insights.append(
+            "NeuralForecast was present but excluded because its subprocess "
+            "import health check failed."
+        )
+
+    return {
+        "enabled_groups": enabled_groups,
+        "enabled_models": enabled_models,
+        "skipped_groups": len(skipped_groups),
+        "rows": rows,
+        "insights": insights,
+    }
 
 
 def _build_chart_data(result: BenchmarkResult) -> dict:

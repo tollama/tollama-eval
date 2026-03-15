@@ -12,6 +12,7 @@ from ts_autopilot.contracts import (
     ModelResult,
 )
 from ts_autopilot.reporting.html_report import render_report
+from ts_autopilot.runners.optional import OptionalRunnerStatus
 
 
 def _make_enriched_result():
@@ -201,6 +202,35 @@ def test_report_has_professional_header():
     html = render_report(result)
     assert "report-header" in html
     assert "Benchmark Report" in html
+
+
+def test_report_has_optional_model_environment_section():
+    result = _make_enriched_result()
+    result._optional_runner_statuses = [
+        OptionalRunnerStatus(
+            label="Prophet",
+            available=True,
+            reason="available",
+            runner_names=["Prophet"],
+        ),
+        OptionalRunnerStatus(
+            label="NeuralForecast",
+            available=False,
+            reason="failed health check",
+            runner_names=["NHITS", "NBEATS", "TiDE", "DeepAR", "PatchTST", "TFT"],
+        ),
+    ]
+    html = render_report(result)
+    assert "Optional Model Environment" in html
+    assert "#optional-model-environment" in html
+    assert "Dependency stack available" in html
+    assert "failed health check" in html
+
+
+def test_report_omits_optional_model_environment_without_context():
+    result = _make_enriched_result()
+    html = render_report(result)
+    assert "Optional Model Environment" not in html
 
 
 def test_report_no_diagnostics_without_data():
