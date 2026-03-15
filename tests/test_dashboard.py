@@ -3,6 +3,7 @@
 import io
 import json
 import zipfile
+from pathlib import Path
 
 from ts_autopilot.contracts import (
     BenchmarkConfig,
@@ -33,6 +34,7 @@ from ts_autopilot.reporting.dashboard import (
     _load_result_artifacts,
     _optional_model_environment_summary,
     _parse_dashboard_args,
+    _parse_dashboard_query_artifact_paths,
     _render_artifact_manifest,
     _render_diagnostics_panel,
     _render_display_filters,
@@ -41,6 +43,7 @@ from ts_autopilot.reporting.dashboard import (
     _render_per_series_panel,
     _render_shareable_link,
     _render_snapshot_export,
+    _resolve_saved_result_sources,
 )
 from ts_autopilot.runners.optional import OptionalRunnerStatus
 
@@ -97,6 +100,7 @@ class _FakeStreamlit:
         self.expanders: list[str] = []
         self.plotly_calls: int = 0
         self.warnings: list[str] = []
+        self.errors: list[str] = []
         self.info_messages: list[object] = []
         self.downloads: list[dict[str, object]] = []
         self.query_params: dict[str, str] = {}
@@ -136,6 +140,9 @@ class _FakeStreamlit:
 
     def warning(self, text: str) -> None:
         self.warnings.append(text)
+
+    def error(self, text: str) -> None:
+        self.errors.append(text)
 
     def info(self, text: object) -> None:
         self.info_messages.append(text)
@@ -451,6 +458,49 @@ def test_parse_dashboard_args_prefers_explicit_results_path(tmp_path) -> None:
     assert parsed_details is None
 
 
+def test_parse_dashboard_query_artifact_paths_reads_local_paths() -> None:
+    fake_st = _FakeStreamlit()
+    fake_st.query_params = {
+        "results": "/tmp/out/results.json",
+        "details": "/tmp/out/details.json",
+    }
+
+    parsed_results, parsed_details = _parse_dashboard_query_artifact_paths(fake_st)
+
+    assert parsed_results == Path("/tmp/out/results.json")
+    assert parsed_details == Path("/tmp/out/details.json")
+
+
+def test_resolve_saved_result_sources_stops_when_results_path_is_missing() -> None:
+    fake_st = _FakeStreamlit()
+
+    resolved = _resolve_saved_result_sources(
+        fake_st,
+        Path("/tmp/out/missing-results.json"),
+        Path("/tmp/out/missing-details.json"),
+    )
+
+    assert resolved is None
+    assert "Saved results artifact was not found" in fake_st.errors[0]
+    assert "local artifact path that no longer exists" in fake_st.info_messages[0]
+
+
+def test_resolve_saved_result_sources_drops_missing_details_path(tmp_path) -> None:
+    fake_st = _FakeStreamlit()
+    results_path = tmp_path / "results.json"
+    results_path.write_text("{}", encoding="utf-8")
+
+    resolved = _resolve_saved_result_sources(
+        fake_st,
+        results_path,
+        tmp_path / "missing-details.json",
+    )
+
+    assert resolved == (results_path, None)
+    assert "Optional details artifact was not found" in fake_st.warnings[0]
+    assert "Continuing with `results.json` only" in fake_st.info_messages[0]
+
+
 def test_artifact_source_label_uses_uploaded_name() -> None:
     label = _artifact_source_label(_FakeUpload({}, name="results.json"))
 
@@ -580,6 +630,8 @@ def test_render_display_filters_restores_query_param_state() -> None:
 def test_build_dashboard_shareable_link_encodes_current_filters() -> None:
     fake_st = _FakeStreamlit()
     fake_st.query_params = {
+        "results": "/tmp/out/results.json",
+        "details": "/tmp/out/details.json",
         "display_rank": "2",
         "display_models": '["AutoETS"]',
         "forecast_models": '["AutoETS"]',
@@ -589,7 +641,8 @@ def test_build_dashboard_shareable_link_encodes_current_filters() -> None:
     link = _build_dashboard_shareable_link(fake_st)
 
     assert link is not None
-    assert link.startswith("?display_rank=2")
+    assert link.startswith("?results=%2Ftmp%2Fout%2Fresults.json")
+    assert "details=%2Ftmp%2Fout%2Fdetails.json" in link
     assert "display_models=%5B%22AutoETS%22%5D" in link
     assert "forecast_series=%5B%22s1%22%5D" in link
 

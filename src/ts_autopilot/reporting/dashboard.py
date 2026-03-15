@@ -22,6 +22,8 @@ from typing import Any
 from urllib.parse import urlencode
 
 _DASHBOARD_QUERY_PARAM_KEYS = (
+    "results",
+    "details",
     "display_rank",
     "display_models",
     "forecast_models",
@@ -61,14 +63,29 @@ def main() -> None:
     st.title("tollama-eval Interactive Dashboard")
     st.markdown("Run a benchmark from CSV or inspect saved benchmark artifacts.")
     cli_results_path, cli_details_path = _parse_dashboard_args(sys.argv[1:])
+    query_results_path, query_details_path = _parse_dashboard_query_artifact_paths(st)
 
-    if cli_results_path is not None:
+    resolved_results_path = cli_results_path or query_results_path
+    resolved_details_path = cli_details_path or query_details_path
+
+    if resolved_results_path is not None:
+        _update_dashboard_query_params(
+            st,
+            {
+                "results": str(resolved_results_path),
+                "details": (
+                    str(resolved_details_path)
+                    if resolved_details_path is not None
+                    else None
+                ),
+            },
+        )
         with st.sidebar:
             st.header("Loaded Artifacts")
-            st.caption(str(cli_results_path))
-            if cli_details_path is not None:
-                st.caption(str(cli_details_path))
-        _open_saved_results(cli_results_path, cli_details_path)
+            st.caption(str(resolved_results_path))
+            if resolved_details_path is not None:
+                st.caption(str(resolved_details_path))
+        _open_saved_results(resolved_results_path, resolved_details_path)
         return
 
     # Sidebar configuration
@@ -236,9 +253,49 @@ def _parse_dashboard_args(argv: list[str]) -> tuple[Path | None, Path | None]:
     return results_path, details_path
 
 
+def _parse_dashboard_query_artifact_paths(st: Any) -> tuple[Path | None, Path | None]:
+    """Parse optional artifact path query params from the dashboard URL."""
+    params = _read_dashboard_query_params(st)
+    results_path = Path(params["results"]) if params.get("results") else None
+    details_path = Path(params["details"]) if params.get("details") else None
+    return results_path, details_path
+
+
+def _resolve_saved_result_sources(
+    st: Any,
+    results_file: Any,
+    details_file: Any | None = None,
+) -> tuple[Any, Any | None] | None:
+    """Validate saved artifact sources and return usable inputs for loading."""
+    if isinstance(results_file, Path) and not results_file.exists():
+        st.error(f"Saved results artifact was not found: {results_file}")
+        st.info(
+            "This dashboard link points to a local artifact path that no longer "
+            "exists. Update the link, pass `--artifact-dir` / `--results`, or "
+            "open the artifacts manually from the sidebar."
+        )
+        return None
+
+    if isinstance(details_file, Path) and not details_file.exists():
+        st.warning(f"Optional details artifact was not found: {details_file}")
+        st.info(
+            "Continuing with `results.json` only. Forecasts, diagnostics, and "
+            "environment provenance will be unavailable until `details.json` is "
+            "provided again."
+        )
+        return results_file, None
+
+    return results_file, details_file
+
+
 def _open_saved_results(results_file: Any, details_file: Any | None = None) -> None:
     """Open and render saved benchmark artifacts in the dashboard."""
     import streamlit as st
+
+    resolved_sources = _resolve_saved_result_sources(st, results_file, details_file)
+    if resolved_sources is None:
+        return
+    results_file, details_file = resolved_sources
 
     try:
         result = _load_result_artifacts(results_file, details_file)
