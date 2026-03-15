@@ -20,6 +20,15 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+_DASHBOARD_QUERY_PARAM_KEYS = (
+    "display_rank",
+    "display_models",
+    "forecast_models",
+    "forecast_series",
+    "per_series_models",
+    "per_series_series",
+)
+
 
 def _check_streamlit() -> bool:
     try:
@@ -705,6 +714,131 @@ def _filter_result_for_dashboard(
     return filtered
 
 
+def _normalize_query_param_value(value: Any) -> str | None:
+    """Normalize Streamlit query param values to a single string."""
+    if value is None:
+        return None
+    if isinstance(value, list):
+        if not value:
+            return None
+        if len(value) == 1:
+            return str(value[0])
+        return json.dumps([str(item) for item in value], separators=(",", ":"))
+    return str(value)
+
+
+def _read_dashboard_query_params(st: Any) -> dict[str, str]:
+    """Read current dashboard query params in a Streamlit-version-safe way."""
+    raw_params: dict[str, Any] = {}
+    if hasattr(st, "query_params"):
+        raw_params = {
+            key: st.query_params[key]
+            for key in st.query_params
+        }
+    elif hasattr(st, "experimental_get_query_params"):
+        raw_params = st.experimental_get_query_params()
+
+    params: dict[str, str] = {}
+    for key, value in raw_params.items():
+        normalized = _normalize_query_param_value(value)
+        if normalized is not None:
+            params[key] = normalized
+    return params
+
+
+def _decode_query_param_list(raw_value: str | None) -> list[str] | None:
+    """Decode a list-valued dashboard query param."""
+    if raw_value is None or raw_value == "":
+        return None
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, list):
+        return [str(item) for item in parsed]
+    return [item for item in raw_value.split(",") if item]
+
+
+def _encode_query_param_list(values: list[str]) -> str:
+    """Encode a list-valued dashboard query param."""
+    return json.dumps(values, separators=(",", ":"))
+
+
+def _get_query_param_int(
+    st: Any,
+    key: str,
+    *,
+    default: int,
+    min_value: int,
+    max_value: int,
+) -> int:
+    """Return a bounded integer query param or the provided default."""
+    raw_value = _read_dashboard_query_params(st).get(key)
+    if raw_value is None:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return default
+    return max(min_value, min(max_value, value))
+
+
+def _get_query_param_selection(
+    st: Any,
+    key: str,
+    options: list[str],
+    default: list[str],
+) -> list[str]:
+    """Return a validated list selection from dashboard query params."""
+    requested = _decode_query_param_list(_read_dashboard_query_params(st).get(key))
+    if requested is None:
+        return default
+    allowed = [value for value in requested if value in options]
+    return allowed or default
+
+
+def _update_dashboard_query_params(st: Any, updates: dict[str, str | None]) -> None:
+    """Persist dashboard filter state into the page query params."""
+    current = _read_dashboard_query_params(st)
+    desired = dict(current)
+    for key in _DASHBOARD_QUERY_PARAM_KEYS:
+        if key not in updates:
+            continue
+        value = updates[key]
+        if value in (None, ""):
+            desired.pop(key, None)
+        else:
+            desired[key] = value
+
+    current_subset = {
+        key: current.get(key)
+        for key in _DASHBOARD_QUERY_PARAM_KEYS
+        if key in current or key in updates
+    }
+    desired_subset = {
+        key: desired.get(key)
+        for key in _DASHBOARD_QUERY_PARAM_KEYS
+        if key in desired or key in updates
+    }
+    if current_subset == desired_subset:
+        return
+
+    if hasattr(st, "query_params"):
+        for key in _DASHBOARD_QUERY_PARAM_KEYS:
+            if key not in updates:
+                continue
+            value = updates[key]
+            if value in (None, ""):
+                if key in st.query_params:
+                    del st.query_params[key]
+            else:
+                st.query_params[key] = value
+        return
+
+    if hasattr(st, "experimental_set_query_params"):
+        st.experimental_set_query_params(**desired)
+
+
 def _render_display_filters(st: Any, result: Any) -> Any:
     """Render dashboard model filters and return the filtered result view."""
     if len(result.models) <= 1:
@@ -715,11 +849,18 @@ def _render_display_filters(st: Any, result: Any) -> Any:
     ranked_total = len(result.leaderboard)
     max_rank = None
     if ranked_total > 0:
+        default_rank = _get_query_param_int(
+            st,
+            "display_rank",
+            default=min(5, ranked_total),
+            min_value=1,
+            max_value=ranked_total,
+        )
         max_rank = st.slider(
             "Show up to rank",
             min_value=1,
             max_value=ranked_total,
-            value=min(5, ranked_total),
+            value=default_rank,
         )
         default_models = [
             entry.name for entry in result.leaderboard if entry.rank <= max_rank
@@ -727,10 +868,23 @@ def _render_display_filters(st: Any, result: Any) -> Any:
     else:
         default_models = ordered_names[: min(5, len(ordered_names))]
 
+    selected_default = _get_query_param_selection(
+        st,
+        "display_models",
+        ordered_names,
+        default_models,
+    )
     selected_model_names = st.multiselect(
         "Models to display",
         ordered_names,
-        default=default_models,
+        default=selected_default,
+    )
+    _update_dashboard_query_params(
+        st,
+        {
+            "display_rank": str(max_rank) if max_rank is not None else None,
+            "display_models": _encode_query_param_list(selected_model_names),
+        },
     )
     filtered_result = _filter_result_for_dashboard(
         result,
@@ -951,15 +1105,34 @@ def _render_forecast_panels(st: Any, forecast_chart: dict[str, Any]) -> None:
         for model in forecast_chart["models"]
         for series in model["series"]
     ]
+    default_model_names = _get_query_param_selection(
+        st,
+        "forecast_models",
+        model_options,
+        model_options,
+    )
     selected_model_names = st.multiselect(
         "Forecast models",
         model_options,
-        default=model_options,
+        default=default_model_names,
+    )
+    default_series = _get_query_param_selection(
+        st,
+        "forecast_series",
+        series_options,
+        series_options,
     )
     selected_series = st.multiselect(
         "Forecast series",
         series_options,
-        default=series_options,
+        default=default_series,
+    )
+    _update_dashboard_query_params(
+        st,
+        {
+            "forecast_models": _encode_query_param_list(selected_model_names),
+            "forecast_series": _encode_query_param_list(selected_series),
+        },
     )
     filtered_chart = _filter_forecast_chart_data(
         forecast_chart,
@@ -1094,15 +1267,34 @@ def _render_per_series_panel(st: Any, per_series_chart: dict[str, Any]) -> None:
 
     model_options = per_series_chart.get("models", [])
     series_options = per_series_chart.get("heatmap_series", [])
+    default_model_names = _get_query_param_selection(
+        st,
+        "per_series_models",
+        model_options,
+        model_options,
+    )
     selected_model_names = st.multiselect(
         "Per-series models",
         model_options,
-        default=model_options,
+        default=default_model_names,
+    )
+    default_series = _get_query_param_selection(
+        st,
+        "per_series_series",
+        series_options,
+        series_options,
     )
     selected_series = st.multiselect(
         "Per-series series",
         series_options,
-        default=series_options,
+        default=default_series,
+    )
+    _update_dashboard_query_params(
+        st,
+        {
+            "per_series_models": _encode_query_param_list(selected_model_names),
+            "per_series_series": _encode_query_param_list(selected_series),
+        },
     )
     filtered_chart = _filter_per_series_chart_data(
         per_series_chart,

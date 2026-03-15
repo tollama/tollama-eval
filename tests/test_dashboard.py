@@ -34,6 +34,7 @@ from ts_autopilot.reporting.dashboard import (
     _parse_dashboard_args,
     _render_artifact_manifest,
     _render_diagnostics_panel,
+    _render_display_filters,
     _render_forecast_panels,
     _render_optional_model_environment,
     _render_per_series_panel,
@@ -96,6 +97,7 @@ class _FakeStreamlit:
         self.warnings: list[str] = []
         self.info_messages: list[object] = []
         self.downloads: list[dict[str, object]] = []
+        self.query_params: dict[str, str] = {}
 
     def subheader(self, text: str) -> None:
         self.subheaders.append(text)
@@ -154,6 +156,18 @@ class _FakeStreamlit:
                 "mime": mime,
             }
         )
+
+    def experimental_get_query_params(self) -> dict[str, list[str]]:
+        return {
+            key: [value]
+            for key, value in self.query_params.items()
+        }
+
+    def experimental_set_query_params(self, **kwargs: object) -> None:
+        self.query_params = {
+            key: str(value)
+            for key, value in kwargs.items()
+        }
 
 
 class _FakeUpload:
@@ -505,6 +519,52 @@ def test_build_dashboard_snapshot_html_respects_filtered_models() -> None:
     assert "leader at export time: SeasonalNaive (MASE 1.0000)" in html
 
 
+def test_render_display_filters_restores_query_param_state() -> None:
+    fake_st = _FakeStreamlit()
+    fake_st.query_params = {
+        "display_rank": "2",
+        "display_models": '["AutoETS"]',
+    }
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=120,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[
+            ModelResult(
+                name="AutoETS",
+                runtime_sec=0.5,
+                folds=[],
+                mean_mase=0.875,
+                std_mase=0.025,
+            ),
+            ModelResult(
+                name="SeasonalNaive",
+                runtime_sec=0.1,
+                folds=[],
+                mean_mase=1.0,
+                std_mase=0.0,
+            ),
+        ],
+        leaderboard=[
+            LeaderboardEntry(rank=1, name="AutoETS", mean_mase=0.875),
+            LeaderboardEntry(rank=2, name="SeasonalNaive", mean_mase=1.0),
+        ],
+    )
+
+    filtered = _render_display_filters(fake_st, result)
+
+    assert [model.name for model in filtered.models] == ["AutoETS"]
+    assert fake_st.query_params["display_rank"] == "2"
+    assert fake_st.query_params["display_models"] == '["AutoETS"]'
+
+
 def test_build_dashboard_filtered_results_json_respects_filtered_models() -> None:
     result = BenchmarkResult(
         profile=DataProfile(
@@ -839,6 +899,10 @@ def test_render_snapshot_export_adds_details_download_when_available() -> None:
 
 def test_render_forecast_panels_outputs_chart_blocks() -> None:
     fake_st = _FakeStreamlit()
+    fake_st.query_params = {
+        "forecast_models": '["AutoETS"]',
+        "forecast_series": '["s1"]',
+    }
 
     _render_forecast_panels(
         fake_st,
@@ -870,6 +934,8 @@ def test_render_forecast_panels_outputs_chart_blocks() -> None:
     assert fake_st.subheaders == ["Forecast vs Actual"]
     assert fake_st.expanders == ["AutoETS (MASE=0.8750)"]
     assert fake_st.plotly_calls == 1
+    assert fake_st.query_params["forecast_models"] == '["AutoETS"]'
+    assert fake_st.query_params["forecast_series"] == '["s1"]'
 
 
 def test_filter_forecast_chart_data_limits_models_and_series() -> None:
@@ -932,6 +998,10 @@ def test_render_diagnostics_panel_outputs_metrics_and_charts() -> None:
 
 def test_render_per_series_panel_outputs_charts_and_table() -> None:
     fake_st = _FakeStreamlit()
+    fake_st.query_params = {
+        "per_series_models": '["AutoETS"]',
+        "per_series_series": '["s2"]',
+    }
 
     _render_per_series_panel(
         fake_st,
@@ -964,6 +1034,8 @@ def test_render_per_series_panel_outputs_charts_and_table() -> None:
     assert fake_st.subheaders == ["Per-Series Winners"]
     assert fake_st.plotly_calls == 2
     assert fake_st.dataframes
+    assert fake_st.query_params["per_series_models"] == '["AutoETS"]'
+    assert fake_st.query_params["per_series_series"] == '["s2"]'
 
 
 def test_filter_per_series_chart_data_limits_models_and_series() -> None:
