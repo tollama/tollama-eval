@@ -13,6 +13,7 @@ from ts_autopilot.contracts import (
 from ts_autopilot.reporting.dashboard import (
     _load_result_artifacts,
     _optional_model_environment_summary,
+    _parse_dashboard_args,
     _render_optional_model_environment,
 )
 from ts_autopilot.runners.optional import OptionalRunnerStatus
@@ -172,3 +173,53 @@ def test_load_result_artifacts_supports_results_only() -> None:
 
     assert loaded.leaderboard[0].name == "SeasonalNaive"
     assert loaded.forecast_data == []
+
+
+def test_load_result_artifacts_supports_filesystem_paths(tmp_path) -> None:
+    result = _make_result()
+    result._optional_runner_statuses = [
+        OptionalRunnerStatus(
+            label="LightGBM",
+            available=False,
+            reason="missing dependency: lightgbm",
+            runner_names=["LightGBM"],
+        )
+    ]
+    results_path = tmp_path / "results.json"
+    details_path = tmp_path / "details.json"
+    results_path.write_text(json.dumps(result.to_dict()), encoding="utf-8")
+    details_path.write_text(json.dumps(result.to_details_dict()), encoding="utf-8")
+
+    loaded = _load_result_artifacts(results_path, details_path)
+
+    assert loaded._optional_runner_statuses[0]["label"] == "LightGBM"
+
+
+def test_parse_dashboard_args_uses_artifact_dir_defaults(tmp_path) -> None:
+    results_path = tmp_path / "results.json"
+    details_path = tmp_path / "details.json"
+    results_path.write_text("{}", encoding="utf-8")
+    details_path.write_text("{}", encoding="utf-8")
+
+    parsed_results, parsed_details = _parse_dashboard_args(
+        ["--artifact-dir", str(tmp_path)]
+    )
+
+    assert parsed_results == results_path
+    assert parsed_details == details_path
+
+
+def test_parse_dashboard_args_prefers_explicit_results_path(tmp_path) -> None:
+    explicit_results = tmp_path / "custom-results.json"
+
+    parsed_results, parsed_details = _parse_dashboard_args(
+        [
+            "--artifact-dir",
+            str(tmp_path),
+            "--results",
+            str(explicit_results),
+        ]
+    )
+
+    assert parsed_results == explicit_results
+    assert parsed_details is None

@@ -1,7 +1,9 @@
 """Interactive Streamlit dashboard for tollama-eval.
 
 Launch with:
-    streamlit run -m ts_autopilot.reporting.dashboard -- --input data.csv
+    streamlit run -m ts_autopilot.reporting.dashboard
+    streamlit run -m ts_autopilot.reporting.dashboard -- --artifact-dir out/
+    streamlit run -m ts_autopilot.reporting.dashboard -- --results out/results.json
 
 Or from code:
     python -m ts_autopilot.reporting.dashboard
@@ -9,6 +11,7 @@ Or from code:
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -44,6 +47,16 @@ def main() -> None:
 
     st.title("tollama-eval Interactive Dashboard")
     st.markdown("Run a benchmark from CSV or inspect saved benchmark artifacts.")
+    cli_results_path, cli_details_path = _parse_dashboard_args(sys.argv[1:])
+
+    if cli_results_path is not None:
+        with st.sidebar:
+            st.header("Loaded Artifacts")
+            st.caption(str(cli_results_path))
+            if cli_details_path is not None:
+                st.caption(str(cli_details_path))
+        _open_saved_results(cli_results_path, cli_details_path)
+        return
 
     # Sidebar configuration
     with st.sidebar:
@@ -165,9 +178,12 @@ def main() -> None:
 
 
 def _read_uploaded_json(uploaded_file: Any) -> dict[str, Any]:
-    """Read a Streamlit uploaded JSON artifact."""
-    raw = uploaded_file.getvalue()
-    text = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+    """Read JSON from an uploaded file or filesystem path."""
+    if hasattr(uploaded_file, "getvalue"):
+        raw = uploaded_file.getvalue()
+        text = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+    else:
+        text = Path(uploaded_file).read_text(encoding="utf-8")
     return json.loads(text)
 
 
@@ -182,6 +198,29 @@ def _load_result_artifacts(
     if details_file is not None:
         combined.update(_read_uploaded_json(details_file))
     return BenchmarkResult.from_dict(combined)
+
+
+def _parse_dashboard_args(argv: list[str]) -> tuple[Path | None, Path | None]:
+    """Parse optional artifact path arguments passed through Streamlit."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--artifact-dir")
+    parser.add_argument("--results")
+    parser.add_argument("--details")
+    args, _ = parser.parse_known_args(argv)
+
+    results_path = Path(args.results) if args.results else None
+    details_path = Path(args.details) if args.details else None
+
+    if args.artifact_dir:
+        artifact_dir = Path(args.artifact_dir)
+        if results_path is None:
+            results_path = artifact_dir / "results.json"
+        if details_path is None:
+            candidate = artifact_dir / "details.json"
+            if candidate.exists():
+                details_path = candidate
+
+    return results_path, details_path
 
 
 def _open_saved_results(results_file: Any, details_file: Any | None = None) -> None:
