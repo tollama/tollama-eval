@@ -10,6 +10,67 @@ from ts_autopilot.logging_config import get_logger
 logger = get_logger("export")
 
 
+def _build_per_series_winner_summary(
+    result: BenchmarkResult,
+) -> tuple[list[str], list[dict]]:
+    """Build average per-series winner rows across all models."""
+    scores_by_model: dict[str, dict[str, list[float]]] = {}
+    ordered_models = [entry.name for entry in result.leaderboard]
+
+    for model in result.models:
+        if model.name not in ordered_models:
+            ordered_models.append(model.name)
+        model_scores: dict[str, list[float]] = {}
+        for fold in model.folds:
+            for sid, score in fold.series_scores.items():
+                model_scores.setdefault(sid, []).append(score)
+        if model_scores:
+            scores_by_model[model.name] = model_scores
+
+    comparable_rows: list[dict] = []
+    all_series = sorted(
+        {
+            sid
+            for model_scores in scores_by_model.values()
+            for sid in model_scores
+        }
+    )
+
+    for sid in all_series:
+        averages: dict[str, float] = {}
+        for model_name in ordered_models:
+            series_scores = scores_by_model.get(model_name, {}).get(sid)
+            if series_scores:
+                averages[model_name] = round(
+                    sum(series_scores) / len(series_scores),
+                    4,
+                )
+
+        if len(averages) < 2:
+            continue
+
+        ranked = sorted(averages.items(), key=lambda item: item[1])
+        winner_name, winner_score = ranked[0]
+        runner_up_name, runner_up_score = ranked[1]
+        comparable_rows.append(
+            {
+                "series": sid,
+                "winner": winner_name,
+                "winner_mase": winner_score,
+                "runner_up": runner_up_name,
+                "runner_up_mase": runner_up_score,
+                "margin": round(runner_up_score - winner_score, 4),
+                "spread": round(ranked[-1][1] - winner_score, 4),
+                "scores": averages,
+            }
+        )
+
+    comparable_rows.sort(
+        key=lambda row: (-row["winner_mase"], row["margin"], row["series"])
+    )
+    return ordered_models, comparable_rows
+
+
 def export_leaderboard_csv(result: BenchmarkResult, output_path: str | Path) -> Path:
     """Export leaderboard as a CSV file.
 
@@ -114,11 +175,44 @@ def export_per_series_csv(result: BenchmarkResult, output_path: str | Path) -> P
     return output_path
 
 
+def export_per_series_winners_csv(
+    result: BenchmarkResult,
+    output_path: str | Path,
+) -> Path:
+    """Export average per-series winners and competition margins as a CSV file."""
+    import pandas as pd
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    ordered_models, rows = _build_per_series_winner_summary(result)
+
+    flattened_rows = []
+    for row in rows:
+        flat_row = {
+            "series": row["series"],
+            "winner": row["winner"],
+            "winner_mase": row["winner_mase"],
+            "runner_up": row["runner_up"],
+            "runner_up_mase": row["runner_up_mase"],
+            "margin": row["margin"],
+            "spread": row["spread"],
+        }
+        for model_name in ordered_models:
+            flat_row[f"{model_name}_mase"] = row["scores"].get(model_name)
+        flattened_rows.append(flat_row)
+
+    df = pd.DataFrame(flattened_rows)
+    df.to_csv(output_path, index=False)
+    logger.info("Exported per-series winners CSV: %s", output_path)
+    return output_path
+
+
 def export_excel(result: BenchmarkResult, output_path: str | Path) -> Path:
     """Export benchmark results as a formatted Excel workbook.
 
     Creates sheets: Executive Summary, Leaderboard, Fold Details,
-    Per-Series Scores, Data Profile.
+    Per-Series Scores, Per-Series Winners, Data Profile.
 
     Requires openpyxl. Install with: pip install "tollama-eval[excel]"
 
@@ -302,7 +396,62 @@ def export_excel(result: BenchmarkResult, output_path: str | Path) -> Path:
 
     _auto_width(ws_series)
 
-    # --- Sheet 5: Data Profile ---
+    # --- Sheet 5: Per-Series Winners ---
+    ws_winners = wb.create_sheet("Per-Series Winners")
+    ordered_models, winner_rows = _build_per_series_winner_summary(result)
+    winner_headers = [
+        "Series",
+        "Winner",
+        "Winner MASE",
+        "Runner-up",
+        "Runner-up MASE",
+        "Margin",
+        "Spread",
+        *[f"{model_name} MASE" for model_name in ordered_models],
+    ]
+    for col, header in enumerate(winner_headers, 1):
+        ws_winners.cell(row=1, column=col, value=header)
+    _style_header(ws_winners, 1, len(winner_headers))
+
+    row = 2
+    for winner_row in winner_rows:
+        ws_winners.cell(row=row, column=1, value=winner_row["series"])
+        ws_winners.cell(row=row, column=2, value=winner_row["winner"])
+        winner_mase_cell = ws_winners.cell(
+            row=row,
+            column=3,
+            value=winner_row["winner_mase"],
+        )
+        ws_winners.cell(row=row, column=4, value=winner_row["runner_up"])
+        ws_winners.cell(row=row, column=5, value=winner_row["runner_up_mase"])
+        ws_winners.cell(row=row, column=6, value=winner_row["margin"])
+        ws_winners.cell(row=row, column=7, value=winner_row["spread"])
+
+        for idx, model_name in enumerate(ordered_models, start=8):
+            score = winner_row["scores"].get(model_name)
+            cell = ws_winners.cell(row=row, column=idx, value=score)
+            if score is not None:
+                if score < 1.0:
+                    cell.fill = good_fill
+                    cell.font = good_font
+                elif score > 1.0:
+                    cell.fill = bad_fill
+                    cell.font = bad_font
+
+        if winner_row["winner_mase"] < 1.0:
+            winner_mase_cell.fill = good_fill
+            winner_mase_cell.font = good_font
+        elif winner_row["winner_mase"] > 1.0:
+            winner_mase_cell.fill = bad_fill
+            winner_mase_cell.font = bad_font
+
+        for col in range(1, len(winner_headers) + 1):
+            ws_winners.cell(row=row, column=col).border = thin_border
+        row += 1
+
+    _auto_width(ws_winners)
+
+    # --- Sheet 6: Data Profile ---
     ws_profile = wb.create_sheet("Data Profile")
     profile_data = [
         ("Series Count", result.profile.n_series),

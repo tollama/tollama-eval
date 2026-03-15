@@ -1,5 +1,7 @@
 """Tests for data export utilities."""
 
+import pytest
+
 from ts_autopilot.contracts import (
     BenchmarkConfig,
     BenchmarkResult,
@@ -9,9 +11,11 @@ from ts_autopilot.contracts import (
     ModelResult,
 )
 from ts_autopilot.reporting.export import (
+    export_excel,
     export_fold_details_csv,
     export_leaderboard_csv,
     export_per_series_csv,
+    export_per_series_winners_csv,
 )
 
 
@@ -120,6 +124,19 @@ def test_export_per_series_csv(tmp_path):
     assert "series" in lines[0]
 
 
+def test_export_per_series_winners_csv(tmp_path):
+    result = _make_result()
+    path = export_per_series_winners_csv(result, tmp_path / "series_winners.csv")
+    assert path.exists()
+    lines = path.read_text().strip().split("\n")
+    assert len(lines) == 3  # header + 2 series
+    assert "winner" in lines[0]
+    assert "runner_up" in lines[0]
+    assert "ModelA_mase" in lines[0]
+    assert any("s1" in line for line in lines[1:])
+    assert any("s2" in line for line in lines[1:])
+
+
 def test_export_empty_leaderboard(tmp_path):
     result = _make_result()
     result.leaderboard = []
@@ -134,3 +151,26 @@ def test_export_creates_parent_dirs(tmp_path):
     result = _make_result()
     path = export_leaderboard_csv(result, tmp_path / "sub" / "dir" / "lb.csv")
     assert path.exists()
+
+
+def test_export_excel_includes_per_series_winners_sheet(tmp_path):
+    openpyxl = pytest.importorskip("openpyxl")
+
+    result = _make_result()
+    path = export_excel(result, tmp_path / "report.xlsx")
+
+    wb = openpyxl.load_workbook(path)
+    assert "Per-Series Winners" in wb.sheetnames
+    ws = wb["Per-Series Winners"]
+    headers = [ws.cell(row=1, column=col).value for col in range(1, 10)]
+    assert headers[:7] == [
+        "Series",
+        "Winner",
+        "Winner MASE",
+        "Runner-up",
+        "Runner-up MASE",
+        "Margin",
+        "Spread",
+    ]
+    assert "ModelA MASE" in headers
+    assert ws.cell(row=2, column=1).value in {"s1", "s2"}
