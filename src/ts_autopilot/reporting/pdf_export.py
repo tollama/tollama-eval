@@ -68,7 +68,7 @@ def is_available() -> bool:
         import weasyprint  # noqa: F401
 
         return True
-    except ImportError:
+    except (ImportError, OSError):
         return False
 
 
@@ -122,6 +122,63 @@ def _inject_static_charts(html_content: str) -> str:
 
     static_images: dict[str, str] = {}
 
+    def _figure_to_img_html(fig, alt: str) -> str:
+        img_bytes = pio.to_image(fig, format="png", scale=2)
+        b64 = base64.b64encode(img_bytes).decode()
+        return (
+            f'<img class="static-chart-img" src="data:image/png;base64,{b64}" '
+            f'alt="{alt}">'
+        )
+
+    def _build_series_line_chart(
+        title: str,
+        history_x: list[str] | None,
+        history_y: list[float] | None,
+        actual_x: list[str] | None,
+        actual_y: list[float] | None,
+        forecast_x: list[str] | None = None,
+        forecast_y: list[float] | None = None,
+    ):
+        fig = go.Figure()
+        if history_x and history_y:
+            fig.add_trace(
+                go.Scatter(
+                    x=history_x,
+                    y=history_y,
+                    mode="lines+markers",
+                    name="Recent history",
+                    line={"color": "#6b7280", "width": 2},
+                )
+            )
+        if actual_x and actual_y:
+            fig.add_trace(
+                go.Scatter(
+                    x=actual_x,
+                    y=actual_y,
+                    mode="lines+markers",
+                    name="Actual",
+                    line={"color": "#2563eb", "width": 2},
+                )
+            )
+        if forecast_x and forecast_y:
+            fig.add_trace(
+                go.Scatter(
+                    x=forecast_x,
+                    y=forecast_y,
+                    mode="lines+markers",
+                    name="Forecast",
+                    line={"color": "#dc2626", "width": 2, "dash": "dash"},
+                )
+            )
+        fig.update_layout(
+            title=title,
+            width=900,
+            height=320,
+            showlegend=True,
+            margin={"l": 60, "r": 30, "t": 50, "b": 50},
+        )
+        return fig
+
     # Generate static images for key charts
     try:
         # MASE bar chart
@@ -166,6 +223,86 @@ def _inject_static_charts(html_content: str) -> str:
                 f'alt="MASE heatmap">'
             )
 
+        # Per-series winner charts
+        per_series = chart_data.get("per_series") or {}
+        if per_series.get("winner_summary"):
+            fig = go.Figure(
+                go.Bar(
+                    x=[item["name"] for item in per_series["winner_summary"]],
+                    y=[item["count"] for item in per_series["winner_summary"]],
+                )
+            )
+            fig.update_layout(
+                title="Series Wins by Model",
+                width=800,
+                height=320,
+                yaxis_title="Series won",
+            )
+            static_images["chart-per-series-wins"] = _figure_to_img_html(
+                fig,
+                "Per-series winner counts",
+            )
+
+        if per_series.get("heatmap_z"):
+            fig = go.Figure(
+                go.Heatmap(
+                    z=per_series["heatmap_z"],
+                    x=per_series["models"],
+                    y=per_series["heatmap_series"],
+                    colorscale=[[0, "#059669"], [0.5, "#fbbf24"], [1, "#dc2626"]],
+                )
+            )
+            fig.update_layout(
+                title="Per-Series Difficulty by Model",
+                width=900,
+                height=max(400, len(per_series["heatmap_series"]) * 28 + 120),
+            )
+            static_images["chart-per-series-heatmap"] = _figure_to_img_html(
+                fig,
+                "Per-series MASE heatmap",
+            )
+
+        # Data overview charts
+        data_overview = chart_data.get("data_overview") or {}
+        for series in data_overview.get("series", []):
+            title = series["name"]
+            mase = series.get("mase")
+            if mase is not None:
+                title += f" (Winner MASE: {mase:.4f})"
+            fig = _build_series_line_chart(
+                title=title,
+                history_x=series.get("ds_history"),
+                history_y=series.get("y_history"),
+                actual_x=series.get("ds_actual"),
+                actual_y=series.get("y_actual"),
+            )
+            static_images[series["chart_id"]] = _figure_to_img_html(
+                fig,
+                f"Data overview for {series['name']}",
+            )
+
+        # Forecast charts
+        forecast_data = chart_data.get("forecast") or {}
+        for model in forecast_data.get("models", []):
+            for series in model.get("series", []):
+                title = f"{model['name']} - {series['name']}"
+                mase = series.get("mase")
+                if mase is not None:
+                    title += f" (MASE: {mase:.4f})"
+                fig = _build_series_line_chart(
+                    title=title,
+                    history_x=series.get("ds_history"),
+                    history_y=series.get("y_history"),
+                    actual_x=series.get("ds_actual"),
+                    actual_y=series.get("y_actual"),
+                    forecast_x=series.get("ds_forecast"),
+                    forecast_y=series.get("y_hat"),
+                )
+                static_images[series["chart_id"]] = _figure_to_img_html(
+                    fig,
+                    f"Forecast chart for {model['name']} on {series['name']}",
+                )
+
     except Exception as exc:
         logger.warning("Static chart generation failed: %s", exc)
 
@@ -194,7 +331,7 @@ def generate_pdf(html_path: str | Path, output_path: str | Path) -> bool:
     """
     try:
         from weasyprint import CSS, HTML
-    except ImportError:
+    except (ImportError, OSError):
         logger.info(
             'weasyprint not installed. Install with: pip install "tollama-eval[pdf]"'
         )
