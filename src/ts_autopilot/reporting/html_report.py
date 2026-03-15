@@ -79,6 +79,7 @@ def render_report(
     # Report traceability
     run_id = getattr(result.metadata, "run_id", None) if result.metadata else None
     optional_model_environment = _build_optional_model_environment_data(result)
+    dashboard_snapshot_context = _build_dashboard_snapshot_context_data(result)
 
     return str(
         template.render(
@@ -108,6 +109,7 @@ def render_report(
             run_id=run_id,
             data_chars=result.data_characteristics,
             optional_model_environment=optional_model_environment,
+            dashboard_snapshot_context=dashboard_snapshot_context,
         )
     )
 
@@ -174,6 +176,20 @@ def _build_optional_model_environment_data(result: BenchmarkResult) -> dict:
         "skipped_groups": len(skipped_groups),
         "rows": rows,
         "insights": insights,
+    }
+
+
+def _build_dashboard_snapshot_context_data(result: BenchmarkResult) -> dict:
+    """Build report context for dashboard-exported HTML snapshots."""
+    raw_context = getattr(result, "_dashboard_snapshot_context", None)
+    if not raw_context:
+        return {}
+
+    return {
+        "source": str(raw_context.get("source", "dashboard filtered view")),
+        "model_count": int(raw_context.get("model_count", len(result.models))),
+        "leader_name": raw_context.get("leader_name"),
+        "leader_mase": raw_context.get("leader_mase"),
     }
 
 

@@ -460,10 +460,31 @@ def _build_dashboard_snapshot_html(result: Any) -> str:
     """Build a static HTML snapshot for the current filtered dashboard view."""
     from ts_autopilot.reporting.html_report import render_report
 
-    return render_report(
-        result,
-        report_title="Filtered Benchmark Snapshot",
-    )
+    snapshot_context = {
+        "source": "dashboard filtered view",
+        "model_count": len(result.models),
+        "leader_name": (
+            result.leaderboard[0].name if getattr(result, "leaderboard", None) else None
+        ),
+        "leader_mase": (
+            result.leaderboard[0].mean_mase
+            if getattr(result, "leaderboard", None)
+            else None
+        ),
+    }
+    marker = object()
+    previous_context = getattr(result, "_dashboard_snapshot_context", marker)
+    result._dashboard_snapshot_context = snapshot_context
+    try:
+        return render_report(
+            result,
+            report_title="Filtered Benchmark Snapshot",
+        )
+    finally:
+        if previous_context is marker:
+            delattr(result, "_dashboard_snapshot_context")
+        else:
+            result._dashboard_snapshot_context = previous_context
 
 
 def _build_dashboard_filtered_results_json(result: Any) -> str:

@@ -500,6 +500,9 @@ def test_build_dashboard_snapshot_html_respects_filtered_models() -> None:
     assert "Filtered Benchmark Snapshot" in html
     assert "SeasonalNaive" in html
     assert "AutoETS" not in html
+    assert "Snapshot provenance" in html
+    assert "exported from the dashboard filtered view with 1 visible model(s)" in html
+    assert "leader at export time: SeasonalNaive (MASE 1.0000)" in html
 
 
 def test_build_dashboard_filtered_results_json_respects_filtered_models() -> None:
