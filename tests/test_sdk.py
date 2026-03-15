@@ -44,7 +44,7 @@ def test_sdk_chaining(sample_df: pd.DataFrame) -> None:
 
 
 def test_sdk_save(sample_df: pd.DataFrame, tmp_path: object) -> None:
-    """save() should write results.json and report.html."""
+    """save() should write the standard benchmark artifacts."""
     from pathlib import Path
 
     from ts_autopilot.sdk import TSAutopilot
@@ -56,6 +56,10 @@ def test_sdk_save(sample_df: pd.DataFrame, tmp_path: object) -> None:
 
     assert (out / "results.json").exists()
     assert (out / "report.html").exists()
+    assert (out / "leaderboard.csv").exists()
+    assert (out / "fold_details.csv").exists()
+    assert (out / "per_series_scores.csv").exists()
+    assert (out / "per_series_winners.csv").exists()
 
 
 def test_sdk_auto_select(sample_df: pd.DataFrame) -> None:

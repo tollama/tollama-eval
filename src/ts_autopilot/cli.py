@@ -572,12 +572,9 @@ def run(
                     model_names=model_names,
                     n_jobs=n_jobs,
                 )
-                # Write output files
-                output.mkdir(parents=True, exist_ok=True)
-                (output / "results.json").write_text(result.to_json(indent=2))
-                from ts_autopilot.reporting.html_report import render_report
+                from ts_autopilot.pipeline import write_output_artifacts
 
-                (output / "report.html").write_text(render_report(result))
+                write_output_artifacts(result, output)
             else:
                 result = run_from_csv(
                     csv_path=input,

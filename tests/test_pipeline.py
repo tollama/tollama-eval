@@ -39,7 +39,7 @@ def test_each_model_has_correct_folds(tiny_long_df):
 
 
 def test_run_from_csv_writes_files(tmp_path):
-    """Integration test: CSV → results.json + report.html."""
+    """Integration test: CSV -> standard benchmark artifacts."""
     import pandas as pd
 
     # Create a small CSV
@@ -56,6 +56,10 @@ def test_run_from_csv_writes_files(tmp_path):
 
     assert (out_dir / "results.json").exists()
     assert (out_dir / "report.html").exists()
+    assert (out_dir / "leaderboard.csv").exists()
+    assert (out_dir / "fold_details.csv").exists()
+    assert (out_dir / "per_series_scores.csv").exists()
+    assert (out_dir / "per_series_winners.csv").exists()
 
 
 def test_results_json_schema(tmp_path):

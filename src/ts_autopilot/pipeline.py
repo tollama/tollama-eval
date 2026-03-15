@@ -669,6 +669,81 @@ def _atomic_write(path: Path, content: str) -> None:
         raise
 
 
+def write_output_artifacts(
+    result: BenchmarkResult,
+    output_dir: str | Path,
+    *,
+    report_title: str | None = None,
+    report_lang: str | None = None,
+    generate_pdf: bool = False,
+) -> list[Path]:
+    """Write the standard benchmark artifacts to disk.
+
+    Produces the core JSON/HTML outputs plus default CSV exports that are
+    useful outside the interactive report.
+    """
+    from ts_autopilot.reporting.export import (
+        export_fold_details_csv,
+        export_leaderboard_csv,
+        export_per_series_csv,
+        export_per_series_winners_csv,
+    )
+    from ts_autopilot.reporting.html_report import render_report
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    written_paths: list[Path] = []
+
+    results_path = output_dir / "results.json"
+    _atomic_write(results_path, result.to_json(indent=2))
+    written_paths.append(results_path)
+
+    details = result.to_details_dict()
+    if details:
+        details_path = output_dir / "details.json"
+        _atomic_write(details_path, result.to_details_json(indent=2))
+        written_paths.append(details_path)
+
+    report_path = output_dir / "report.html"
+    _atomic_write(
+        report_path,
+        render_report(result, report_title=report_title, report_lang=report_lang),
+    )
+    written_paths.append(report_path)
+
+    # CSV exports are standard artifacts because they do not require
+    # optional dependencies and make the benchmark easier to consume.
+    written_paths.append(
+        export_leaderboard_csv(result, output_dir / "leaderboard.csv")
+    )
+    written_paths.append(
+        export_fold_details_csv(result, output_dir / "fold_details.csv")
+    )
+    written_paths.append(
+        export_per_series_csv(result, output_dir / "per_series_scores.csv")
+    )
+    written_paths.append(
+        export_per_series_winners_csv(result, output_dir / "per_series_winners.csv")
+    )
+
+    if generate_pdf:
+        from ts_autopilot.reporting.pdf_export import generate_pdf as make_pdf
+        from ts_autopilot.reporting.pdf_export import is_available
+
+        if is_available():
+            pdf_path = output_dir / "report.pdf"
+            if make_pdf(report_path, pdf_path):
+                written_paths.append(pdf_path)
+        else:
+            logger.info(
+                "PDF export requested but weasyprint not installed. "
+                'Install with: pip install "tollama-eval[pdf]"'
+            )
+
+    return written_paths
+
+
 def run_from_csv(
     csv_path: str | Path,
     horizon: int,
@@ -697,8 +772,6 @@ def run_from_csv(
     If tollama_url and tollama_models are provided, creates TollamaRunners
     to benchmark TSFM models alongside statistical models.
     """
-    from ts_autopilot.reporting.html_report import render_report
-
     if run_id is None:
         run_id = uuid.uuid4().hex[:12]
 
@@ -791,40 +864,15 @@ def run_from_csv(
         )
         return result
 
-    # Atomic write results.json
-    results_path = output_dir / "results.json"
-    _atomic_write(results_path, result.to_json(indent=2))
-    logger.info("[run_id=%s] Wrote %s", run_id, results_path)
-
-    # Atomic write details.json (forecast data + diagnostics for report reproducibility)
-    details = result.to_details_dict()
-    if details:
-        details_path = output_dir / "details.json"
-        _atomic_write(details_path, result.to_details_json(indent=2))
-        logger.info("[run_id=%s] Wrote %s", run_id, details_path)
-
-    # Atomic write report.html
-    report_path = output_dir / "report.html"
-    _atomic_write(
-        report_path,
-        render_report(result, report_title=report_title, report_lang=report_lang),
+    written_paths = write_output_artifacts(
+        result,
+        output_dir,
+        report_title=report_title,
+        report_lang=report_lang,
+        generate_pdf=generate_pdf,
     )
-    logger.info("[run_id=%s] Wrote %s", run_id, report_path)
-
-    # Optional PDF generation
-    if generate_pdf:
-        from ts_autopilot.reporting.pdf_export import generate_pdf as make_pdf
-        from ts_autopilot.reporting.pdf_export import is_available
-
-        if is_available():
-            pdf_path = output_dir / "report.pdf"
-            if make_pdf(report_path, pdf_path):
-                logger.info("[run_id=%s] Wrote %s", run_id, pdf_path)
-        else:
-            logger.info(
-                "PDF export requested but weasyprint not installed. "
-                'Install with: pip install "tollama-eval[pdf]"'
-            )
+    for path in written_paths:
+        logger.info("[run_id=%s] Wrote %s", run_id, path)
 
     return result
 

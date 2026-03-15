@@ -119,29 +119,17 @@ class TSAutopilot:
         """Run the benchmark and save results to disk.
 
         Args:
-            output_dir: Directory to write results.json and report.html.
+            output_dir: Directory to write standard benchmark artifacts.
 
         Returns:
             Path to the output directory.
         """
-        import json
-
-        from ts_autopilot.reporting.html_report import render_report
+        from ts_autopilot.pipeline import write_output_artifacts
 
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         result = self.run()
-
-        results_path = output_dir / "results.json"
-        results_path.write_text(result.to_json(indent=2))
-
-        report_path = output_dir / "report.html"
-        report_path.write_text(render_report(result))
-
-        details = result.to_details_dict()
-        if details:
-            details_path = output_dir / "details.json"
-            details_path.write_text(json.dumps(details, indent=2))
+        write_output_artifacts(result, output_dir)
 
         return output_dir
