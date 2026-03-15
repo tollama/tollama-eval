@@ -420,6 +420,10 @@ def _render_result_dashboard(
     import plotly.graph_objects as go
 
     from ts_autopilot.reporting.executive_summary import generate_executive_summary
+    from ts_autopilot.reporting.html_report import (
+        _build_diagnostics_chart_data,
+        _build_forecast_chart_data,
+    )
 
     st.divider()
 
@@ -510,6 +514,14 @@ def _render_result_dashboard(
             fig2.update_layout(title="MASE Stability Across Folds", height=350)
             st.plotly_chart(fig2, use_container_width=True)
 
+    forecast_chart = _build_forecast_chart_data(result)
+    if forecast_chart.get("models"):
+        _render_forecast_panels(st, forecast_chart)
+
+    diagnostics_chart = _build_diagnostics_chart_data(result)
+    if diagnostics_chart:
+        _render_diagnostics_panel(st, diagnostics_chart)
+
     if result.models:
         st.subheader("Model Details")
         for model in result.models:
@@ -533,6 +545,107 @@ def _render_result_dashboard(
                         hide_index=True,
                     )
                 st.caption(f"Runtime: {model.runtime_sec:.2f}s")
+
+
+def _render_forecast_panels(st: Any, forecast_chart: dict[str, Any]) -> None:
+    """Render forecast vs actual panels for each model and highlighted series."""
+    import plotly.graph_objects as go
+
+    st.subheader("Forecast vs Actual")
+    st.caption(
+        f"Fold {forecast_chart['fold']} forecasts for highlighted representative "
+        "series across all available models."
+    )
+
+    for model in forecast_chart["models"]:
+        with st.expander(
+            f"{model['name']} (MASE={model['mean_mase']:.4f})",
+            expanded=model.get("rank") == 1,
+        ):
+            st.caption(model["summary"])
+            for series in model["series"]:
+                fig = go.Figure()
+                if series["ds_history"] and series["y_history"]:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=series["ds_history"],
+                            y=series["y_history"],
+                            mode="lines+markers",
+                            name="Train Tail",
+                            line={"color": "#94a3b8"},
+                        )
+                    )
+                fig.add_trace(
+                    go.Scatter(
+                        x=series["ds_actual"],
+                        y=series["y_actual"],
+                        mode="lines+markers",
+                        name="Actual",
+                        line={"color": "#1d4ed8"},
+                    )
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=series["ds_forecast"],
+                        y=series["y_hat"],
+                        mode="lines+markers",
+                        name="Forecast",
+                        line={"color": "#dc2626"},
+                    )
+                )
+                fig.update_layout(
+                    title=f"{series['name']} | {series['note']}",
+                    height=320,
+                    margin={"l": 20, "r": 20, "t": 60, "b": 20},
+                    legend={"orientation": "h"},
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_diagnostics_panel(st: Any, diagnostics_chart: dict[str, Any]) -> None:
+    """Render residual diagnostics for the best model."""
+    import plotly.graph_objects as go
+
+    st.subheader("Residual Diagnostics")
+    st.caption(
+        f"Residual behavior for the best available diagnostics model: "
+        f"{diagnostics_chart['model_name']}."
+    )
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Residual Mean", f"{diagnostics_chart['residual_mean']:.4f}")
+    col2.metric("Residual Std", f"{diagnostics_chart['residual_std']:.4f}")
+    col3.metric("Ljung-Box p", f"{diagnostics_chart['ljung_box_p']:.4f}")
+
+    hist = go.Figure(
+        go.Bar(
+            x=diagnostics_chart["histogram_bins"][:-1],
+            y=diagnostics_chart["histogram_counts"],
+            marker_color="#2563eb",
+            name="Residual Count",
+        )
+    )
+    hist.update_layout(
+        title="Residual Distribution",
+        height=320,
+        margin={"l": 20, "r": 20, "t": 50, "b": 20},
+    )
+    st.plotly_chart(hist, use_container_width=True)
+
+    if diagnostics_chart["acf_lags"] and diagnostics_chart["acf_values"]:
+        acf = go.Figure(
+            go.Bar(
+                x=diagnostics_chart["acf_lags"],
+                y=diagnostics_chart["acf_values"],
+                marker_color="#059669",
+                name="ACF",
+            )
+        )
+        acf.update_layout(
+            title="Residual Autocorrelation",
+            height=320,
+            margin={"l": 20, "r": 20, "t": 50, "b": 20},
+        )
+        st.plotly_chart(acf, use_container_width=True)
 
 
 def _optional_model_environment_summary(result: Any) -> dict[str, Any]:

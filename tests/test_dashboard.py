@@ -17,6 +17,8 @@ from ts_autopilot.reporting.dashboard import (
     _optional_model_environment_summary,
     _parse_dashboard_args,
     _render_artifact_manifest,
+    _render_diagnostics_panel,
+    _render_forecast_panels,
     _render_optional_model_environment,
 )
 from ts_autopilot.runners.optional import OptionalRunnerStatus
@@ -51,10 +53,18 @@ def _make_result() -> BenchmarkResult:
 
 class _FakeColumn:
     def __init__(self) -> None:
-        self.metrics: list[tuple[str, int]] = []
+        self.metrics: list[tuple[str, object]] = []
 
-    def metric(self, label: str, value: int) -> None:
+    def metric(self, label: str, value: object) -> None:
         self.metrics.append((label, value))
+
+
+class _FakeExpander:
+    def __enter__(self) -> "_FakeExpander":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        return None
 
 
 class _FakeStreamlit:
@@ -63,6 +73,8 @@ class _FakeStreamlit:
         self.captions: list[str] = []
         self.dataframes: list[object] = []
         self.columns_created: list[_FakeColumn] = []
+        self.expanders: list[str] = []
+        self.plotly_calls: int = 0
 
     def subheader(self, text: str) -> None:
         self.subheaders.append(text)
@@ -76,6 +88,13 @@ class _FakeStreamlit:
 
     def dataframe(self, data: object, **_: object) -> None:
         self.dataframes.append(data)
+
+    def expander(self, label: str, **_: object) -> _FakeExpander:
+        self.expanders.append(label)
+        return _FakeExpander()
+
+    def plotly_chart(self, *_: object, **__: object) -> None:
+        self.plotly_calls += 1
 
 
 class _FakeUpload:
@@ -313,3 +332,60 @@ def test_render_artifact_manifest_uses_streamlit_block() -> None:
     assert fake_st.columns_created[0].metrics == [("Artifacts Loaded", 1)]
     assert fake_st.columns_created[1].metrics == [("Artifacts Missing", 1)]
     assert fake_st.dataframes
+
+
+def test_render_forecast_panels_outputs_chart_blocks() -> None:
+    fake_st = _FakeStreamlit()
+
+    _render_forecast_panels(
+        fake_st,
+        {
+            "fold": 2,
+            "models": [
+                {
+                    "name": "AutoETS",
+                    "rank": 1,
+                    "mean_mase": 0.875,
+                    "summary": "Mean MASE is 0.8750.",
+                    "series": [
+                        {
+                            "name": "s1",
+                            "note": "MASE 0.8000; this model beats the naive baseline.",
+                            "ds_history": ["2020-07-01"],
+                            "y_history": [9.5],
+                            "ds_actual": ["2020-07-02"],
+                            "y_actual": [10.5],
+                            "ds_forecast": ["2020-07-02"],
+                            "y_hat": [10.0],
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+
+    assert fake_st.subheaders == ["Forecast vs Actual"]
+    assert fake_st.expanders == ["AutoETS (MASE=0.8750)"]
+    assert fake_st.plotly_calls == 1
+
+
+def test_render_diagnostics_panel_outputs_metrics_and_charts() -> None:
+    fake_st = _FakeStreamlit()
+
+    _render_diagnostics_panel(
+        fake_st,
+        {
+            "model_name": "AutoETS",
+            "residual_mean": 0.1,
+            "residual_std": 0.5,
+            "ljung_box_p": 0.42,
+            "histogram_bins": [0.0, 0.5, 1.0],
+            "histogram_counts": [3, 2],
+            "acf_lags": [1, 2],
+            "acf_values": [0.1, -0.05],
+        },
+    )
+
+    assert fake_st.subheaders == ["Residual Diagnostics"]
+    assert fake_st.columns_created[2].metrics == [("Ljung-Box p", "0.4200")]
+    assert fake_st.plotly_calls == 2
