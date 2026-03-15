@@ -530,6 +530,32 @@ def _render_artifact_manifest(st: Any, manifest: dict[str, Any]) -> None:
     st.dataframe(manifest["rows"], use_container_width=True, hide_index=True)
 
 
+def _render_artifact_health(st: Any, manifest: dict[str, Any]) -> None:
+    """Render a compact saved-artifact health summary."""
+    rows = manifest.get("rows", [])
+    if not rows:
+        return
+
+    status_by_artifact = {
+        row["Artifact"]: row["Status"]
+        for row in rows
+    }
+    details_status = status_by_artifact.get("details.json", "Unknown")
+    if manifest.get("missing_count", 0) == 0:
+        overall_status = "Complete"
+    elif details_status == "Not Provided":
+        overall_status = "Base Only"
+    else:
+        overall_status = "Degraded"
+
+    st.subheader("Artifact Health")
+    st.caption("Saved artifact availability for this dashboard session.")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Overall", overall_status)
+    col2.metric("results.json", status_by_artifact.get("results.json", "Unknown"))
+    col3.metric("details.json", details_status)
+
+
 def _dashboard_snapshot_filename(result: Any) -> str:
     """Build a stable filename for a filtered dashboard snapshot."""
     leader = result.leaderboard[0].name if result.leaderboard else "snapshot"
@@ -1059,6 +1085,7 @@ def _render_result_dashboard(
     st.divider()
 
     if artifact_manifest:
+        _render_artifact_health(st, artifact_manifest)
         _render_artifact_manifest(st, artifact_manifest)
 
     filtered_result = _render_display_filters(st, result)

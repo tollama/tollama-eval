@@ -35,6 +35,7 @@ from ts_autopilot.reporting.dashboard import (
     _optional_model_environment_summary,
     _parse_dashboard_args,
     _parse_dashboard_query_artifact_paths,
+    _render_artifact_health,
     _render_artifact_manifest,
     _render_diagnostics_panel,
     _render_display_filters,
@@ -953,6 +954,37 @@ def test_artifact_manifest_summary_marks_details_missing_on_disk() -> None:
     assert "requested, but local file was not available" in manifest["rows"][1][
         "Contents"
     ]
+
+
+def test_render_artifact_health_uses_manifest_states() -> None:
+    fake_st = _FakeStreamlit()
+
+    _render_artifact_health(
+        fake_st,
+        {
+            "loaded_count": 1,
+            "missing_count": 1,
+            "rows": [
+                {
+                    "Artifact": "results.json",
+                    "Status": "Loaded",
+                    "Source": "results.json",
+                    "Contents": "profile, config, models, leaderboard",
+                },
+                {
+                    "Artifact": "details.json",
+                    "Status": "Missing on Disk",
+                    "Source": "/tmp/out/details.json",
+                    "Contents": "requested, but local file was not available",
+                },
+            ],
+        },
+    )
+
+    assert fake_st.subheaders == ["Artifact Health"]
+    assert fake_st.columns_created[0].metrics == [("Overall", "Degraded")]
+    assert fake_st.columns_created[1].metrics == [("results.json", "Loaded")]
+    assert fake_st.columns_created[2].metrics == [("details.json", "Missing on Disk")]
 
 
 def test_render_artifact_manifest_uses_streamlit_block() -> None:
