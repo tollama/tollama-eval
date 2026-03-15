@@ -44,6 +44,7 @@ from ts_autopilot.reporting.dashboard import (
     _render_shareable_link,
     _render_snapshot_export,
     _resolve_saved_result_sources,
+    _saved_artifact_sidebar_rows,
 )
 from ts_autopilot.runners.optional import OptionalRunnerStatus
 
@@ -471,6 +472,29 @@ def test_parse_dashboard_query_artifact_paths_reads_local_paths() -> None:
     assert parsed_details == Path("/tmp/out/details.json")
 
 
+def test_saved_artifact_sidebar_rows_marks_details_not_provided(tmp_path) -> None:
+    results_path = tmp_path / "results.json"
+    results_path.write_text("{}", encoding="utf-8")
+
+    rows = _saved_artifact_sidebar_rows(results_path, None)
+
+    assert rows[0]["Status"] == "Loaded"
+    assert rows[1]["Status"] == "Not Provided"
+    assert rows[1]["Source"] == "not provided"
+
+
+def test_saved_artifact_sidebar_rows_marks_missing_details_on_disk(tmp_path) -> None:
+    results_path = tmp_path / "results.json"
+    results_path.write_text("{}", encoding="utf-8")
+    details_path = tmp_path / "details.json"
+
+    rows = _saved_artifact_sidebar_rows(results_path, details_path)
+
+    assert rows[0]["Status"] == "Loaded"
+    assert rows[1]["Status"] == "Missing on Disk"
+    assert rows[1]["Source"] == str(details_path)
+
+
 def test_resolve_saved_result_sources_stops_when_results_path_is_missing() -> None:
     fake_st = _FakeStreamlit()
 
@@ -496,7 +520,7 @@ def test_resolve_saved_result_sources_drops_missing_details_path(tmp_path) -> No
         tmp_path / "missing-details.json",
     )
 
-    assert resolved == (results_path, None)
+    assert resolved == (results_path, None, True)
     assert "Optional details artifact was not found" in fake_st.warnings[0]
     assert "Continuing with `results.json` only" in fake_st.info_messages[0]
 
@@ -876,7 +900,8 @@ def test_artifact_manifest_summary_marks_missing_details() -> None:
     assert manifest["loaded_count"] == 1
     assert manifest["missing_count"] == 1
     assert manifest["rows"][1]["Artifact"] == "details.json"
-    assert manifest["rows"][1]["Status"] == "Missing"
+    assert manifest["rows"][1]["Status"] == "Not Provided"
+    assert manifest["rows"][1]["Source"] == "not provided"
 
 
 def test_artifact_manifest_summary_lists_detail_features() -> None:
@@ -912,6 +937,24 @@ def test_artifact_manifest_summary_lists_detail_features() -> None:
     assert "environment provenance" in manifest["rows"][1]["Contents"]
 
 
+def test_artifact_manifest_summary_marks_details_missing_on_disk() -> None:
+    result = _make_result()
+
+    manifest = _artifact_manifest_summary(
+        result,
+        results_source="results.json",
+        details_source="/tmp/out/details.json",
+        details_requested=False,
+        details_missing_on_disk=True,
+    )
+
+    assert manifest["rows"][1]["Status"] == "Missing on Disk"
+    assert manifest["rows"][1]["Source"] == "/tmp/out/details.json"
+    assert "requested, but local file was not available" in manifest["rows"][1][
+        "Contents"
+    ]
+
+
 def test_render_artifact_manifest_uses_streamlit_block() -> None:
     fake_st = _FakeStreamlit()
 
@@ -929,7 +972,7 @@ def test_render_artifact_manifest_uses_streamlit_block() -> None:
                 },
                 {
                     "Artifact": "details.json",
-                    "Status": "Missing",
+                    "Status": "Not Provided",
                     "Source": "not provided",
                     "Contents": "-",
                 },

@@ -82,9 +82,12 @@ def main() -> None:
         )
         with st.sidebar:
             st.header("Loaded Artifacts")
-            st.caption(str(resolved_results_path))
-            if resolved_details_path is not None:
-                st.caption(str(resolved_details_path))
+            for row in _saved_artifact_sidebar_rows(
+                resolved_results_path,
+                resolved_details_path,
+            ):
+                st.caption(f"{row['Artifact']}: {row['Status']}")
+                st.caption(row["Source"])
         _open_saved_results(resolved_results_path, resolved_details_path)
         return
 
@@ -265,7 +268,7 @@ def _resolve_saved_result_sources(
     st: Any,
     results_file: Any,
     details_file: Any | None = None,
-) -> tuple[Any, Any | None] | None:
+) -> tuple[Any, Any | None, bool] | None:
     """Validate saved artifact sources and return usable inputs for loading."""
     if isinstance(results_file, Path) and not results_file.exists():
         st.error(f"Saved results artifact was not found: {results_file}")
@@ -283,9 +286,9 @@ def _resolve_saved_result_sources(
             "environment provenance will be unavailable until `details.json` is "
             "provided again."
         )
-        return results_file, None
+        return results_file, None, True
 
-    return results_file, details_file
+    return results_file, details_file, False
 
 
 def _open_saved_results(results_file: Any, details_file: Any | None = None) -> None:
@@ -295,7 +298,7 @@ def _open_saved_results(results_file: Any, details_file: Any | None = None) -> N
     resolved_sources = _resolve_saved_result_sources(st, results_file, details_file)
     if resolved_sources is None:
         return
-    results_file, details_file = resolved_sources
+    results_file, details_file, details_missing_on_disk = resolved_sources
 
     try:
         result = _load_result_artifacts(results_file, details_file)
@@ -311,6 +314,7 @@ def _open_saved_results(results_file: Any, details_file: Any | None = None) -> N
             results_source=_artifact_source_label(results_file),
             details_source=_artifact_source_label(details_file),
             details_requested=details_file is not None,
+            details_missing_on_disk=details_missing_on_disk,
         ),
     )
 
@@ -419,12 +423,48 @@ def _artifact_source_label(source: Any | None) -> str | None:
     return str(source)
 
 
+def _saved_artifact_sidebar_rows(
+    results_source: Path,
+    details_source: Path | None,
+) -> list[dict[str, str]]:
+    """Build sidebar status rows for saved artifact paths."""
+    rows = [
+        {
+            "Artifact": "results.json",
+            "Status": "Loaded" if results_source.exists() else "Missing on Disk",
+            "Source": str(results_source),
+        }
+    ]
+
+    if details_source is None:
+        rows.append(
+            {
+                "Artifact": "details.json",
+                "Status": "Not Provided",
+                "Source": "not provided",
+            }
+        )
+    else:
+        rows.append(
+            {
+                "Artifact": "details.json",
+                "Status": (
+                    "Loaded" if details_source.exists() else "Missing on Disk"
+                ),
+                "Source": str(details_source),
+            }
+        )
+
+    return rows
+
+
 def _artifact_manifest_summary(
     result: Any,
     *,
     results_source: str,
     details_source: str | None,
     details_requested: bool,
+    details_missing_on_disk: bool = False,
 ) -> dict[str, Any]:
     """Summarize which saved artifacts were loaded and what they provide."""
     details = result.to_details_dict()
@@ -440,6 +480,19 @@ def _artifact_manifest_summary(
         detail_features.append("environment provenance")
 
     detail_contents = ", ".join(detail_features) if detail_features else "no extras"
+    details_status = "Not Provided"
+    details_contents = "-"
+    details_source_label = details_source or "not provided"
+    if details_requested and details_loaded:
+        details_status = "Loaded"
+        details_contents = detail_contents
+    elif details_missing_on_disk:
+        details_status = "Missing on Disk"
+        details_contents = "requested, but local file was not available"
+        details_source_label = details_source or "missing local path"
+    elif details_requested:
+        details_status = "Missing"
+
     rows = [
         {
             "Artifact": "results.json",
@@ -449,11 +502,9 @@ def _artifact_manifest_summary(
         },
         {
             "Artifact": "details.json",
-            "Status": "Loaded" if details_requested and details_loaded else "Missing",
-            "Source": details_source or "not provided",
-            "Contents": (
-                detail_contents if details_requested and details_loaded else "-"
-            ),
+            "Status": details_status,
+            "Source": details_source_label,
+            "Contents": details_contents,
         },
     ]
     return {
