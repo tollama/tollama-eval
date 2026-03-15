@@ -529,10 +529,10 @@ def _render_result_dashboard(
     import plotly.graph_objects as go
 
     from ts_autopilot.reporting.executive_summary import generate_executive_summary
-    from ts_autopilot.reporting.html_report import (
-        _build_diagnostics_chart_data,
-        _build_forecast_chart_data,
-        _build_per_series_competition_data,
+    from ts_autopilot.reporting.view_data import (
+        build_diagnostics_chart_data,
+        build_forecast_chart_data,
+        build_per_series_competition_data,
     )
 
     st.divider()
@@ -631,15 +631,15 @@ def _render_result_dashboard(
             fig2.update_layout(title="MASE Stability Across Folds", height=350)
             st.plotly_chart(fig2, use_container_width=True)
 
-    per_series_chart = _build_per_series_competition_data(filtered_result)
+    per_series_chart = build_per_series_competition_data(filtered_result)
     if per_series_chart:
         _render_per_series_panel(st, per_series_chart)
 
-    forecast_chart = _build_forecast_chart_data(filtered_result)
+    forecast_chart = build_forecast_chart_data(filtered_result)
     if forecast_chart.get("models"):
         _render_forecast_panels(st, forecast_chart)
 
-    diagnostics_chart = _build_diagnostics_chart_data(filtered_result)
+    diagnostics_chart = build_diagnostics_chart_data(filtered_result)
     if diagnostics_chart:
         _render_diagnostics_panel(st, diagnostics_chart)
 
@@ -668,6 +668,44 @@ def _render_result_dashboard(
                 st.caption(f"Runtime: {model.runtime_sec:.2f}s")
 
 
+def _filter_forecast_chart_data(
+    forecast_chart: dict[str, Any],
+    *,
+    selected_model_names: list[str] | None = None,
+    selected_series: list[str] | None = None,
+) -> dict[str, Any]:
+    """Filter forecast panels by model and series for dashboard display."""
+    series_options = forecast_chart.get("selected_series") or [
+        series["name"]
+        for model in forecast_chart["models"]
+        for series in model["series"]
+    ]
+    allowed_models = set(
+        selected_model_names or [model["name"] for model in forecast_chart["models"]]
+    )
+    allowed_series = set(selected_series or series_options)
+
+    models = []
+    for model in forecast_chart["models"]:
+        if model["name"] not in allowed_models:
+            continue
+        filtered_series = [
+            series for series in model["series"] if series["name"] in allowed_series
+        ]
+        if filtered_series:
+            models.append({**model, "series": filtered_series})
+
+    return {
+        "fold": forecast_chart["fold"],
+        "selected_series": [
+            sid
+            for sid in series_options
+            if sid in allowed_series
+        ],
+        "models": models,
+    }
+
+
 def _render_forecast_panels(st: Any, forecast_chart: dict[str, Any]) -> None:
     """Render forecast vs actual panels for each model and highlighted series."""
     import plotly.graph_objects as go
@@ -678,7 +716,32 @@ def _render_forecast_panels(st: Any, forecast_chart: dict[str, Any]) -> None:
         "series across all available models."
     )
 
-    for model in forecast_chart["models"]:
+    model_options = [model["name"] for model in forecast_chart["models"]]
+    series_options = forecast_chart.get("selected_series") or [
+        series["name"]
+        for model in forecast_chart["models"]
+        for series in model["series"]
+    ]
+    selected_model_names = st.multiselect(
+        "Forecast models",
+        model_options,
+        default=model_options,
+    )
+    selected_series = st.multiselect(
+        "Forecast series",
+        series_options,
+        default=series_options,
+    )
+    filtered_chart = _filter_forecast_chart_data(
+        forecast_chart,
+        selected_model_names=selected_model_names,
+        selected_series=selected_series,
+    )
+    if not filtered_chart["models"]:
+        st.warning("No forecast panels match the current forecast filters.")
+        return
+
+    for model in filtered_chart["models"]:
         with st.expander(
             f"{model['name']} (MASE={model['mean_mase']:.4f})",
             expanded=model.get("rank") == 1,
@@ -723,6 +786,70 @@ def _render_forecast_panels(st: Any, forecast_chart: dict[str, Any]) -> None:
                 st.plotly_chart(fig, use_container_width=True)
 
 
+def _filter_per_series_chart_data(
+    per_series_chart: dict[str, Any],
+    *,
+    selected_model_names: list[str] | None = None,
+    selected_series: list[str] | None = None,
+) -> dict[str, Any]:
+    """Filter per-series winner views by model and series."""
+    model_names = per_series_chart.get("models", [])
+    heatmap_series = per_series_chart.get("heatmap_series", [])
+    allowed_models = set(selected_model_names or model_names)
+    allowed_series = set(selected_series or heatmap_series)
+
+    model_indexes = [
+        idx
+        for idx, model_name in enumerate(model_names)
+        if model_name in allowed_models
+    ]
+    filtered_models = [model_names[idx] for idx in model_indexes]
+    filtered_heatmap_series = [
+        sid for sid in heatmap_series if sid in allowed_series
+    ]
+
+    heatmap_z = []
+    heatmap_text = []
+    for sid, z_row, text_row in zip(
+        heatmap_series,
+        per_series_chart.get("heatmap_z", []),
+        per_series_chart.get("heatmap_text", []),
+        strict=False,
+    ):
+        if sid not in allowed_series:
+            continue
+        heatmap_z.append([z_row[idx] for idx in model_indexes])
+        heatmap_text.append([text_row[idx] for idx in model_indexes])
+
+    filtered_rows = []
+    for row in per_series_chart.get("table_rows", []):
+        if row["series_id"] not in allowed_series:
+            continue
+        row_copy = dict(row)
+        row_copy["scores"] = {
+            name: score
+            for name, score in row.get("scores", {}).items()
+            if name in allowed_models
+        }
+        filtered_rows.append(row_copy)
+
+    filtered_winner_summary = [
+        row
+        for row in per_series_chart.get("winner_summary", [])
+        if row["name"] in allowed_models
+    ]
+
+    return {
+        **per_series_chart,
+        "models": filtered_models,
+        "heatmap_series": filtered_heatmap_series,
+        "heatmap_z": heatmap_z,
+        "heatmap_text": heatmap_text,
+        "table_rows": filtered_rows,
+        "winner_summary": filtered_winner_summary,
+    }
+
+
 def _render_per_series_panel(st: Any, per_series_chart: dict[str, Any]) -> None:
     """Render per-series winner concentration and hardest-series views."""
     import pandas as pd
@@ -736,7 +863,28 @@ def _render_per_series_panel(st: Any, per_series_chart: dict[str, Any]) -> None:
     for insight in per_series_chart.get("insights", []):
         st.caption(insight)
 
-    winner_summary = per_series_chart.get("winner_summary", [])
+    model_options = per_series_chart.get("models", [])
+    series_options = per_series_chart.get("heatmap_series", [])
+    selected_model_names = st.multiselect(
+        "Per-series models",
+        model_options,
+        default=model_options,
+    )
+    selected_series = st.multiselect(
+        "Per-series series",
+        series_options,
+        default=series_options,
+    )
+    filtered_chart = _filter_per_series_chart_data(
+        per_series_chart,
+        selected_model_names=selected_model_names,
+        selected_series=selected_series,
+    )
+    if not filtered_chart.get("models") or not filtered_chart.get("heatmap_series"):
+        st.warning("No per-series panels match the current per-series filters.")
+        return
+
+    winner_summary = filtered_chart.get("winner_summary", [])
     if winner_summary:
         winner_fig = go.Figure(
             go.Bar(
@@ -753,13 +901,13 @@ def _render_per_series_panel(st: Any, per_series_chart: dict[str, Any]) -> None:
         )
         st.plotly_chart(winner_fig, use_container_width=True)
 
-    if per_series_chart.get("heatmap_z"):
+    if filtered_chart.get("heatmap_z"):
         heatmap = go.Figure(
             go.Heatmap(
-                z=per_series_chart["heatmap_z"],
-                x=per_series_chart["models"],
-                y=per_series_chart["heatmap_series"],
-                text=per_series_chart["heatmap_text"],
+                z=filtered_chart["heatmap_z"],
+                x=filtered_chart["models"],
+                y=filtered_chart["heatmap_series"],
+                text=filtered_chart["heatmap_text"],
                 texttemplate="%{text}",
                 colorscale="Blues",
                 hovertemplate=(
@@ -769,14 +917,14 @@ def _render_per_series_panel(st: Any, per_series_chart: dict[str, Any]) -> None:
         )
         heatmap.update_layout(
             title="Per-Series MASE Heatmap",
-            height=max(360, 28 * len(per_series_chart["heatmap_series"]) + 120),
+            height=max(360, 28 * len(filtered_chart["heatmap_series"]) + 120),
             margin={"l": 20, "r": 20, "t": 50, "b": 20},
         )
         st.plotly_chart(heatmap, use_container_width=True)
 
-    if per_series_chart.get("table_rows"):
+    if filtered_chart.get("table_rows"):
         table_rows = []
-        for row in per_series_chart["table_rows"]:
+        for row in filtered_chart["table_rows"]:
             table_rows.append(
                 {
                     "Series": row["series_id"],

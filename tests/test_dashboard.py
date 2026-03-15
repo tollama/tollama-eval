@@ -14,6 +14,8 @@ from ts_autopilot.contracts import (
 from ts_autopilot.reporting.dashboard import (
     _artifact_manifest_summary,
     _artifact_source_label,
+    _filter_forecast_chart_data,
+    _filter_per_series_chart_data,
     _filter_result_for_dashboard,
     _load_result_artifacts,
     _optional_model_environment_summary,
@@ -242,6 +244,41 @@ def test_load_result_artifacts_supports_filesystem_paths(tmp_path) -> None:
     loaded = _load_result_artifacts(results_path, details_path)
 
     assert loaded._optional_runner_statuses[0]["label"] == "LightGBM"
+
+
+def test_written_artifacts_roundtrip_into_dashboard_loader(tmp_path) -> None:
+    from ts_autopilot.pipeline import write_output_artifacts
+
+    result = _make_result()
+    result.forecast_data = [
+        ForecastData(
+            model_name="SeasonalNaive",
+            fold=1,
+            unique_id=["s1"],
+            ds=["2020-01-02"],
+            y_hat=[1.0],
+            y_actual=[1.1],
+        )
+    ]
+    result._optional_runner_statuses = [
+        OptionalRunnerStatus(
+            label="Prophet",
+            available=True,
+            reason="available",
+            runner_names=["Prophet"],
+        )
+    ]
+
+    out_dir = tmp_path / "out"
+    write_output_artifacts(result, out_dir)
+    loaded = _load_result_artifacts(
+        out_dir / "results.json",
+        out_dir / "details.json",
+    )
+
+    assert loaded.leaderboard[0].name == "SeasonalNaive"
+    assert loaded.forecast_data[0].model_name == "SeasonalNaive"
+    assert loaded._optional_runner_statuses[0]["label"] == "Prophet"
 
 
 def test_filter_result_for_dashboard_trims_models_forecasts_and_diagnostics() -> None:
@@ -478,6 +515,42 @@ def test_render_forecast_panels_outputs_chart_blocks() -> None:
     assert fake_st.plotly_calls == 1
 
 
+def test_filter_forecast_chart_data_limits_models_and_series() -> None:
+    filtered = _filter_forecast_chart_data(
+        {
+            "fold": 2,
+            "selected_series": ["s1", "s2"],
+            "models": [
+                {
+                    "name": "AutoETS",
+                    "rank": 1,
+                    "mean_mase": 0.875,
+                    "summary": "Mean MASE is 0.8750.",
+                    "series": [
+                        {"name": "s1"},
+                        {"name": "s2"},
+                    ],
+                },
+                {
+                    "name": "SeasonalNaive",
+                    "rank": 2,
+                    "mean_mase": 1.0,
+                    "summary": "Mean MASE is 1.0000.",
+                    "series": [
+                        {"name": "s1"},
+                    ],
+                },
+            ],
+        },
+        selected_model_names=["SeasonalNaive"],
+        selected_series=["s1"],
+    )
+
+    assert filtered["selected_series"] == ["s1"]
+    assert [model["name"] for model in filtered["models"]] == ["SeasonalNaive"]
+    assert filtered["models"][0]["series"] == [{"name": "s1"}]
+
+
 def test_render_diagnostics_panel_outputs_metrics_and_charts() -> None:
     fake_st = _FakeStreamlit()
 
@@ -534,3 +607,39 @@ def test_render_per_series_panel_outputs_charts_and_table() -> None:
     assert fake_st.subheaders == ["Per-Series Winners"]
     assert fake_st.plotly_calls == 2
     assert fake_st.dataframes
+
+
+def test_filter_per_series_chart_data_limits_models_and_series() -> None:
+    filtered = _filter_per_series_chart_data(
+        {
+            "series_total": 2,
+            "models": ["AutoETS", "SeasonalNaive"],
+            "winner_summary": [
+                {"name": "AutoETS", "count": 2},
+                {"name": "SeasonalNaive", "count": 0},
+            ],
+            "heatmap_series": ["s2", "s1"],
+            "heatmap_z": [[0.975, 1.06], [0.775, 0.94]],
+            "heatmap_text": [["0.9750", "1.0600"], ["0.7750", "0.9400"]],
+            "table_rows": [
+                {
+                    "series_id": "s2",
+                    "winner": "AutoETS",
+                    "winner_mase": 0.975,
+                    "runner_up": "SeasonalNaive",
+                    "runner_up_mase": 1.06,
+                    "margin": 0.085,
+                    "spread": 0.085,
+                    "scores": {"AutoETS": 0.975, "SeasonalNaive": 1.06},
+                }
+            ],
+            "insights": [],
+        },
+        selected_model_names=["AutoETS"],
+        selected_series=["s2"],
+    )
+
+    assert filtered["models"] == ["AutoETS"]
+    assert filtered["heatmap_series"] == ["s2"]
+    assert filtered["heatmap_z"] == [[0.975]]
+    assert filtered["table_rows"][0]["scores"] == {"AutoETS": 0.975}
