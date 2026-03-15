@@ -10,6 +10,36 @@ from ts_autopilot.logging_config import get_logger
 logger = get_logger("export")
 
 
+def _optional_model_environment_rows(result: BenchmarkResult) -> list[dict]:
+    """Return normalized optional model environment rows for export sinks."""
+    raw_statuses = getattr(result, "_optional_runner_statuses", None)
+    if not raw_statuses:
+        return []
+
+    rows = []
+    for status in raw_statuses:
+        if isinstance(status, dict):
+            label = status.get("label", "")
+            available = bool(status.get("available", False))
+            reason = status.get("reason", "")
+            runner_names = list(status.get("runner_names", []))
+        else:
+            label = getattr(status, "label", "")
+            available = bool(getattr(status, "available", False))
+            reason = getattr(status, "reason", "")
+            runner_names = list(getattr(status, "runner_names", []))
+
+        rows.append(
+            {
+                "group": label,
+                "status": "Enabled" if available else "Skipped",
+                "models": ", ".join(runner_names),
+                "detail": "Dependency stack available" if available else reason,
+            }
+        )
+    return rows
+
+
 def _build_per_series_winner_summary(
     result: BenchmarkResult,
 ) -> tuple[list[str], list[dict]]:
@@ -212,7 +242,8 @@ def export_excel(result: BenchmarkResult, output_path: str | Path) -> Path:
     """Export benchmark results as a formatted Excel workbook.
 
     Creates sheets: Executive Summary, Leaderboard, Fold Details,
-    Per-Series Scores, Per-Series Winners, Data Profile.
+    Per-Series Scores, Per-Series Winners, Data Profile, and Optional Models
+    when optional runner discovery context is present.
 
     Requires openpyxl. Install with: pip install "tollama-eval[excel]"
 
@@ -451,7 +482,67 @@ def export_excel(result: BenchmarkResult, output_path: str | Path) -> Path:
 
     _auto_width(ws_winners)
 
-    # --- Sheet 6: Data Profile ---
+    optional_env_rows = _optional_model_environment_rows(result)
+    if optional_env_rows:
+        ws_optional = wb.create_sheet("Optional Models")
+        ws_optional.cell(
+            row=1,
+            column=1,
+            value="Optional Model Environment",
+        ).font = title_font
+        summary_rows = [
+            (
+                "Enabled Groups",
+                sum(
+                    1 for row in optional_env_rows if row["status"] == "Enabled"
+                ),
+            ),
+            (
+                "Skipped Groups",
+                sum(
+                    1 for row in optional_env_rows if row["status"] == "Skipped"
+                ),
+            ),
+            (
+                "Enabled Models",
+                sum(
+                    len([name for name in row["models"].split(", ") if name])
+                    for row in optional_env_rows
+                    if row["status"] == "Enabled"
+                ),
+            ),
+        ]
+        row = 3
+        for key, value in summary_rows:
+            ws_optional.cell(row=row, column=1, value=key).font = Font(bold=True)
+            ws_optional.cell(row=row, column=2, value=value)
+            ws_optional.cell(row=row, column=1).border = thin_border
+            ws_optional.cell(row=row, column=2).border = thin_border
+            row += 1
+
+        optional_headers = ["Group", "Status", "Models", "Detail"]
+        for col, header in enumerate(optional_headers, 1):
+            ws_optional.cell(row=row + 1, column=col, value=header)
+        _style_header(ws_optional, row + 1, len(optional_headers))
+
+        data_start_row = row + 2
+        for idx, env_row in enumerate(optional_env_rows, start=data_start_row):
+            ws_optional.cell(row=idx, column=1, value=env_row["group"])
+            status_cell = ws_optional.cell(row=idx, column=2, value=env_row["status"])
+            ws_optional.cell(row=idx, column=3, value=env_row["models"])
+            ws_optional.cell(row=idx, column=4, value=env_row["detail"])
+            if env_row["status"] == "Enabled":
+                status_cell.fill = good_fill
+                status_cell.font = good_font
+            else:
+                status_cell.fill = bad_fill
+                status_cell.font = bad_font
+            for col in range(1, len(optional_headers) + 1):
+                ws_optional.cell(row=idx, column=col).border = thin_border
+
+        _auto_width(ws_optional)
+
+    # --- Sheet 6/7: Data Profile ---
     ws_profile = wb.create_sheet("Data Profile")
     profile_data = [
         ("Series Count", result.profile.n_series),

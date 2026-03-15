@@ -10,6 +10,7 @@ from ts_autopilot.contracts import (
     LeaderboardEntry,
     ModelResult,
 )
+from ts_autopilot.runners.optional import OptionalRunnerStatus
 
 
 def _make_benchmark_result():
@@ -168,3 +169,44 @@ def test_benchmark_result_from_dict_without_data_chars():
     d = result.to_dict()
     restored = BenchmarkResult.from_dict(d)
     assert restored.data_characteristics is None
+
+
+def test_benchmark_result_details_with_optional_model_environment():
+    result = _make_benchmark_result()
+    result._optional_runner_statuses = [
+        OptionalRunnerStatus(
+            label="Prophet",
+            available=True,
+            reason="available",
+            runner_names=["Prophet"],
+        ),
+        OptionalRunnerStatus(
+            label="NeuralForecast",
+            available=False,
+            reason="failed health check",
+            runner_names=["NHITS", "NBEATS"],
+        ),
+    ]
+
+    details = result.to_details_dict()
+
+    assert "optional_model_environment" in details
+    assert details["optional_model_environment"][0]["label"] == "Prophet"
+    assert details["optional_model_environment"][1]["reason"] == "failed health check"
+
+
+def test_benchmark_result_from_dict_with_optional_model_environment():
+    result = _make_benchmark_result()
+    combined = result.to_dict()
+    combined["optional_model_environment"] = [
+        {
+            "label": "LightGBM",
+            "available": False,
+            "reason": "missing dependency: lightgbm",
+            "runner_names": ["LightGBM"],
+        }
+    ]
+
+    restored = BenchmarkResult.from_dict(combined)
+
+    assert restored._optional_runner_statuses[0]["label"] == "LightGBM"

@@ -17,6 +17,7 @@ from ts_autopilot.reporting.export import (
     export_per_series_csv,
     export_per_series_winners_csv,
 )
+from ts_autopilot.runners.optional import OptionalRunnerStatus
 
 
 def _make_result():
@@ -174,3 +175,33 @@ def test_export_excel_includes_per_series_winners_sheet(tmp_path):
     ]
     assert "ModelA MASE" in headers
     assert ws.cell(row=2, column=1).value in {"s1", "s2"}
+
+
+def test_export_excel_includes_optional_models_sheet(tmp_path):
+    openpyxl = pytest.importorskip("openpyxl")
+
+    result = _make_result()
+    result._optional_runner_statuses = [
+        OptionalRunnerStatus(
+            label="Prophet",
+            available=True,
+            reason="available",
+            runner_names=["Prophet"],
+        ),
+        OptionalRunnerStatus(
+            label="NeuralForecast",
+            available=False,
+            reason="failed health check",
+            runner_names=["NHITS", "NBEATS"],
+        ),
+    ]
+
+    path = export_excel(result, tmp_path / "report.xlsx")
+
+    wb = openpyxl.load_workbook(path)
+    assert "Optional Models" in wb.sheetnames
+    ws = wb["Optional Models"]
+    assert ws["A1"].value == "Optional Model Environment"
+    assert ws["A7"].value == "Group"
+    assert ws["B8"].value == "Enabled"
+    assert ws["D9"].value == "failed health check"

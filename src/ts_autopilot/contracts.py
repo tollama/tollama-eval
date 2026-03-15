@@ -316,6 +316,26 @@ class BenchmarkResult:
     diagnostics: list[DiagnosticsResult] = field(default_factory=list)
     data_characteristics: DataCharacteristics | None = None
 
+    @staticmethod
+    def _serialize_optional_runner_status(
+        status: Any,
+    ) -> dict[str, Any]:
+        """Serialize optional runner status objects or dicts for details.json."""
+        if isinstance(status, dict):
+            return {
+                "label": status.get("label", ""),
+                "available": bool(status.get("available", False)),
+                "reason": status.get("reason", ""),
+                "runner_names": list(status.get("runner_names", [])),
+            }
+
+        return {
+            "label": getattr(status, "label", ""),
+            "available": bool(getattr(status, "available", False)),
+            "reason": getattr(status, "reason", ""),
+            "runner_names": list(getattr(status, "runner_names", [])),
+        }
+
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {}
         if self.metadata is not None:
@@ -345,6 +365,12 @@ class BenchmarkResult:
             d["diagnostics"] = [diag.to_dict() for diag in self.diagnostics]
         if self.data_characteristics is not None:
             d["data_characteristics"] = self.data_characteristics.to_dict()
+        optional_runner_statuses = getattr(self, "_optional_runner_statuses", None)
+        if optional_runner_statuses:
+            d["optional_model_environment"] = [
+                self._serialize_optional_runner_status(status)
+                for status in optional_runner_statuses
+            ]
         return d
 
     def to_details_json(self, indent: int = 2) -> str:
@@ -358,7 +384,7 @@ class BenchmarkResult:
         data_chars = None
         if "data_characteristics" in d:
             data_chars = DataCharacteristics.from_dict(d["data_characteristics"])
-        return cls(
+        result = cls(
             profile=DataProfile.from_dict(d["profile"]),
             config=BenchmarkConfig.from_dict(d["config"]),
             models=[ModelResult.from_dict(m) for m in d["models"]],
@@ -373,6 +399,9 @@ class BenchmarkResult:
             ],
             data_characteristics=data_chars,
         )
+        if "optional_model_environment" in d:
+            result._optional_runner_statuses = list(d["optional_model_environment"])
+        return result
 
     @classmethod
     def from_json(cls, s: str) -> BenchmarkResult:
