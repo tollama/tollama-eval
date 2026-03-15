@@ -233,7 +233,16 @@ def _open_saved_results(results_file: Any, details_file: Any | None = None) -> N
         st.error(f"Failed to load benchmark artifacts: {exc}")
         return
 
-    _render_result_dashboard(st, result)
+    _render_result_dashboard(
+        st,
+        result,
+        artifact_manifest=_artifact_manifest_summary(
+            result,
+            results_source=_artifact_source_label(results_file),
+            details_source=_artifact_source_label(details_file),
+            details_requested=details_file is not None,
+        ),
+    )
 
 
 def _show_sample_format() -> None:
@@ -331,7 +340,81 @@ def _run_benchmark(
     _render_result_dashboard(st, result)
 
 
-def _render_result_dashboard(st: Any, result: Any) -> None:
+def _artifact_source_label(source: Any | None) -> str | None:
+    """Return a human-readable label for an uploaded artifact source."""
+    if source is None:
+        return None
+    if hasattr(source, "name") and source.name:
+        return str(source.name)
+    return str(source)
+
+
+def _artifact_manifest_summary(
+    result: Any,
+    *,
+    results_source: str,
+    details_source: str | None,
+    details_requested: bool,
+) -> dict[str, Any]:
+    """Summarize which saved artifacts were loaded and what they provide."""
+    details = result.to_details_dict()
+    details_loaded = bool(details)
+    detail_features = []
+    if result.forecast_data:
+        detail_features.append("forecast data")
+    if result.diagnostics:
+        detail_features.append("diagnostics")
+    if getattr(result, "data_characteristics", None) is not None:
+        detail_features.append("data characteristics")
+    if "optional_model_environment" in details:
+        detail_features.append("environment provenance")
+
+    detail_contents = ", ".join(detail_features) if detail_features else "no extras"
+    rows = [
+        {
+            "Artifact": "results.json",
+            "Status": "Loaded",
+            "Source": results_source,
+            "Contents": "profile, config, models, leaderboard",
+        },
+        {
+            "Artifact": "details.json",
+            "Status": "Loaded" if details_requested and details_loaded else "Missing",
+            "Source": details_source or "not provided",
+            "Contents": (
+                detail_contents if details_requested and details_loaded else "-"
+            ),
+        },
+    ]
+    return {
+        "rows": rows,
+        "loaded_count": sum(1 for row in rows if row["Status"] == "Loaded"),
+        "missing_count": sum(1 for row in rows if row["Status"] != "Loaded"),
+    }
+
+
+def _render_artifact_manifest(st: Any, manifest: dict[str, Any]) -> None:
+    """Render a compact manifest for loaded benchmark artifacts."""
+    if not manifest.get("rows"):
+        return
+
+    st.subheader("Artifact Manifest")
+    st.caption(
+        "Saved-result inputs loaded by the dashboard. Missing companions limit "
+        "available views such as forecasts, diagnostics, and environment context."
+    )
+    col1, col2 = st.columns(2)
+    col1.metric("Artifacts Loaded", manifest["loaded_count"])
+    col2.metric("Artifacts Missing", manifest["missing_count"])
+    st.dataframe(manifest["rows"], use_container_width=True, hide_index=True)
+
+
+def _render_result_dashboard(
+    st: Any,
+    result: Any,
+    *,
+    artifact_manifest: dict[str, Any] | None = None,
+) -> None:
     """Render a benchmark result in the dashboard."""
     import pandas as pd
     import plotly.graph_objects as go
@@ -342,6 +425,9 @@ def _render_result_dashboard(st: Any, result: Any) -> None:
 
     summary = generate_executive_summary(result)
     st.info(summary)
+
+    if artifact_manifest:
+        _render_artifact_manifest(st, artifact_manifest)
 
     st.subheader("Dataset Profile")
     col1, col2, col3, col4 = st.columns(4)

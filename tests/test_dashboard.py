@@ -11,9 +11,12 @@ from ts_autopilot.contracts import (
     ModelResult,
 )
 from ts_autopilot.reporting.dashboard import (
+    _artifact_manifest_summary,
+    _artifact_source_label,
     _load_result_artifacts,
     _optional_model_environment_summary,
     _parse_dashboard_args,
+    _render_artifact_manifest,
     _render_optional_model_environment,
 )
 from ts_autopilot.runners.optional import OptionalRunnerStatus
@@ -76,8 +79,9 @@ class _FakeStreamlit:
 
 
 class _FakeUpload:
-    def __init__(self, payload: dict) -> None:
+    def __init__(self, payload: dict, name: str = "artifact.json") -> None:
         self._payload = json.dumps(payload).encode("utf-8")
+        self.name = name
 
     def getvalue(self) -> bytes:
         return self._payload
@@ -223,3 +227,89 @@ def test_parse_dashboard_args_prefers_explicit_results_path(tmp_path) -> None:
 
     assert parsed_results == explicit_results
     assert parsed_details is None
+
+
+def test_artifact_source_label_uses_uploaded_name() -> None:
+    label = _artifact_source_label(_FakeUpload({}, name="results.json"))
+
+    assert label == "results.json"
+
+
+def test_artifact_manifest_summary_marks_missing_details() -> None:
+    result = _make_result()
+
+    manifest = _artifact_manifest_summary(
+        result,
+        results_source="results.json",
+        details_source=None,
+        details_requested=False,
+    )
+
+    assert manifest["loaded_count"] == 1
+    assert manifest["missing_count"] == 1
+    assert manifest["rows"][1]["Artifact"] == "details.json"
+    assert manifest["rows"][1]["Status"] == "Missing"
+
+
+def test_artifact_manifest_summary_lists_detail_features() -> None:
+    result = _make_result()
+    result.forecast_data = [
+        ForecastData(
+            model_name="SeasonalNaive",
+            fold=1,
+            unique_id=["s1"],
+            ds=["2020-01-02"],
+            y_hat=[1.0],
+            y_actual=[1.1],
+        )
+    ]
+    result._optional_runner_statuses = [
+        OptionalRunnerStatus(
+            label="Prophet",
+            available=True,
+            reason="available",
+            runner_names=["Prophet"],
+        )
+    ]
+
+    manifest = _artifact_manifest_summary(
+        result,
+        results_source="results.json",
+        details_source="details.json",
+        details_requested=True,
+    )
+
+    assert manifest["rows"][1]["Status"] == "Loaded"
+    assert "forecast data" in manifest["rows"][1]["Contents"]
+    assert "environment provenance" in manifest["rows"][1]["Contents"]
+
+
+def test_render_artifact_manifest_uses_streamlit_block() -> None:
+    fake_st = _FakeStreamlit()
+
+    _render_artifact_manifest(
+        fake_st,
+        {
+            "loaded_count": 1,
+            "missing_count": 1,
+            "rows": [
+                {
+                    "Artifact": "results.json",
+                    "Status": "Loaded",
+                    "Source": "results.json",
+                    "Contents": "profile, config, models, leaderboard",
+                },
+                {
+                    "Artifact": "details.json",
+                    "Status": "Missing",
+                    "Source": "not provided",
+                    "Contents": "-",
+                },
+            ],
+        },
+    )
+
+    assert fake_st.subheaders == ["Artifact Manifest"]
+    assert fake_st.columns_created[0].metrics == [("Artifacts Loaded", 1)]
+    assert fake_st.columns_created[1].metrics == [("Artifacts Missing", 1)]
+    assert fake_st.dataframes
