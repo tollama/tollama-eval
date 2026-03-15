@@ -21,6 +21,7 @@ from ts_autopilot.reporting.dashboard import (
     _build_dashboard_bundle_readme,
     _build_dashboard_filtered_details_json,
     _build_dashboard_filtered_results_json,
+    _build_dashboard_shareable_link,
     _build_dashboard_snapshot_html,
     _dashboard_bundle_filename,
     _dashboard_filtered_details_filename,
@@ -38,6 +39,7 @@ from ts_autopilot.reporting.dashboard import (
     _render_forecast_panels,
     _render_optional_model_environment,
     _render_per_series_panel,
+    _render_shareable_link,
     _render_snapshot_export,
 )
 from ts_autopilot.runners.optional import OptionalRunnerStatus
@@ -98,6 +100,7 @@ class _FakeStreamlit:
         self.info_messages: list[object] = []
         self.downloads: list[dict[str, object]] = []
         self.query_params: dict[str, str] = {}
+        self.text_inputs: list[dict[str, object]] = []
 
     def subheader(self, text: str) -> None:
         self.subheaders.append(text)
@@ -156,6 +159,15 @@ class _FakeStreamlit:
                 "mime": mime,
             }
         )
+
+    def text_input(self, label: str, *, value: str) -> str:
+        self.text_inputs.append(
+            {
+                "label": label,
+                "value": value,
+            }
+        )
+        return value
 
     def experimental_get_query_params(self) -> dict[str, list[str]]:
         return {
@@ -563,6 +575,37 @@ def test_render_display_filters_restores_query_param_state() -> None:
     assert [model.name for model in filtered.models] == ["AutoETS"]
     assert fake_st.query_params["display_rank"] == "2"
     assert fake_st.query_params["display_models"] == '["AutoETS"]'
+
+
+def test_build_dashboard_shareable_link_encodes_current_filters() -> None:
+    fake_st = _FakeStreamlit()
+    fake_st.query_params = {
+        "display_rank": "2",
+        "display_models": '["AutoETS"]',
+        "forecast_models": '["AutoETS"]',
+        "forecast_series": '["s1"]',
+    }
+
+    link = _build_dashboard_shareable_link(fake_st)
+
+    assert link is not None
+    assert link.startswith("?display_rank=2")
+    assert "display_models=%5B%22AutoETS%22%5D" in link
+    assert "forecast_series=%5B%22s1%22%5D" in link
+
+
+def test_render_shareable_link_outputs_copyable_url() -> None:
+    fake_st = _FakeStreamlit()
+    fake_st.query_params = {
+        "display_rank": "2",
+        "display_models": '["AutoETS"]',
+    }
+
+    _render_shareable_link(fake_st)
+
+    assert fake_st.subheaders == ["Shareable Link"]
+    assert fake_st.text_inputs[0]["label"] == "Shareable URL"
+    assert fake_st.text_inputs[0]["value"].startswith("?display_rank=2")
 
 
 def test_build_dashboard_filtered_results_json_respects_filtered_models() -> None:

@@ -19,6 +19,7 @@ import zipfile
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 _DASHBOARD_QUERY_PARAM_KEYS = (
     "display_rank",
@@ -839,6 +840,36 @@ def _update_dashboard_query_params(st: Any, updates: dict[str, str | None]) -> N
         st.experimental_set_query_params(**desired)
 
 
+def _build_dashboard_shareable_link(st: Any) -> str | None:
+    """Build a copy-friendly relative URL for the current dashboard filters."""
+    params = _read_dashboard_query_params(st)
+    filtered_params = [
+        (key, params[key])
+        for key in _DASHBOARD_QUERY_PARAM_KEYS
+        if params.get(key)
+    ]
+    if not filtered_params:
+        return None
+    return f"?{urlencode(filtered_params)}"
+
+
+def _render_shareable_link(st: Any) -> None:
+    """Render a copy-friendly shareable link for the current dashboard view."""
+    shareable_link = _build_dashboard_shareable_link(st)
+    if shareable_link is None:
+        return
+
+    st.subheader("Shareable Link")
+    st.caption(
+        "Copy this URL suffix to reopen the current dashboard filters on the "
+        "same dashboard page."
+    )
+    if hasattr(st, "text_input"):
+        st.text_input("Shareable URL", value=shareable_link)
+    else:
+        st.caption(shareable_link)
+
+
 def _render_display_filters(st: Any, result: Any) -> Any:
     """Render dashboard model filters and return the filtered result view."""
     if len(result.models) <= 1:
@@ -1025,6 +1056,8 @@ def _render_result_dashboard(
     diagnostics_chart = build_diagnostics_chart_data(filtered_result)
     if diagnostics_chart:
         _render_diagnostics_panel(st, diagnostics_chart)
+
+    _render_shareable_link(st)
 
     if filtered_result.models:
         st.subheader("Model Details")
