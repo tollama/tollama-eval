@@ -1,5 +1,6 @@
 """Tests for benchmark pipeline."""
 
+import importlib
 import json
 
 from ts_autopilot.contracts import BenchmarkResult, DataProfile
@@ -184,6 +185,22 @@ def test_default_runners_is_immutable():
     from ts_autopilot.pipeline import DEFAULT_RUNNERS
 
     assert isinstance(DEFAULT_RUNNERS, tuple)
+
+
+def test_pipeline_import_is_safe_when_optional_discovery_breaks(monkeypatch):
+    """Reloading pipeline should not execute optional runner discovery."""
+    import ts_autopilot.pipeline as pipeline_mod
+    import ts_autopilot.runners.optional as optional_mod
+
+    monkeypatch.setattr(
+        optional_mod,
+        "get_optional_runners",
+        lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    reloaded = importlib.reload(pipeline_mod)
+
+    assert isinstance(reloaded.DEFAULT_RUNNERS, tuple)
 
 
 def test_fold_results_contain_series_scores(tiny_long_df):

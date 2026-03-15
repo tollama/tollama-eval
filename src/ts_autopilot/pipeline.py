@@ -44,21 +44,18 @@ from ts_autopilot.evaluation.metrics import (
 from ts_autopilot.exceptions import ModelFitError, ModelTimeoutError
 from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
-from ts_autopilot.runners.optional import get_optional_runners
 from ts_autopilot.runners.statistical import ALL_STATISTICAL_RUNNERS
 
 logger = get_logger("pipeline")
 
-DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
-    *ALL_STATISTICAL_RUNNERS,
-    *get_optional_runners(),
-)
+# Import-safe default runner set. Optional runners are not resolved at module
+# import time because some optional dependency stacks can abort the interpreter
+# merely by being imported.
+DEFAULT_RUNNERS: tuple[BaseRunner, ...] = ALL_STATISTICAL_RUNNERS
 
-# Extended runner set (includes all statistical + optional)
-EXTENDED_DEFAULT_RUNNERS: tuple[BaseRunner, ...] = (
-    *ALL_STATISTICAL_RUNNERS,
-    *get_optional_runners(),
-)
+# Backward-compatible alias used by SDK/tests. Extended runners are resolved
+# lazily by callers when they explicitly opt in.
+EXTENDED_DEFAULT_RUNNERS: tuple[BaseRunner, ...] = DEFAULT_RUNNERS
 
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_RETRY_BACKOFF_SEC = 1.0
