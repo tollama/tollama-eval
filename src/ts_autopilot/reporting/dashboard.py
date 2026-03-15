@@ -554,6 +554,39 @@ def _render_artifact_health(st: Any, manifest: dict[str, Any]) -> None:
     col1.metric("Overall", overall_status)
     col2.metric("results.json", status_by_artifact.get("results.json", "Unknown"))
     col3.metric("details.json", details_status)
+    if hasattr(st, "markdown"):
+        st.markdown(
+            " ".join(
+                [
+                    _artifact_health_badge("Overall", overall_status),
+                    _artifact_health_badge(
+                        "results.json",
+                        status_by_artifact.get("results.json", "Unknown"),
+                    ),
+                    _artifact_health_badge("details.json", details_status),
+                ]
+            ),
+            unsafe_allow_html=True,
+        )
+
+
+def _artifact_health_badge(label: str, status: str) -> str:
+    """Build a color-coded badge for artifact health states."""
+    color_map = {
+        "Loaded": ("#166534", "#dcfce7"),
+        "Complete": ("#166534", "#dcfce7"),
+        "Base Only": ("#92400e", "#fef3c7"),
+        "Not Provided": ("#92400e", "#fef3c7"),
+        "Degraded": ("#991b1b", "#fee2e2"),
+        "Missing on Disk": ("#991b1b", "#fee2e2"),
+    }
+    foreground, background = color_map.get(status, ("#1f2937", "#e5e7eb"))
+    return (
+        f"<span style=\"display:inline-block;margin:0 0.35rem 0.35rem 0;"
+        f"padding:0.2rem 0.6rem;border-radius:9999px;font-size:0.78rem;"
+        f"font-weight:600;color:{foreground};background:{background};\">"
+        f"{label}: {status}</span>"
+    )
 
 
 def _dashboard_snapshot_filename(result: Any) -> str:

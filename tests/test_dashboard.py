@@ -96,6 +96,7 @@ class _FakeExpander:
 class _FakeStreamlit:
     def __init__(self) -> None:
         self.subheaders: list[str] = []
+        self.markdowns: list[dict[str, object]] = []
         self.captions: list[str] = []
         self.dataframes: list[object] = []
         self.columns_created: list[_FakeColumn] = []
@@ -113,6 +114,14 @@ class _FakeStreamlit:
 
     def caption(self, text: str) -> None:
         self.captions.append(text)
+
+    def markdown(self, text: str, **kwargs: object) -> None:
+        self.markdowns.append(
+            {
+                "text": text,
+                "kwargs": kwargs,
+            }
+        )
 
     def columns(self, count: int) -> list[_FakeColumn]:
         self.columns_created = [_FakeColumn() for _ in range(count)]
@@ -985,6 +994,9 @@ def test_render_artifact_health_uses_manifest_states() -> None:
     assert fake_st.columns_created[0].metrics == [("Overall", "Degraded")]
     assert fake_st.columns_created[1].metrics == [("results.json", "Loaded")]
     assert fake_st.columns_created[2].metrics == [("details.json", "Missing on Disk")]
+    assert "Overall: Degraded" in fake_st.markdowns[0]["text"]
+    assert "background:#fee2e2" in fake_st.markdowns[0]["text"]
+    assert fake_st.markdowns[0]["kwargs"] == {"unsafe_allow_html": True}
 
 
 def test_render_artifact_manifest_uses_streamlit_block() -> None:
