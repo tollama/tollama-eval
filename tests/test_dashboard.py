@@ -1,6 +1,8 @@
 """Tests for dashboard benchmark environment provenance."""
 
+import io
 import json
+import zipfile
 
 from ts_autopilot.contracts import (
     BenchmarkConfig,
@@ -14,9 +16,11 @@ from ts_autopilot.contracts import (
 from ts_autopilot.reporting.dashboard import (
     _artifact_manifest_summary,
     _artifact_source_label,
+    _build_dashboard_artifact_bundle,
     _build_dashboard_filtered_details_json,
     _build_dashboard_filtered_results_json,
     _build_dashboard_snapshot_html,
+    _dashboard_bundle_filename,
     _dashboard_filtered_details_filename,
     _dashboard_filtered_results_filename,
     _dashboard_snapshot_filename,
@@ -444,6 +448,10 @@ def test_dashboard_filtered_json_filenames_use_leader_name() -> None:
         _dashboard_filtered_details_filename(result)
         == "dashboard-filtered-details-seasonalnaive.json"
     )
+    assert (
+        _dashboard_bundle_filename(result)
+        == "dashboard-filtered-bundle-seasonalnaive.zip"
+    )
 
 
 def test_build_dashboard_snapshot_html_respects_filtered_models() -> None:
@@ -605,6 +613,38 @@ def test_build_dashboard_filtered_details_json_includes_filtered_details() -> No
     assert '"AutoETS"' not in payload
 
 
+def test_build_dashboard_artifact_bundle_contains_expected_files() -> None:
+    result = _make_result()
+    result.forecast_data = [
+        ForecastData(
+            model_name="SeasonalNaive",
+            fold=1,
+            unique_id=["s1"],
+            ds=["2020-01-02"],
+            y_hat=[1.0],
+            y_actual=[1.1],
+        )
+    ]
+
+    bundle = _build_dashboard_artifact_bundle(result)
+
+    with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
+        names = set(zf.namelist())
+        assert "dashboard-snapshot-seasonalnaive.html" in names
+        assert "dashboard-filtered-results-seasonalnaive.json" in names
+        assert "dashboard-filtered-details-seasonalnaive.json" in names
+
+
+def test_build_dashboard_artifact_bundle_skips_details_when_absent() -> None:
+    bundle = _build_dashboard_artifact_bundle(_make_result())
+
+    with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
+        names = set(zf.namelist())
+        assert "dashboard-snapshot-seasonalnaive.html" in names
+        assert "dashboard-filtered-results-seasonalnaive.json" in names
+        assert "dashboard-filtered-details-seasonalnaive.json" not in names
+
+
 def test_artifact_manifest_summary_marks_missing_details() -> None:
     result = _make_result()
 
@@ -698,7 +738,12 @@ def test_render_snapshot_export_adds_download_button() -> None:
         == "dashboard-filtered-results-seasonalnaive.json"
     )
     assert fake_st.downloads[1]["mime"] == "application/json"
-    assert len(fake_st.downloads) == 2
+    assert (
+        fake_st.downloads[2]["file_name"]
+        == "dashboard-filtered-bundle-seasonalnaive.zip"
+    )
+    assert fake_st.downloads[2]["mime"] == "application/zip"
+    assert len(fake_st.downloads) == 3
 
 
 def test_render_snapshot_export_adds_details_download_when_available() -> None:
@@ -717,12 +762,17 @@ def test_render_snapshot_export_adds_details_download_when_available() -> None:
 
     _render_snapshot_export(fake_st, result)
 
-    assert len(fake_st.downloads) == 3
+    assert len(fake_st.downloads) == 4
     assert (
         fake_st.downloads[2]["file_name"]
         == "dashboard-filtered-details-seasonalnaive.json"
     )
     assert fake_st.downloads[2]["mime"] == "application/json"
+    assert (
+        fake_st.downloads[3]["file_name"]
+        == "dashboard-filtered-bundle-seasonalnaive.zip"
+    )
+    assert fake_st.downloads[3]["mime"] == "application/zip"
 
 
 def test_render_forecast_panels_outputs_chart_blocks() -> None:

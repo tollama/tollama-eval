@@ -12,8 +12,10 @@ Or from code:
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import sys
+import zipfile
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -443,6 +445,17 @@ def _dashboard_filtered_details_filename(result: Any) -> str:
     return f"dashboard-filtered-details-{safe_leader}.json"
 
 
+def _dashboard_bundle_filename(result: Any) -> str:
+    """Build a stable filename for filtered artifact bundle export."""
+    leader = result.leaderboard[0].name if result.leaderboard else "snapshot"
+    safe_leader = "".join(
+        ch.lower() if ch.isalnum() else "-" for ch in leader
+    ).strip("-")
+    if not safe_leader:
+        safe_leader = "snapshot"
+    return f"dashboard-filtered-bundle-{safe_leader}.zip"
+
+
 def _build_dashboard_snapshot_html(result: Any) -> str:
     """Build a static HTML snapshot for the current filtered dashboard view."""
     from ts_autopilot.reporting.html_report import render_report
@@ -464,6 +477,21 @@ def _build_dashboard_filtered_details_json(result: Any) -> str | None:
     if not details:
         return None
     return result.to_details_json(indent=2)
+
+
+def _build_dashboard_artifact_bundle(result: Any) -> bytes:
+    """Build a zip bundle with filtered dashboard exports."""
+    snapshot_html = _build_dashboard_snapshot_html(result)
+    results_json = _build_dashboard_filtered_results_json(result)
+    details_json = _build_dashboard_filtered_details_json(result)
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(_dashboard_snapshot_filename(result), snapshot_html)
+        zf.writestr(_dashboard_filtered_results_filename(result), results_json)
+        if details_json is not None:
+            zf.writestr(_dashboard_filtered_details_filename(result), details_json)
+    return buffer.getvalue()
 
 
 def _render_snapshot_export(st: Any, result: Any) -> None:
@@ -493,6 +521,12 @@ def _render_snapshot_export(st: Any, result: Any) -> None:
             file_name=_dashboard_filtered_details_filename(result),
             mime="application/json",
         )
+    st.download_button(
+        "Download filtered artifact bundle (.zip)",
+        data=_build_dashboard_artifact_bundle(result),
+        file_name=_dashboard_bundle_filename(result),
+        mime="application/zip",
+    )
 
 
 def _ordered_dashboard_model_names(result: Any) -> list[str]:
