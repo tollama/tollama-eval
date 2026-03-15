@@ -421,6 +421,28 @@ def _dashboard_snapshot_filename(result: Any) -> str:
     return f"dashboard-snapshot-{safe_leader}.html"
 
 
+def _dashboard_filtered_results_filename(result: Any) -> str:
+    """Build a stable filename for filtered results.json export."""
+    leader = result.leaderboard[0].name if result.leaderboard else "snapshot"
+    safe_leader = "".join(
+        ch.lower() if ch.isalnum() else "-" for ch in leader
+    ).strip("-")
+    if not safe_leader:
+        safe_leader = "snapshot"
+    return f"dashboard-filtered-results-{safe_leader}.json"
+
+
+def _dashboard_filtered_details_filename(result: Any) -> str:
+    """Build a stable filename for filtered details.json export."""
+    leader = result.leaderboard[0].name if result.leaderboard else "snapshot"
+    safe_leader = "".join(
+        ch.lower() if ch.isalnum() else "-" for ch in leader
+    ).strip("-")
+    if not safe_leader:
+        safe_leader = "snapshot"
+    return f"dashboard-filtered-details-{safe_leader}.json"
+
+
 def _build_dashboard_snapshot_html(result: Any) -> str:
     """Build a static HTML snapshot for the current filtered dashboard view."""
     from ts_autopilot.reporting.html_report import render_report
@@ -431,12 +453,25 @@ def _build_dashboard_snapshot_html(result: Any) -> str:
     )
 
 
+def _build_dashboard_filtered_results_json(result: Any) -> str:
+    """Build machine-readable filtered results.json content."""
+    return result.to_json(indent=2)
+
+
+def _build_dashboard_filtered_details_json(result: Any) -> str | None:
+    """Build machine-readable filtered details.json content when available."""
+    details = result.to_details_dict()
+    if not details:
+        return None
+    return result.to_details_json(indent=2)
+
+
 def _render_snapshot_export(st: Any, result: Any) -> None:
-    """Render a download for the current filtered dashboard snapshot."""
+    """Render downloads for the current filtered dashboard snapshot and data."""
     st.subheader("Snapshot Export")
     st.caption(
         "Download the current filtered dashboard view as a static HTML report "
-        "for sharing outside Streamlit."
+        "or as machine-readable filtered artifacts."
     )
     st.download_button(
         "Download filtered HTML snapshot",
@@ -444,6 +479,20 @@ def _render_snapshot_export(st: Any, result: Any) -> None:
         file_name=_dashboard_snapshot_filename(result),
         mime="text/html",
     )
+    st.download_button(
+        "Download filtered results.json",
+        data=_build_dashboard_filtered_results_json(result),
+        file_name=_dashboard_filtered_results_filename(result),
+        mime="application/json",
+    )
+    details_json = _build_dashboard_filtered_details_json(result)
+    if details_json is not None:
+        st.download_button(
+            "Download filtered details.json",
+            data=details_json,
+            file_name=_dashboard_filtered_details_filename(result),
+            mime="application/json",
+        )
 
 
 def _ordered_dashboard_model_names(result: Any) -> list[str]:

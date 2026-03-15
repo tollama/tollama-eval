@@ -14,7 +14,11 @@ from ts_autopilot.contracts import (
 from ts_autopilot.reporting.dashboard import (
     _artifact_manifest_summary,
     _artifact_source_label,
+    _build_dashboard_filtered_details_json,
+    _build_dashboard_filtered_results_json,
     _build_dashboard_snapshot_html,
+    _dashboard_filtered_details_filename,
+    _dashboard_filtered_results_filename,
     _dashboard_snapshot_filename,
     _filter_forecast_chart_data,
     _filter_per_series_chart_data,
@@ -429,6 +433,19 @@ def test_dashboard_snapshot_filename_uses_leader_name() -> None:
     assert filename == "dashboard-snapshot-seasonalnaive.html"
 
 
+def test_dashboard_filtered_json_filenames_use_leader_name() -> None:
+    result = _make_result()
+
+    assert (
+        _dashboard_filtered_results_filename(result)
+        == "dashboard-filtered-results-seasonalnaive.json"
+    )
+    assert (
+        _dashboard_filtered_details_filename(result)
+        == "dashboard-filtered-details-seasonalnaive.json"
+    )
+
+
 def test_build_dashboard_snapshot_html_respects_filtered_models() -> None:
     result = BenchmarkResult(
         profile=DataProfile(
@@ -473,6 +490,119 @@ def test_build_dashboard_snapshot_html_respects_filtered_models() -> None:
     assert "Filtered Benchmark Snapshot" in html
     assert "SeasonalNaive" in html
     assert "AutoETS" not in html
+
+
+def test_build_dashboard_filtered_results_json_respects_filtered_models() -> None:
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=120,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[
+            ModelResult(
+                name="AutoETS",
+                runtime_sec=0.5,
+                folds=[],
+                mean_mase=0.875,
+                std_mase=0.025,
+            ),
+            ModelResult(
+                name="SeasonalNaive",
+                runtime_sec=0.1,
+                folds=[],
+                mean_mase=1.0,
+                std_mase=0.0,
+            ),
+        ],
+        leaderboard=[
+            LeaderboardEntry(rank=1, name="AutoETS", mean_mase=0.875),
+            LeaderboardEntry(rank=2, name="SeasonalNaive", mean_mase=1.0),
+        ],
+    )
+    filtered = _filter_result_for_dashboard(
+        result,
+        selected_model_names=["SeasonalNaive"],
+        max_rank=2,
+    )
+
+    payload = _build_dashboard_filtered_results_json(filtered)
+
+    assert '"SeasonalNaive"' in payload
+    assert '"AutoETS"' not in payload
+
+
+def test_build_dashboard_filtered_details_json_returns_none_without_details() -> None:
+    assert _build_dashboard_filtered_details_json(_make_result()) is None
+
+
+def test_build_dashboard_filtered_details_json_includes_filtered_details() -> None:
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=120,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[
+            ModelResult(
+                name="AutoETS",
+                runtime_sec=0.5,
+                folds=[],
+                mean_mase=0.875,
+                std_mase=0.025,
+            ),
+            ModelResult(
+                name="SeasonalNaive",
+                runtime_sec=0.1,
+                folds=[],
+                mean_mase=1.0,
+                std_mase=0.0,
+            ),
+        ],
+        leaderboard=[
+            LeaderboardEntry(rank=1, name="AutoETS", mean_mase=0.875),
+            LeaderboardEntry(rank=2, name="SeasonalNaive", mean_mase=1.0),
+        ],
+        forecast_data=[
+            ForecastData(
+                model_name="AutoETS",
+                fold=2,
+                unique_id=["s1"],
+                ds=["2020-07-02"],
+                y_hat=[10.0],
+                y_actual=[10.5],
+            ),
+            ForecastData(
+                model_name="SeasonalNaive",
+                fold=2,
+                unique_id=["s1"],
+                ds=["2020-07-02"],
+                y_hat=[9.8],
+                y_actual=[10.5],
+            ),
+        ],
+    )
+    filtered = _filter_result_for_dashboard(
+        result,
+        selected_model_names=["SeasonalNaive"],
+        max_rank=2,
+    )
+
+    payload = _build_dashboard_filtered_details_json(filtered)
+
+    assert payload is not None
+    assert '"SeasonalNaive"' in payload
+    assert '"AutoETS"' not in payload
 
 
 def test_artifact_manifest_summary_marks_missing_details() -> None:
@@ -563,6 +693,36 @@ def test_render_snapshot_export_adds_download_button() -> None:
     assert fake_st.subheaders == ["Snapshot Export"]
     assert fake_st.downloads[0]["file_name"] == "dashboard-snapshot-seasonalnaive.html"
     assert fake_st.downloads[0]["mime"] == "text/html"
+    assert (
+        fake_st.downloads[1]["file_name"]
+        == "dashboard-filtered-results-seasonalnaive.json"
+    )
+    assert fake_st.downloads[1]["mime"] == "application/json"
+    assert len(fake_st.downloads) == 2
+
+
+def test_render_snapshot_export_adds_details_download_when_available() -> None:
+    fake_st = _FakeStreamlit()
+    result = _make_result()
+    result.forecast_data = [
+        ForecastData(
+            model_name="SeasonalNaive",
+            fold=1,
+            unique_id=["s1"],
+            ds=["2020-01-02"],
+            y_hat=[1.0],
+            y_actual=[1.1],
+        )
+    ]
+
+    _render_snapshot_export(fake_st, result)
+
+    assert len(fake_st.downloads) == 3
+    assert (
+        fake_st.downloads[2]["file_name"]
+        == "dashboard-filtered-details-seasonalnaive.json"
+    )
+    assert fake_st.downloads[2]["mime"] == "application/json"
 
 
 def test_render_forecast_panels_outputs_chart_blocks() -> None:
