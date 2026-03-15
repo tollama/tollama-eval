@@ -55,8 +55,18 @@ def _make_enriched_result():
                 name="SeasonalNaive",
                 runtime_sec=0.1,
                 folds=[
-                    FoldResult(fold=1, cutoff="2020-06-01", mase=1.0),
-                    FoldResult(fold=2, cutoff="2020-07-01", mase=1.0),
+                    FoldResult(
+                        fold=1,
+                        cutoff="2020-06-01",
+                        mase=1.0,
+                        series_scores={"s1": 0.92, "s2": 1.08},
+                    ),
+                    FoldResult(
+                        fold=2,
+                        cutoff="2020-07-01",
+                        mase=1.0,
+                        series_scores={"s1": 0.96, "s2": 1.04},
+                    ),
                 ],
                 mean_mase=1.0,
                 std_mase=0.0,
@@ -168,6 +178,15 @@ def test_report_has_model_comparison():
     assert "Model Comparison" in html
     assert "chart-radar" in html
     assert "chart-fold-stability" in html
+
+
+def test_report_has_per_series_winner_section():
+    result = _make_enriched_result()
+    html = render_report(result)
+    assert "Per-Series Winners" in html
+    assert "chart-per-series-wins" in html
+    assert "chart-per-series-heatmap" in html
+    assert "Hardest Series Snapshot" in html
 
 
 def test_report_has_stats_grid():

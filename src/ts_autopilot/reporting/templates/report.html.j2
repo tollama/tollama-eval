@@ -767,6 +767,7 @@
             <a href="#leaderboard" data-section="leaderboard">Leaderboard</a>
             {% if significance %}<a href="#significance" data-section="significance">Significance</a>{% endif %}
             <a href="#model-comparison" data-section="model-comparison">Comparison</a>
+            {% if chart_data.per_series and chart_data.per_series.table_rows %}<a href="#per-series" data-section="per-series">Per-Series</a>{% endif %}
             {% if chart_data.pareto and chart_data.pareto.points %}<a href="#pareto" data-section="pareto">Speed vs Accuracy</a>{% endif %}
             {% if has_forecast_data %}<a href="#forecasts" data-section="forecasts">Forecasts</a>{% endif %}
             {% if has_diagnostics %}<a href="#diagnostics" data-section="diagnostics">Diagnostics</a>{% endif %}
@@ -1201,6 +1202,58 @@
             </figure>
             {% endif %}
         </section>
+
+        {% if chart_data.per_series and chart_data.per_series.table_rows %}
+        <section id="per-series" class="card" aria-labelledby="per-series-heading">
+            <h2 id="per-series-heading">Per-Series Winners</h2>
+            <p style="color: var(--gray-500); font-size: 0.85rem;">
+                Average per-series MASE across folds. This shows whether the global leaderboard hides series-level losers.
+                Displaying {{ chart_data.per_series.displayed_total }} of {{ chart_data.per_series.series_total }} comparable series in the heatmap.
+            </p>
+            {% if chart_data.per_series.insights %}
+            <ul class="key-findings">
+                {% for insight in chart_data.per_series.insights %}
+                <li>{{ insight }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            <div class="chart-row">
+                <figure class="chart-container" role="img" aria-label="Bar chart showing how many series each model wins">
+                    <div id="chart-per-series-wins"></div>
+                </figure>
+                <figure class="chart-container" role="img" aria-label="Heatmap of per-series MASE by model">
+                    <div id="chart-per-series-heatmap"></div>
+                </figure>
+            </div>
+            <h3>Hardest Series Snapshot</h3>
+            <div class="table-wrapper">
+            <table aria-label="Per-series winner summary">
+                <thead>
+                <tr>
+                    <th scope="col">Series</th>
+                    <th scope="col">Winner</th>
+                    <th scope="col">Winner MASE</th>
+                    <th scope="col">Runner-up</th>
+                    <th scope="col">Margin</th>
+                    <th scope="col">Spread</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in chart_data.per_series.table_rows %}
+                <tr>
+                    <td>{{ row.series_id }}</td>
+                    <td>{{ row.winner }}</td>
+                    <td class="{% if row.winner_mase < 1.0 %}metric-good{% elif row.winner_mase > 1.0 %}metric-bad{% endif %}">{{ "%.4f"|format(row.winner_mase) }}</td>
+                    <td>{{ row.runner_up }}</td>
+                    <td>{{ "%.4f"|format(row.margin) }}</td>
+                    <td>{{ "%.4f"|format(row.spread) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </section>
+        {% endif %}
 
         <!-- 7b. Speed vs Accuracy (Pareto) -->
         {% if chart_data.pareto and chart_data.pareto.points %}
@@ -1692,7 +1745,53 @@
                 }), plotlyConfig);
             }
 
-            // 6. Data Overview
+            // 6. Per-Series Winners
+            if (chartData.per_series && chartData.per_series.winner_summary) {
+                var winnerSummary = chartData.per_series.winner_summary;
+                if (winnerSummary.length > 0) {
+                    Plotly.newPlot('chart-per-series-wins', [{
+                        type: 'bar',
+                        x: winnerSummary.map(function(item) { return item.name; }),
+                        y: winnerSummary.map(function(item) { return item.count; }),
+                        marker: {
+                            color: winnerSummary.map(function(_, i) {
+                                return colors[i % colors.length];
+                            })
+                        },
+                        hovertemplate: '%{x}<br>Series wins: %{y}<extra></extra>'
+                    }], makeLayout({
+                        title: { text: 'Series Wins by Model', font: { size: 14 } },
+                        xaxis: { title: '' },
+                        yaxis: { title: 'Series won', gridcolor: pc.grid, dtick: 1 },
+                        showlegend: false,
+                        height: 320,
+                        margin: { l: 50, r: 20, t: 45, b: 70 }
+                    }), plotlyConfig);
+                }
+            }
+
+            if (chartData.per_series && chartData.per_series.heatmap_z && chartData.per_series.heatmap_z.length > 0) {
+                Plotly.newPlot('chart-per-series-heatmap', [{
+                    type: 'heatmap',
+                    z: chartData.per_series.heatmap_z,
+                    x: chartData.per_series.models,
+                    y: chartData.per_series.heatmap_series,
+                    colorscale: [[0, '#059669'], [0.5, '#fbbf24'], [1, '#dc2626']],
+                    colorbar: { title: 'MASE', titlefont: { size: 11 } },
+                    hovertemplate: 'Series %{y}<br>%{x}: %{z:.4f}<extra></extra>',
+                    text: chartData.per_series.heatmap_text,
+                    texttemplate: '%{text}',
+                    textfont: { size: 10 }
+                }], makeLayout({
+                    title: { text: 'Per-Series Difficulty by Model', font: { size: 14 } },
+                    xaxis: { title: '', side: 'bottom' },
+                    yaxis: { automargin: true },
+                    margin: { l: 120, r: 40, t: 45, b: 50 },
+                    height: Math.max(320, chartData.per_series.heatmap_series.length * 28 + 120)
+                }), plotlyConfig);
+            }
+
+            // 7. Data Overview
             if (chartData.data_overview && chartData.data_overview.series) {
                 chartData.data_overview.series.forEach(function(s) {
                     var traces = [];
@@ -1730,7 +1829,7 @@
                 });
             }
 
-            // 7. Forecast Charts
+            // 8. Forecast Charts
             if (chartData.forecast && chartData.forecast.models) {
                 chartData.forecast.models.forEach(function(model) {
                     model.series.forEach(function(s) {
@@ -1777,7 +1876,7 @@
                 });
             }
 
-            // 8. Diagnostics
+            // 9. Diagnostics
             if (chartData.diagnostics && chartData.diagnostics.histogram_bins) {
                 var diag = chartData.diagnostics;
 
@@ -1846,7 +1945,7 @@
             }
         }
 
-            // 9. Pareto Chart
+            // 10. Pareto Chart
             if (chartData.pareto && chartData.pareto.points && chartData.pareto.points.length > 0) {
                 var paretoEl = document.getElementById('chart-pareto');
                 if (paretoEl) {
@@ -1895,7 +1994,7 @@
 
         function replotAllCharts() {
             // Purge existing charts and re-render
-            var chartIds = ['chart-mase', 'chart-radar', 'chart-fold-stability', 'chart-heatmap', 'chart-boxplot', 'chart-resid-hist', 'chart-resid-acf', 'chart-resid-scatter', 'chart-pareto'];
+            var chartIds = ['chart-mase', 'chart-radar', 'chart-fold-stability', 'chart-heatmap', 'chart-boxplot', 'chart-per-series-wins', 'chart-per-series-heatmap', 'chart-resid-hist', 'chart-resid-acf', 'chart-resid-scatter', 'chart-pareto'];
             if (chartData.data_overview && chartData.data_overview.series) {
                 chartData.data_overview.series.forEach(function(s) {
                     chartIds.push(s.chart_id);

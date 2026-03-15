@@ -138,6 +138,9 @@ def _build_chart_data(result: BenchmarkResult) -> dict:
     # Error distribution: per-series MASE box plot data
     box_plot_data = _build_box_plot_data(result)
 
+    # Per-series winner analysis
+    per_series_data = _build_per_series_competition_data(result)
+
     # Data overview snapshots from the evaluation window
     data_overview = _build_data_overview_chart_data(result)
 
@@ -159,6 +162,7 @@ def _build_chart_data(result: BenchmarkResult) -> dict:
         "fold_labels": fold_labels,
         "radar": radar_data,
         "box_plot": box_plot_data,
+        "per_series": per_series_data,
         "data_overview": data_overview,
         "forecast": forecast_chart,
         "diagnostics": diagnostics_chart,
@@ -216,6 +220,159 @@ def _build_series_score_lookup(result: BenchmarkResult) -> dict[str, dict[str, f
                 for sid, scores in totals.items()
             }
     return lookup
+
+
+def _build_per_series_competition_data(result: BenchmarkResult) -> dict:
+    """Build per-series winner and difficulty analysis."""
+    scores_by_model = _build_series_score_lookup(result)
+    if len(scores_by_model) < 2:
+        return {}
+
+    ordered_models = [
+        entry.name for entry in result.leaderboard if entry.name in scores_by_model
+    ]
+    for model in result.models:
+        if model.name in scores_by_model and model.name not in ordered_models:
+            ordered_models.append(model.name)
+
+    all_series = sorted(
+        {
+            sid
+            for model_scores in scores_by_model.values()
+            for sid in model_scores
+        }
+    )
+
+    rows = []
+    winner_counts = {model_name: 0 for model_name in ordered_models}
+
+    for sid in all_series:
+        comparisons = [
+            (model_name, model_scores[sid])
+            for model_name, model_scores in scores_by_model.items()
+            if sid in model_scores
+        ]
+        if len(comparisons) < 2:
+            continue
+
+        comparisons.sort(key=lambda item: item[1])
+        winner_name, winner_score = comparisons[0]
+        runner_name, runner_score = comparisons[1]
+        margin = round(runner_score - winner_score, 4)
+        spread = round(comparisons[-1][1] - winner_score, 4)
+        winner_counts[winner_name] = winner_counts.get(winner_name, 0) + 1
+        row_scores = {
+            model_name: scores_by_model.get(model_name, {}).get(sid)
+            for model_name in ordered_models
+        }
+        rows.append(
+            {
+                "series_id": sid,
+                "winner": winner_name,
+                "winner_mase": round(winner_score, 4),
+                "runner_up": runner_name,
+                "runner_up_mase": round(runner_score, 4),
+                "margin": margin,
+                "spread": spread,
+                "scores": row_scores,
+            }
+        )
+
+    if not rows:
+        return {}
+
+    hardest_rows = sorted(
+        rows,
+        key=lambda item: (-item["winner_mase"], item["margin"], item["series_id"]),
+    )
+    closest_rows = sorted(
+        rows,
+        key=lambda item: (item["margin"], item["winner_mase"], item["series_id"]),
+    )
+
+    display_rows = hardest_rows[: min(15, len(hardest_rows))]
+    heatmap_rows = hardest_rows[: min(25, len(hardest_rows))]
+    heatmap_z = []
+    heatmap_text = []
+    heatmap_labels = []
+    for row in heatmap_rows:
+        heatmap_labels.append(row["series_id"])
+        z_row: list[float | None] = []
+        text_row: list[str] = []
+        for model_name in ordered_models:
+            score = row["scores"].get(model_name)
+            z_row.append(score)
+            text_row.append("" if score is None else f"{score:.4f}")
+        heatmap_z.append(z_row)
+        heatmap_text.append(text_row)
+
+    winner_summary = [
+        {"name": model_name, "count": count}
+        for model_name, count in sorted(
+            winner_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+        if count > 0
+    ]
+
+    insights = _build_per_series_insights(
+        rows=rows,
+        winner_summary=winner_summary,
+        closest_rows=closest_rows,
+        hardest_rows=hardest_rows,
+    )
+
+    return {
+        "models": ordered_models,
+        "winner_summary": winner_summary,
+        "series_total": len(rows),
+        "displayed_total": len(heatmap_rows),
+        "heatmap_series": heatmap_labels,
+        "heatmap_z": heatmap_z,
+        "heatmap_text": heatmap_text,
+        "table_rows": display_rows,
+        "insights": insights,
+    }
+
+
+def _build_per_series_insights(
+    rows: list[dict],
+    winner_summary: list[dict],
+    closest_rows: list[dict],
+    hardest_rows: list[dict],
+) -> list[str]:
+    """Generate short interpretation notes for per-series winners."""
+    insights: list[str] = []
+
+    if winner_summary:
+        top = winner_summary[0]
+        insights.append(
+            f"{top['name']} wins {top['count']} of {len(rows)} comparable series."
+        )
+
+    if closest_rows:
+        closest = closest_rows[0]
+        insights.append(
+            f"The closest race is {closest['series_id']}: "
+            f"{closest['winner']} beats {closest['runner_up']} by only "
+            f"{closest['margin']:.4f} MASE."
+        )
+
+    if hardest_rows:
+        hardest = hardest_rows[0]
+        if hardest["winner_mase"] < 1.0:
+            insights.append(
+                f"The hardest highlighted series is {hardest['series_id']} "
+                f"(best MASE {hardest['winner_mase']:.4f}); "
+                "it is still beatable, but model spread is large."
+            )
+        else:
+            insights.append(
+                f"{hardest['series_id']} remains difficult for every model: "
+                f"the best available MASE is {hardest['winner_mase']:.4f}."
+            )
+
+    return insights[:3]
 
 
 def _get_reference_forecast_data(result: BenchmarkResult):
