@@ -449,6 +449,7 @@ def run_benchmark(
                     ds=output.ds,
                     y_hat=output.y_hat,
                     y_actual=test_sorted["y"].tolist(),
+                    train_unique_id=train_tail["unique_id"].tolist(),
                     ds_train_tail=[d.isoformat() for d in train_tail["ds"]],
                     y_train_tail=train_tail["y"].tolist(),
                 )

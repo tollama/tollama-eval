@@ -81,8 +81,20 @@ def _make_enriched_result():
                 ds=["2020-07-02", "2020-07-03", "2020-07-02", "2020-07-03"],
                 y_hat=[10.0, 11.0, 20.0, 21.0],
                 y_actual=[10.5, 10.8, 20.3, 21.2],
-                ds_train_tail=["2020-06-30", "2020-07-01"],
-                y_train_tail=[9.0, 9.5],
+                train_unique_id=["s1", "s1", "s2", "s2"],
+                ds_train_tail=["2020-06-30", "2020-07-01", "2020-06-30", "2020-07-01"],
+                y_train_tail=[9.0, 9.5, 19.1, 19.6],
+            ),
+            ForecastData(
+                model_name="SeasonalNaive",
+                fold=2,
+                unique_id=["s1", "s1", "s2", "s2"],
+                ds=["2020-07-02", "2020-07-03", "2020-07-02", "2020-07-03"],
+                y_hat=[9.8, 10.1, 19.7, 20.4],
+                y_actual=[10.5, 10.8, 20.3, 21.2],
+                train_unique_id=["s1", "s1", "s2", "s2"],
+                ds_train_tail=["2020-06-30", "2020-07-01", "2020-06-30", "2020-07-01"],
+                y_train_tail=[9.0, 9.5, 19.1, 19.6],
             ),
         ],
         diagnostics=[
@@ -137,6 +149,17 @@ def test_report_has_forecast_section():
     result = _make_enriched_result()
     html = render_report(result)
     assert "Forecast vs Actual" in html
+    assert "Fold 2 forecasts for every model." in html
+    assert "chart-forecast-1-1" in html
+    assert "chart-forecast-2-1" in html
+
+
+def test_report_has_data_overview_section():
+    result = _make_enriched_result()
+    html = render_report(result)
+    assert "Data Overview" in html
+    assert "chart-data-overview-1" in html
+    assert "Recent training history plus holdout actuals from fold 2." in html
 
 
 def test_report_has_model_comparison():

@@ -189,8 +189,9 @@ class ForecastData:
     ds: list[str]
     y_hat: list[float]
     y_actual: list[float]
-    ds_train_tail: list[str]
-    y_train_tail: list[float]
+    train_unique_id: list[str] = field(default_factory=list)
+    ds_train_tail: list[str] = field(default_factory=list)
+    y_train_tail: list[float] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

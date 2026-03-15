@@ -762,6 +762,7 @@
         <div class="toc-links">
             <a href="#executive-summary" data-section="executive-summary">Summary</a>
             <a href="#data-profile" data-section="data-profile">Data Profile</a>
+            {% if chart_data.data_overview and chart_data.data_overview.series %}<a href="#data-overview" data-section="data-overview">Data Overview</a>{% endif %}
             {% if warnings %}<a href="#data-quality" data-section="data-quality">Data Quality</a>{% endif %}
             <a href="#leaderboard" data-section="leaderboard">Leaderboard</a>
             {% if significance %}<a href="#significance" data-section="significance">Significance</a>{% endif %}
@@ -1050,6 +1051,29 @@
         </section>
         {% endif %}
 
+        {% if chart_data.data_overview and chart_data.data_overview.series %}
+        <section id="data-overview" class="card" aria-labelledby="data-overview-heading">
+            <h2 id="data-overview-heading">Data Overview</h2>
+            <p style="color: var(--gray-500); font-size: 0.85rem;">
+                Recent training history plus holdout actuals from fold {{ chart_data.data_overview.fold }}.
+                These representative series provide context for the benchmark before comparing model forecasts.
+            </p>
+            {% if chart_data.data_overview.insights %}
+            <ul class="key-findings">
+                {% for insight in chart_data.data_overview.insights %}
+                <li>{{ insight }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% for s in chart_data.data_overview.series %}
+            <figure class="chart-container" role="img" aria-label="Recent data snapshot for series {{ s.name }}">
+                <div id="{{ s.chart_id }}"></div>
+                <figcaption style="font-size:0.82rem;color:var(--gray-500);margin-top:0.5rem;">{{ s.summary }}</figcaption>
+            </figure>
+            {% endfor %}
+        </section>
+        {% endif %}
+
         <!-- 6. Leaderboard -->
         <section id="leaderboard" class="card" aria-labelledby="lb-heading">
             <h2 id="lb-heading">Leaderboard</h2>
@@ -1215,17 +1239,25 @@
         {% endif %}
 
         <!-- 8. Forecast Visualization -->
-        {% if has_forecast_data and chart_data.forecast.series %}
+        {% if has_forecast_data and chart_data.forecast.models %}
         <section id="forecasts" class="card" aria-labelledby="fc-heading">
             <h2 id="fc-heading">Forecast vs Actual</h2>
             <p style="color: var(--gray-500); font-size: 0.85rem;">
-                Best model ({{ chart_data.forecast.model_name }}) predictions on fold {{ chart_data.forecast.fold }}.
-                Showing selected series by MASE ranking.
+                Fold {{ chart_data.forecast.fold }} forecasts for every model.
+                Each model is evaluated on the same representative series so visual comparisons stay consistent.
             </p>
-            {% for s in chart_data.forecast.series %}
-            <figure class="chart-container" role="img" aria-label="Forecast vs actual for series {{ s.name }}">
-                <div id="chart-forecast-{{ loop.index }}"></div>
+            {% for model in chart_data.forecast.models %}
+            <h3>
+                {{ model.name }}
+                {% if model.rank %}<span style="color:var(--gray-500);font-weight:500;">(Rank {{ model.rank }})</span>{% endif %}
+            </h3>
+            <p style="color: var(--gray-500); font-size: 0.82rem;">{{ model.summary }}</p>
+            {% for s in model.series %}
+            <figure class="chart-container" role="img" aria-label="Forecast vs actual for model {{ model.name }} on series {{ s.name }}">
+                <div id="{{ s.chart_id }}"></div>
+                <figcaption style="font-size:0.82rem;color:var(--gray-500);margin-top:0.5rem;">{{ s.note }}</figcaption>
             </figure>
+            {% endfor %}
             {% endfor %}
         </section>
         {% endif %}
@@ -1660,29 +1692,34 @@
                 }), plotlyConfig);
             }
 
-            // 6. Forecast Charts
-            if (chartData.forecast && chartData.forecast.series) {
-                chartData.forecast.series.forEach(function(s, idx) {
+            // 6. Data Overview
+            if (chartData.data_overview && chartData.data_overview.series) {
+                chartData.data_overview.series.forEach(function(s) {
                     var traces = [];
+                    if (s.y_history && s.y_history.length > 0) {
+                        traces.push({
+                            type: 'scatter', mode: 'lines+markers',
+                            x: s.ds_history, y: s.y_history,
+                            name: 'Recent history',
+                            line: { color: '#6b7280', width: 2 },
+                            marker: { size: 4 }
+                        });
+                    }
                     if (s.y_actual && s.y_actual.length > 0) {
                         traces.push({
                             type: 'scatter', mode: 'lines+markers',
-                            x: s.ds, y: s.y_actual,
-                            name: 'Actual',
+                            x: s.ds_actual, y: s.y_actual,
+                            name: 'Holdout actual',
                             line: { color: '#2563eb', width: 2 },
                             marker: { size: 4 }
                         });
                     }
-                    traces.push({
-                        type: 'scatter', mode: 'lines+markers',
-                        x: s.ds, y: s.y_hat,
-                        name: 'Forecast',
-                        line: { color: '#dc2626', width: 2, dash: 'dash' },
-                        marker: { size: 4 }
-                    });
-                    var elId = 'chart-forecast-' + (idx + 1);
-                    Plotly.newPlot(elId, traces, makeLayout({
-                        title: { text: s.name + ' (MASE: ' + s.mase.toFixed(4) + ')', font: { size: 13 } },
+                    var title = s.name;
+                    if (s.mase !== null && s.mase !== undefined) {
+                        title += ' (Winner MASE: ' + s.mase.toFixed(4) + ')';
+                    }
+                    Plotly.newPlot(s.chart_id, traces, makeLayout({
+                        title: { text: title, font: { size: 13 } },
                         xaxis: { title: '' },
                         yaxis: { title: 'Value', gridcolor: pc.grid },
                         showlegend: true,
@@ -1693,7 +1730,54 @@
                 });
             }
 
-            // 7. Diagnostics
+            // 7. Forecast Charts
+            if (chartData.forecast && chartData.forecast.models) {
+                chartData.forecast.models.forEach(function(model) {
+                    model.series.forEach(function(s) {
+                        var traces = [];
+                        if (s.y_history && s.y_history.length > 0) {
+                            traces.push({
+                                type: 'scatter', mode: 'lines+markers',
+                                x: s.ds_history, y: s.y_history,
+                                name: 'Recent history',
+                                line: { color: '#6b7280', width: 2 },
+                                marker: { size: 4 }
+                            });
+                        }
+                        if (s.y_actual && s.y_actual.length > 0) {
+                            traces.push({
+                                type: 'scatter', mode: 'lines+markers',
+                                x: s.ds_actual, y: s.y_actual,
+                                name: 'Actual',
+                                line: { color: '#2563eb', width: 2 },
+                                marker: { size: 4 }
+                            });
+                        }
+                        traces.push({
+                            type: 'scatter', mode: 'lines+markers',
+                            x: s.ds_forecast, y: s.y_hat,
+                            name: 'Forecast',
+                            line: { color: '#dc2626', width: 2, dash: 'dash' },
+                            marker: { size: 4 }
+                        });
+                        var seriesTitle = model.name + ' - ' + s.name;
+                        if (s.mase !== null && s.mase !== undefined) {
+                            seriesTitle += ' (MASE: ' + s.mase.toFixed(4) + ')';
+                        }
+                        Plotly.newPlot(s.chart_id, traces, makeLayout({
+                            title: { text: seriesTitle, font: { size: 13 } },
+                            xaxis: { title: '' },
+                            yaxis: { title: 'Value', gridcolor: pc.grid },
+                            showlegend: true,
+                            legend: { font: { size: 10 }, orientation: 'h', y: -0.2 },
+                            height: 280,
+                            margin: { l: 50, r: 20, t: 40, b: 50 }
+                        }), plotlyConfig);
+                    });
+                });
+            }
+
+            // 8. Diagnostics
             if (chartData.diagnostics && chartData.diagnostics.histogram_bins) {
                 var diag = chartData.diagnostics;
 
@@ -1762,7 +1846,7 @@
             }
         }
 
-            // 8. Pareto Chart
+            // 9. Pareto Chart
             if (chartData.pareto && chartData.pareto.points && chartData.pareto.points.length > 0) {
                 var paretoEl = document.getElementById('chart-pareto');
                 if (paretoEl) {
@@ -1812,9 +1896,16 @@
         function replotAllCharts() {
             // Purge existing charts and re-render
             var chartIds = ['chart-mase', 'chart-radar', 'chart-fold-stability', 'chart-heatmap', 'chart-boxplot', 'chart-resid-hist', 'chart-resid-acf', 'chart-resid-scatter', 'chart-pareto'];
-            if (chartData.forecast && chartData.forecast.series) {
-                chartData.forecast.series.forEach(function(s, idx) {
-                    chartIds.push('chart-forecast-' + (idx + 1));
+            if (chartData.data_overview && chartData.data_overview.series) {
+                chartData.data_overview.series.forEach(function(s) {
+                    chartIds.push(s.chart_id);
+                });
+            }
+            if (chartData.forecast && chartData.forecast.models) {
+                chartData.forecast.models.forEach(function(model) {
+                    model.series.forEach(function(s) {
+                        chartIds.push(s.chart_id);
+                    });
                 });
             }
             chartIds.forEach(function(id) {

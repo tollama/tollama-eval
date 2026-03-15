@@ -138,7 +138,10 @@ def _build_chart_data(result: BenchmarkResult) -> dict:
     # Error distribution: per-series MASE box plot data
     box_plot_data = _build_box_plot_data(result)
 
-    # Forecast vs actual (best model, last fold)
+    # Data overview snapshots from the evaluation window
+    data_overview = _build_data_overview_chart_data(result)
+
+    # Forecast vs actual (all models, last fold)
     forecast_chart = _build_forecast_chart_data(result)
 
     # Diagnostics charts (best model)
@@ -156,6 +159,7 @@ def _build_chart_data(result: BenchmarkResult) -> dict:
         "fold_labels": fold_labels,
         "radar": radar_data,
         "box_plot": box_plot_data,
+        "data_overview": data_overview,
         "forecast": forecast_chart,
         "diagnostics": diagnostics_chart,
     }
@@ -198,85 +202,394 @@ def _build_box_plot_data(result: BenchmarkResult) -> dict:
     return data
 
 
-def _build_forecast_chart_data(result: BenchmarkResult) -> dict:
-    """Build forecast vs actual chart data for best model."""
-    if not result.forecast_data or not result.leaderboard:
-        return {"series": []}
+def _build_series_score_lookup(result: BenchmarkResult) -> dict[str, dict[str, float]]:
+    """Average per-series MASE across folds for each model."""
+    lookup: dict[str, dict[str, float]] = {}
+    for model in result.models:
+        totals: dict[str, list[float]] = {}
+        for fold in model.folds:
+            for sid, score in fold.series_scores.items():
+                totals.setdefault(sid, []).append(score)
+        if totals:
+            lookup[model.name] = {
+                sid: round(sum(scores) / len(scores), 4)
+                for sid, scores in totals.items()
+            }
+    return lookup
 
-    best_model = result.leaderboard[0].name
-    # Use last fold for visualization
+
+def _get_reference_forecast_data(result: BenchmarkResult):
+    """Pick one forecast payload to represent the evaluation window."""
+    if not result.forecast_data:
+        return None
+
     last_fold = max(fd.fold for fd in result.forecast_data)
-    best_fd = next(
-        (
-            fd
-            for fd in result.forecast_data
-            if fd.model_name == best_model and fd.fold == last_fold
-        ),
-        None,
-    )
+    best_model = result.leaderboard[0].name if result.leaderboard else None
+    if best_model is not None:
+        for fd in result.forecast_data:
+            if fd.model_name == best_model and fd.fold == last_fold:
+                return fd
 
-    if not best_fd:
-        return {"series": []}
+    for fd in result.forecast_data:
+        if fd.fold == last_fold:
+            return fd
+    return result.forecast_data[0]
 
-    # Group by series
-    series_data: dict[str, dict] = {}
-    for i, uid in enumerate(best_fd.unique_id):
-        if uid not in series_data:
-            series_data[uid] = {
+
+def _group_forecast_series(fd) -> dict[str, dict]:
+    """Group train/evaluation points by unique_id for chart rendering."""
+    series: dict[str, dict] = {}
+
+    for i, uid in enumerate(fd.unique_id):
+        if uid not in series:
+            series[uid] = {
+                "ds_history": [],
+                "y_history": [],
+                "ds_actual": [],
+                "y_actual": [],
                 "ds_forecast": [],
                 "y_hat": [],
-                "y_actual": [],
             }
-        series_data[uid]["ds_forecast"].append(best_fd.ds[i])
-        series_data[uid]["y_hat"].append(best_fd.y_hat[i])
-        if i < len(best_fd.y_actual):
-            series_data[uid]["y_actual"].append(best_fd.y_actual[i])
+        if i < len(fd.ds):
+            series[uid]["ds_actual"].append(fd.ds[i])
+            series[uid]["ds_forecast"].append(fd.ds[i])
+        if i < len(fd.y_actual):
+            series[uid]["y_actual"].append(fd.y_actual[i])
+        if i < len(fd.y_hat):
+            series[uid]["y_hat"].append(fd.y_hat[i])
 
-    # Find best and worst series by MASE
-    winner_model = next((m for m in result.models if m.name == best_model), None)
-    if not winner_model:
-        return {"series": []}
+    train_ids = fd.train_unique_id
+    if not train_ids and len(set(fd.unique_id)) == 1:
+        train_ids = [fd.unique_id[0]] * len(fd.ds_train_tail)
 
-    scores_by_series: dict[str, list[float]] = {}
-    for fold in winner_model.folds:
-        for sid, score in fold.series_scores.items():
-            scores_by_series.setdefault(sid, []).append(score)
-    avg_scores: dict[str, float] = {
-        sid: sum(scores) / len(scores) for sid, scores in scores_by_series.items()
+    for i, uid in enumerate(train_ids):
+        if uid not in series:
+            series[uid] = {
+                "ds_history": [],
+                "y_history": [],
+                "ds_actual": [],
+                "y_actual": [],
+                "ds_forecast": [],
+                "y_hat": [],
+            }
+        if i < len(fd.ds_train_tail):
+            series[uid]["ds_history"].append(fd.ds_train_tail[i])
+        if i < len(fd.y_train_tail):
+            series[uid]["y_history"].append(fd.y_train_tail[i])
+
+    return series
+
+
+def _select_representative_series(
+    result: BenchmarkResult,
+    available_series: list[str],
+    scores_by_model: dict[str, dict[str, float]],
+    max_series: int = 3,
+) -> list[str]:
+    """Pick best, median, and worst series to keep charts focused."""
+    if not available_series:
+        return []
+
+    best_model = result.leaderboard[0].name if result.leaderboard else None
+    score_map = scores_by_model.get(best_model or "", {})
+    ranked = [
+        (sid, score_map[sid]) for sid in available_series if sid in score_map
+    ]
+    ranked.sort(key=lambda item: item[1])
+
+    selected: list[str] = []
+    if ranked:
+        candidate_positions = [0, len(ranked) // 2, len(ranked) - 1]
+        for pos in candidate_positions:
+            sid = ranked[pos][0]
+            if sid not in selected:
+                selected.append(sid)
+        for sid, _ in ranked:
+            if len(selected) >= min(max_series, len(available_series)):
+                break
+            if sid not in selected:
+                selected.append(sid)
+
+    if len(selected) < min(max_series, len(available_series)):
+        for sid in sorted(available_series):
+            if sid not in selected:
+                selected.append(sid)
+            if len(selected) >= min(max_series, len(available_series)):
+                break
+
+    return selected
+
+
+def _build_data_overview_insights(result: BenchmarkResult) -> list[str]:
+    """Generate short chart-adjacent data interpretation notes."""
+    insights: list[str] = []
+    profile = result.profile
+    data_chars = result.data_characteristics
+
+    if profile.missing_ratio == 0:
+        insights.append("No missing values were detected in the input data.")
+    elif profile.missing_ratio < 0.05:
+        insights.append(
+            f"Missingness is low at {profile.missing_ratio:.1%}, "
+            "so ranking noise from gaps should be limited."
+        )
+    else:
+        insights.append(
+            f"Missingness is {profile.missing_ratio:.1%}; "
+            "treat model differences cautiously on sparse regions."
+        )
+
+    if data_chars is not None:
+        if data_chars.seasonality_strength >= 0.5:
+            insights.append(
+                f"Seasonality is strong "
+                f"({data_chars.seasonality_strength:.2f}), "
+                "so seasonal models should have an advantage."
+            )
+        elif data_chars.trend_strength >= 0.6:
+            insights.append(
+                f"Trend strength is elevated ({data_chars.trend_strength:.2f}), "
+                "so trend-tracking behavior matters more than seasonal fit."
+            )
+
+        if data_chars.series_heterogeneity >= 0.7:
+            insights.append(
+                f"Series heterogeneity is high "
+                f"({data_chars.series_heterogeneity:.2f}), "
+                "which increases the chance that one global winner "
+                "hides per-series losers."
+            )
+
+    if profile.min_length < profile.season_length_guess * 2:
+        insights.append(
+            "The shortest series are relatively short for the "
+            "inferred seasonality, which can reduce forecast stability."
+        )
+
+    return insights[:3]
+
+
+def _build_data_overview_chart_data(result: BenchmarkResult) -> dict:
+    """Build recent-history charts to explain the benchmarked data window."""
+    reference_fd = _get_reference_forecast_data(result)
+    if reference_fd is None:
+        return {"series": [], "insights": []}
+
+    scores_by_model = _build_series_score_lookup(result)
+    grouped = _group_forecast_series(reference_fd)
+    selected = _select_representative_series(
+        result=result,
+        available_series=list(grouped.keys()),
+        scores_by_model=scores_by_model,
+    )
+
+    best_model = result.leaderboard[0].name if result.leaderboard else ""
+    best_scores = scores_by_model.get(best_model, {})
+    series_payload = []
+    for idx, sid in enumerate(selected, start=1):
+        payload = grouped[sid]
+        score = best_scores.get(sid)
+        series_payload.append(
+            {
+                "name": sid,
+                "chart_id": f"chart-data-overview-{idx}",
+                "ds_history": payload["ds_history"],
+                "y_history": payload["y_history"],
+                "ds_actual": payload["ds_actual"],
+                "y_actual": payload["y_actual"],
+                "mase": score,
+                "summary": _describe_series_snapshot(
+                    sid=sid,
+                    mase=score,
+                    history_points=len(payload["y_history"]),
+                    horizon_points=len(payload["y_actual"]),
+                ),
+            }
+        )
+
+    return {
+        "series": series_payload,
+        "fold": reference_fd.fold,
+        "reference_model": reference_fd.model_name,
+        "insights": _build_data_overview_insights(result),
     }
 
-    if not avg_scores:
-        return {"series": []}
 
-    sorted_series = sorted(avg_scores.items(), key=lambda x: x[1])
-    # Top 3 best + top 3 worst (unique)
-    n_show = min(3, len(sorted_series))
-    selected = []
-    for sid, _ in sorted_series[:n_show]:
-        selected.append(sid)
-    for sid, _ in sorted_series[-n_show:]:
-        if sid not in selected:
-            selected.append(sid)
+def _describe_series_snapshot(
+    sid: str,
+    mase: float | None,
+    history_points: int,
+    horizon_points: int,
+) -> str:
+    """Describe the data window shown for one representative series."""
+    parts = [
+        f"{sid} shows {history_points} recent training points "
+        f"and {horizon_points} holdout observations."
+    ]
+    if mase is not None:
+        if mase < 1.0:
+            parts.append(
+                f"The winning model beats naive on this series "
+                f"(MASE {mase:.4f})."
+            )
+        else:
+            parts.append(
+                "This series remains difficult for the winning model "
+                f"(MASE {mase:.4f})."
+            )
+    return " ".join(parts)
 
-    output_series = []
-    for sid in selected:
-        if sid in series_data:
-            sd = series_data[sid]
-            output_series.append(
+
+def _describe_model_forecast(
+    model_name: str,
+    model_score: float,
+    leader_name: str | None,
+    leader_score: float | None,
+    selected_scores: list[float],
+) -> str:
+    """Summarize what a model's forecast charts mean."""
+    parts = [f"Mean MASE is {model_score:.4f}."]
+    if model_score < 1.0:
+        parts.append(
+            f"That is {(1.0 - model_score) * 100:.1f}% better "
+            "than the naive baseline."
+        )
+    elif model_score > 1.0:
+        parts.append(
+            f"That is {(model_score - 1.0) * 100:.1f}% worse "
+            "than the naive baseline."
+        )
+    else:
+        parts.append("That matches the naive baseline.")
+
+    if leader_name and leader_score is not None and model_name != leader_name:
+        parts.append(
+            f"It trails {leader_name} "
+            f"by {model_score - leader_score:.4f} MASE."
+        )
+
+    if selected_scores:
+        beats_naive = sum(score < 1.0 for score in selected_scores)
+        parts.append(
+            f"Among the highlighted series, "
+            f"{beats_naive}/{len(selected_scores)} beat the naive baseline."
+        )
+
+    return " ".join(parts)
+
+
+def _build_forecast_chart_data(result: BenchmarkResult) -> dict:
+    """Build forecast vs actual chart data for every model on the last fold."""
+    if not result.forecast_data:
+        return {"models": [], "selected_series": []}
+
+    last_fold = max(fd.fold for fd in result.forecast_data)
+    scores_by_model = _build_series_score_lookup(result)
+
+    reference_fd = _get_reference_forecast_data(result)
+    if reference_fd is None:
+        return {"models": [], "selected_series": []}
+
+    selected_series = _select_representative_series(
+        result=result,
+        available_series=list(_group_forecast_series(reference_fd).keys()),
+        scores_by_model=scores_by_model,
+    )
+
+    leaderboard_map = {entry.name: entry.mean_mase for entry in result.leaderboard}
+    leader_name = result.leaderboard[0].name if result.leaderboard else None
+    leader_score = result.leaderboard[0].mean_mase if result.leaderboard else None
+
+    models_payload = []
+    for model_idx, model in enumerate(result.models, start=1):
+        fd = next(
+            (
+                item
+                for item in result.forecast_data
+                if item.model_name == model.name and item.fold == last_fold
+            ),
+            None,
+        )
+        if fd is None:
+            continue
+
+        grouped = _group_forecast_series(fd)
+        per_series_scores = scores_by_model.get(model.name, {})
+        series_payload = []
+        selected_scores: list[float] = []
+        for series_idx, sid in enumerate(selected_series, start=1):
+            if sid not in grouped:
+                continue
+            payload = grouped[sid]
+            score = per_series_scores.get(sid)
+            if score is not None:
+                selected_scores.append(score)
+            series_payload.append(
                 {
                     "name": sid,
-                    "mase": round(avg_scores.get(sid, 0), 4),
-                    "ds": sd["ds_forecast"],
-                    "y_hat": sd["y_hat"],
-                    "y_actual": sd["y_actual"],
+                    "chart_id": f"chart-forecast-{model_idx}-{series_idx}",
+                    "mase": score,
+                    "note": _describe_series_forecast(score),
+                    "ds_history": payload["ds_history"],
+                    "y_history": payload["y_history"],
+                    "ds_actual": payload["ds_actual"],
+                    "y_actual": payload["y_actual"],
+                    "ds_forecast": payload["ds_forecast"],
+                    "y_hat": payload["y_hat"],
                 }
             )
 
+        if not series_payload:
+            continue
+
+        models_payload.append(
+            {
+                "name": model.name,
+                "rank": next(
+                    (
+                        entry.rank
+                        for entry in result.leaderboard
+                        if entry.name == model.name
+                    ),
+                    None,
+                ),
+                "mean_mase": leaderboard_map.get(model.name, model.mean_mase),
+                "summary": _describe_model_forecast(
+                    model_name=model.name,
+                    model_score=leaderboard_map.get(model.name, model.mean_mase),
+                    leader_name=leader_name,
+                    leader_score=leader_score,
+                    selected_scores=selected_scores,
+                ),
+                "series": series_payload,
+            }
+        )
+
     return {
-        "series": output_series,
-        "model_name": best_model,
+        "models": models_payload,
+        "selected_series": selected_series,
         "fold": last_fold,
     }
+
+
+def _describe_series_forecast(mase: float | None) -> str:
+    """Explain one per-series forecast panel in plain language."""
+    if mase is None:
+        return "Per-series MASE is unavailable for this panel."
+    if mase < 1.0:
+        return (
+            f"MASE {mase:.4f}; this model beats the naive baseline "
+            "on the highlighted series."
+        )
+    if mase > 1.0:
+        return (
+            f"MASE {mase:.4f}; this model underperforms the naive baseline "
+            "on the highlighted series."
+        )
+    return (
+        "MASE 1.0000; this model matches the naive baseline "
+        "on the highlighted series."
+    )
 
 
 def _build_diagnostics_chart_data(result: BenchmarkResult) -> dict:
