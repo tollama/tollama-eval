@@ -525,16 +525,56 @@ def _build_dashboard_bundle_manifest(result: Any) -> str:
     return json.dumps(manifest, indent=2)
 
 
+def _build_dashboard_bundle_readme(result: Any) -> str:
+    """Build a human-readable README for the filtered artifact bundle."""
+    snapshot_name = _dashboard_snapshot_filename(result)
+    results_name = _dashboard_filtered_results_filename(result)
+    details_name = _dashboard_filtered_details_filename(result)
+    lines = [
+        "Filtered Dashboard Artifact Bundle",
+        "",
+        "Contents:",
+        (
+            f"- {snapshot_name}: open this file in a browser for a shareable "
+            "static report."
+        ),
+        f"- {results_name}: filtered benchmark summary in machine-readable JSON.",
+    ]
+    if result.to_details_dict():
+        lines.append(
+            f"- {details_name}: filtered report-only details such as forecasts, "
+            "diagnostics, and environment provenance."
+        )
+    else:
+        lines.append(
+            f"- {details_name}: not included because the filtered view has no "
+            "detail-only payloads."
+        )
+    lines.extend(
+        [
+            "",
+            "Recommended use:",
+            "1. Open the HTML snapshot first for a quick review.",
+            "2. Use results.json for leaderboard/model summaries.",
+            "3. Use details.json only when you need forecasts, diagnostics, or "
+            "provenance context.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def _build_dashboard_artifact_bundle(result: Any) -> bytes:
     """Build a zip bundle with filtered dashboard exports."""
     snapshot_html = _build_dashboard_snapshot_html(result)
     results_json = _build_dashboard_filtered_results_json(result)
     details_json = _build_dashboard_filtered_details_json(result)
     manifest_json = _build_dashboard_bundle_manifest(result)
+    readme_txt = _build_dashboard_bundle_readme(result)
 
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("manifest.json", manifest_json)
+        zf.writestr("README.txt", readme_txt)
         zf.writestr(_dashboard_snapshot_filename(result), snapshot_html)
         zf.writestr(_dashboard_filtered_results_filename(result), results_json)
         if details_json is not None:

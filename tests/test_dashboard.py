@@ -18,6 +18,7 @@ from ts_autopilot.reporting.dashboard import (
     _artifact_source_label,
     _build_dashboard_artifact_bundle,
     _build_dashboard_bundle_manifest,
+    _build_dashboard_bundle_readme,
     _build_dashboard_filtered_details_json,
     _build_dashboard_filtered_results_json,
     _build_dashboard_snapshot_html,
@@ -632,6 +633,7 @@ def test_build_dashboard_artifact_bundle_contains_expected_files() -> None:
     with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
         names = set(zf.namelist())
         assert "manifest.json" in names
+        assert "README.txt" in names
         assert "dashboard-snapshot-seasonalnaive.html" in names
         assert "dashboard-filtered-results-seasonalnaive.json" in names
         assert "dashboard-filtered-details-seasonalnaive.json" in names
@@ -643,6 +645,7 @@ def test_build_dashboard_artifact_bundle_skips_details_when_absent() -> None:
     with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
         names = set(zf.namelist())
         assert "manifest.json" in names
+        assert "README.txt" in names
         assert "dashboard-snapshot-seasonalnaive.html" in names
         assert "dashboard-filtered-results-seasonalnaive.json" in names
         assert "dashboard-filtered-details-seasonalnaive.json" not in names
@@ -669,6 +672,36 @@ def test_build_dashboard_bundle_manifest_describes_artifacts() -> None:
     assert "dashboard-snapshot-seasonalnaive.html" in artifact_names
     assert "dashboard-filtered-results-seasonalnaive.json" in artifact_names
     assert "dashboard-filtered-details-seasonalnaive.json" in artifact_names
+
+
+def test_build_dashboard_bundle_readme_describes_included_files() -> None:
+    result = _make_result()
+    result.forecast_data = [
+        ForecastData(
+            model_name="SeasonalNaive",
+            fold=1,
+            unique_id=["s1"],
+            ds=["2020-01-02"],
+            y_hat=[1.0],
+            y_actual=[1.1],
+        )
+    ]
+
+    readme = _build_dashboard_bundle_readme(result)
+
+    assert "Filtered Dashboard Artifact Bundle" in readme
+    assert "dashboard-snapshot-seasonalnaive.html" in readme
+    assert "dashboard-filtered-results-seasonalnaive.json" in readme
+    assert "dashboard-filtered-details-seasonalnaive.json" in readme
+
+
+def test_build_dashboard_bundle_readme_notes_missing_details() -> None:
+    readme = _build_dashboard_bundle_readme(_make_result())
+
+    assert (
+        "not included because the filtered view has no detail-only payloads"
+        in readme
+    )
 
 
 def test_artifact_manifest_summary_marks_missing_details() -> None:
