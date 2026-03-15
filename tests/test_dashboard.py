@@ -17,6 +17,7 @@ from ts_autopilot.reporting.dashboard import (
     _artifact_manifest_summary,
     _artifact_source_label,
     _build_dashboard_artifact_bundle,
+    _build_dashboard_bundle_manifest,
     _build_dashboard_filtered_details_json,
     _build_dashboard_filtered_results_json,
     _build_dashboard_snapshot_html,
@@ -630,6 +631,7 @@ def test_build_dashboard_artifact_bundle_contains_expected_files() -> None:
 
     with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
         names = set(zf.namelist())
+        assert "manifest.json" in names
         assert "dashboard-snapshot-seasonalnaive.html" in names
         assert "dashboard-filtered-results-seasonalnaive.json" in names
         assert "dashboard-filtered-details-seasonalnaive.json" in names
@@ -640,9 +642,33 @@ def test_build_dashboard_artifact_bundle_skips_details_when_absent() -> None:
 
     with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
         names = set(zf.namelist())
+        assert "manifest.json" in names
         assert "dashboard-snapshot-seasonalnaive.html" in names
         assert "dashboard-filtered-results-seasonalnaive.json" in names
         assert "dashboard-filtered-details-seasonalnaive.json" not in names
+
+
+def test_build_dashboard_bundle_manifest_describes_artifacts() -> None:
+    result = _make_result()
+    result.forecast_data = [
+        ForecastData(
+            model_name="SeasonalNaive",
+            fold=1,
+            unique_id=["s1"],
+            ds=["2020-01-02"],
+            y_hat=[1.0],
+            y_actual=[1.1],
+        )
+    ]
+    manifest = json.loads(_build_dashboard_bundle_manifest(result))
+
+    assert manifest["bundle"] == "dashboard-filtered-bundle-seasonalnaive.zip"
+    assert manifest["leader"] == "SeasonalNaive"
+    assert manifest["model_count"] == 1
+    artifact_names = {artifact["name"] for artifact in manifest["artifacts"]}
+    assert "dashboard-snapshot-seasonalnaive.html" in artifact_names
+    assert "dashboard-filtered-results-seasonalnaive.json" in artifact_names
+    assert "dashboard-filtered-details-seasonalnaive.json" in artifact_names
 
 
 def test_artifact_manifest_summary_marks_missing_details() -> None:

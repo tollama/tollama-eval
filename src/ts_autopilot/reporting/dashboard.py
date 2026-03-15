@@ -479,14 +479,62 @@ def _build_dashboard_filtered_details_json(result: Any) -> str | None:
     return result.to_details_json(indent=2)
 
 
+def _build_dashboard_bundle_manifest(result: Any) -> str:
+    """Build a small manifest describing filtered bundle contents."""
+    details = result.to_details_dict()
+    artifacts = [
+        {
+            "name": _dashboard_snapshot_filename(result),
+            "type": "html",
+            "description": "Static HTML snapshot of the filtered dashboard view.",
+        },
+        {
+            "name": _dashboard_filtered_results_filename(result),
+            "type": "json",
+            "description": (
+                "Filtered results.json containing leaderboard and model summaries."
+            ),
+        },
+    ]
+    if details:
+        detail_features = []
+        if result.forecast_data:
+            detail_features.append("forecast_data")
+        if result.diagnostics:
+            detail_features.append("diagnostics")
+        if getattr(result, "data_characteristics", None) is not None:
+            detail_features.append("data_characteristics")
+        if "optional_model_environment" in details:
+            detail_features.append("optional_model_environment")
+        artifacts.append(
+            {
+                "name": _dashboard_filtered_details_filename(result),
+                "type": "json",
+                "description": "Filtered details.json with report-only context.",
+                "features": detail_features,
+            }
+        )
+
+    leader = result.leaderboard[0].name if result.leaderboard else None
+    manifest = {
+        "bundle": _dashboard_bundle_filename(result),
+        "leader": leader,
+        "model_count": len(result.models),
+        "artifacts": artifacts,
+    }
+    return json.dumps(manifest, indent=2)
+
+
 def _build_dashboard_artifact_bundle(result: Any) -> bytes:
     """Build a zip bundle with filtered dashboard exports."""
     snapshot_html = _build_dashboard_snapshot_html(result)
     results_json = _build_dashboard_filtered_results_json(result)
     details_json = _build_dashboard_filtered_details_json(result)
+    manifest_json = _build_dashboard_bundle_manifest(result)
 
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("manifest.json", manifest_json)
         zf.writestr(_dashboard_snapshot_filename(result), snapshot_html)
         zf.writestr(_dashboard_filtered_results_filename(result), results_json)
         if details_json is not None:
