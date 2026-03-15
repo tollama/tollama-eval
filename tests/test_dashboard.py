@@ -6,6 +6,7 @@ from ts_autopilot.contracts import (
     BenchmarkConfig,
     BenchmarkResult,
     DataProfile,
+    DiagnosticsResult,
     ForecastData,
     LeaderboardEntry,
     ModelResult,
@@ -13,6 +14,7 @@ from ts_autopilot.contracts import (
 from ts_autopilot.reporting.dashboard import (
     _artifact_manifest_summary,
     _artifact_source_label,
+    _filter_result_for_dashboard,
     _load_result_artifacts,
     _optional_model_environment_summary,
     _parse_dashboard_args,
@@ -76,6 +78,8 @@ class _FakeStreamlit:
         self.columns_created: list[_FakeColumn] = []
         self.expanders: list[str] = []
         self.plotly_calls: int = 0
+        self.warnings: list[str] = []
+        self.info_messages: list[object] = []
 
     def subheader(self, text: str) -> None:
         self.subheaders.append(text)
@@ -96,6 +100,27 @@ class _FakeStreamlit:
 
     def plotly_chart(self, *_: object, **__: object) -> None:
         self.plotly_calls += 1
+
+    def slider(self, _label: str, **kwargs: object) -> object:
+        return kwargs["value"]
+
+    def multiselect(
+        self,
+        _label: str,
+        _options: list[str],
+        *,
+        default: list[str],
+    ) -> list[str]:
+        return default
+
+    def warning(self, text: str) -> None:
+        self.warnings.append(text)
+
+    def info(self, text: object) -> None:
+        self.info_messages.append(text)
+
+    def divider(self) -> None:
+        return None
 
 
 class _FakeUpload:
@@ -217,6 +242,89 @@ def test_load_result_artifacts_supports_filesystem_paths(tmp_path) -> None:
     loaded = _load_result_artifacts(results_path, details_path)
 
     assert loaded._optional_runner_statuses[0]["label"] == "LightGBM"
+
+
+def test_filter_result_for_dashboard_trims_models_forecasts_and_diagnostics() -> None:
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=120,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[
+            ModelResult(
+                name="AutoETS",
+                runtime_sec=0.5,
+                folds=[],
+                mean_mase=0.875,
+                std_mase=0.025,
+            ),
+            ModelResult(
+                name="SeasonalNaive",
+                runtime_sec=0.1,
+                folds=[],
+                mean_mase=1.0,
+                std_mase=0.0,
+            ),
+        ],
+        leaderboard=[
+            LeaderboardEntry(rank=1, name="AutoETS", mean_mase=0.875),
+            LeaderboardEntry(rank=2, name="SeasonalNaive", mean_mase=1.0),
+        ],
+        forecast_data=[
+            ForecastData(
+                model_name="AutoETS",
+                fold=2,
+                unique_id=["s1"],
+                ds=["2020-07-02"],
+                y_hat=[10.0],
+                y_actual=[10.5],
+            ),
+            ForecastData(
+                model_name="SeasonalNaive",
+                fold=2,
+                unique_id=["s1"],
+                ds=["2020-07-02"],
+                y_hat=[9.8],
+                y_actual=[10.5],
+            ),
+        ],
+        diagnostics=[
+            DiagnosticsResult(
+                model_name="AutoETS",
+                residual_mean=0.1,
+                residual_std=0.5,
+                residual_skew=0.1,
+                residual_kurtosis=-0.2,
+                ljung_box_p=0.42,
+            ),
+            DiagnosticsResult(
+                model_name="SeasonalNaive",
+                residual_mean=0.0,
+                residual_std=0.6,
+                residual_skew=0.0,
+                residual_kurtosis=-0.1,
+                ljung_box_p=0.35,
+            ),
+        ],
+    )
+
+    filtered = _filter_result_for_dashboard(
+        result,
+        selected_model_names=["SeasonalNaive"],
+        max_rank=2,
+    )
+
+    assert [model.name for model in filtered.models] == ["SeasonalNaive"]
+    assert [entry.name for entry in filtered.leaderboard] == ["SeasonalNaive"]
+    assert filtered.leaderboard[0].rank == 1
+    assert [fd.model_name for fd in filtered.forecast_data] == ["SeasonalNaive"]
+    assert [diag.model_name for diag in filtered.diagnostics] == ["SeasonalNaive"]
 
 
 def test_parse_dashboard_args_uses_artifact_dir_defaults(tmp_path) -> None:

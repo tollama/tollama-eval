@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -409,6 +410,114 @@ def _render_artifact_manifest(st: Any, manifest: dict[str, Any]) -> None:
     st.dataframe(manifest["rows"], use_container_width=True, hide_index=True)
 
 
+def _ordered_dashboard_model_names(result: Any) -> list[str]:
+    """Return model names in leaderboard order with unranked models appended."""
+    ordered = [entry.name for entry in result.leaderboard]
+    for model in result.models:
+        if model.name not in ordered:
+            ordered.append(model.name)
+    return ordered
+
+
+def _filter_result_for_dashboard(
+    result: Any,
+    *,
+    selected_model_names: list[str] | None = None,
+    max_rank: int | None = None,
+) -> Any:
+    """Create a filtered dashboard view of a benchmark result."""
+    from ts_autopilot.contracts import BenchmarkResult
+
+    ordered_names = _ordered_dashboard_model_names(result)
+    ranked_names = {entry.name for entry in result.leaderboard}
+    allowed_names = set(selected_model_names or ordered_names)
+
+    if max_rank is not None and result.leaderboard:
+        top_ranked = {
+            entry.name for entry in result.leaderboard if entry.rank <= max_rank
+        }
+        allowed_names = {
+            name
+            for name in allowed_names
+            if name in top_ranked or name not in ranked_names
+        }
+
+    visible_names = [name for name in ordered_names if name in allowed_names]
+    visible_set = set(visible_names)
+
+    model_by_name = {model.name: model for model in result.models}
+    filtered_models = [
+        model_by_name[name] for name in visible_names if name in model_by_name
+    ]
+
+    filtered_leaderboard = []
+    for idx, entry in enumerate(
+        [entry for entry in result.leaderboard if entry.name in visible_set],
+        start=1,
+    ):
+        filtered_leaderboard.append(replace(entry, rank=idx))
+
+    filtered = BenchmarkResult(
+        profile=result.profile,
+        config=result.config,
+        models=filtered_models,
+        leaderboard=filtered_leaderboard,
+        warnings=list(result.warnings),
+        metadata=result.metadata,
+        forecast_data=[
+            fd for fd in result.forecast_data if fd.model_name in visible_set
+        ],
+        diagnostics=[
+            diag for diag in result.diagnostics if diag.model_name in visible_set
+        ],
+        data_characteristics=result.data_characteristics,
+    )
+    if hasattr(result, "_optional_runner_statuses"):
+        filtered._optional_runner_statuses = result._optional_runner_statuses
+    return filtered
+
+
+def _render_display_filters(st: Any, result: Any) -> Any:
+    """Render dashboard model filters and return the filtered result view."""
+    if len(result.models) <= 1:
+        return result
+
+    st.subheader("Display Filters")
+    ordered_names = _ordered_dashboard_model_names(result)
+    ranked_total = len(result.leaderboard)
+    max_rank = None
+    if ranked_total > 0:
+        max_rank = st.slider(
+            "Show up to rank",
+            min_value=1,
+            max_value=ranked_total,
+            value=min(5, ranked_total),
+        )
+        default_models = [
+            entry.name for entry in result.leaderboard if entry.rank <= max_rank
+        ]
+    else:
+        default_models = ordered_names[: min(5, len(ordered_names))]
+
+    selected_model_names = st.multiselect(
+        "Models to display",
+        ordered_names,
+        default=default_models,
+    )
+    filtered_result = _filter_result_for_dashboard(
+        result,
+        selected_model_names=selected_model_names,
+        max_rank=max_rank,
+    )
+    st.caption(
+        f"Showing {len(filtered_result.models)} of {len(result.models)} models "
+        "in this dashboard view."
+    )
+    if not filtered_result.models:
+        st.warning("No models match the current display filters.")
+    return filtered_result
+
+
 def _render_result_dashboard(
     st: Any,
     result: Any,
@@ -428,29 +537,36 @@ def _render_result_dashboard(
 
     st.divider()
 
-    summary = generate_executive_summary(result)
-    st.info(summary)
-
     if artifact_manifest:
         _render_artifact_manifest(st, artifact_manifest)
 
+    filtered_result = _render_display_filters(st, result)
+    if not filtered_result.models:
+        return
+
+    summary = generate_executive_summary(filtered_result)
+    st.info(summary)
+
     st.subheader("Dataset Profile")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Series", result.profile.n_series)
-    col2.metric("Total Rows", f"{result.profile.total_rows:,}")
-    col3.metric("Frequency", result.profile.frequency)
-    col4.metric("Season Length", result.profile.season_length_guess)
+    col1.metric("Series", filtered_result.profile.n_series)
+    col2.metric("Total Rows", f"{filtered_result.profile.total_rows:,}")
+    col3.metric("Frequency", filtered_result.profile.frequency)
+    col4.metric("Season Length", filtered_result.profile.season_length_guess)
 
-    if result.warnings:
-        with st.expander(f"Warnings ({len(result.warnings)})", expanded=False):
-            for w in result.warnings:
+    if filtered_result.warnings:
+        with st.expander(
+            f"Warnings ({len(filtered_result.warnings)})",
+            expanded=False,
+        ):
+            for w in filtered_result.warnings:
                 st.warning(w)
 
-    _render_optional_model_environment(st, result)
+    _render_optional_model_environment(st, filtered_result)
 
     st.subheader("Leaderboard")
     lb_data = []
-    for entry in result.leaderboard:
+    for entry in filtered_result.leaderboard:
         lb_data.append(
             {
                 "Rank": entry.rank,
@@ -464,11 +580,11 @@ def _render_result_dashboard(
     if lb_data:
         st.dataframe(pd.DataFrame(lb_data), use_container_width=True, hide_index=True)
 
-    if result.leaderboard:
+    if filtered_result.leaderboard:
         st.subheader("Model Comparison")
 
-        names = [e.name for e in result.leaderboard]
-        mase_vals = [e.mean_mase for e in result.leaderboard]
+        names = [e.name for e in filtered_result.leaderboard]
+        mase_vals = [e.mean_mase for e in filtered_result.leaderboard]
         bar_colors = ["#2563eb" if v < 1.0 else "#dc2626" for v in mase_vals]
 
         fig = go.Figure(
@@ -489,7 +605,7 @@ def _render_result_dashboard(
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        if result.models and len(result.models[0].folds) > 1:
+        if filtered_result.models and len(filtered_result.models[0].folds) > 1:
             fig2 = go.Figure()
             colors = [
                 "#2563eb",
@@ -501,7 +617,7 @@ def _render_result_dashboard(
                 "#0891b2",
                 "#65a30d",
             ]
-            for i, model in enumerate(result.models):
+            for i, model in enumerate(filtered_result.models):
                 fig2.add_trace(
                     go.Scatter(
                         x=[f"Fold {f.fold}" for f in model.folds],
@@ -515,21 +631,21 @@ def _render_result_dashboard(
             fig2.update_layout(title="MASE Stability Across Folds", height=350)
             st.plotly_chart(fig2, use_container_width=True)
 
-    per_series_chart = _build_per_series_competition_data(result)
+    per_series_chart = _build_per_series_competition_data(filtered_result)
     if per_series_chart:
         _render_per_series_panel(st, per_series_chart)
 
-    forecast_chart = _build_forecast_chart_data(result)
+    forecast_chart = _build_forecast_chart_data(filtered_result)
     if forecast_chart.get("models"):
         _render_forecast_panels(st, forecast_chart)
 
-    diagnostics_chart = _build_diagnostics_chart_data(result)
+    diagnostics_chart = _build_diagnostics_chart_data(filtered_result)
     if diagnostics_chart:
         _render_diagnostics_panel(st, diagnostics_chart)
 
-    if result.models:
+    if filtered_result.models:
         st.subheader("Model Details")
-        for model in result.models:
+        for model in filtered_result.models:
             with st.expander(f"{model.name} (MASE={model.mean_mase:.4f})"):
                 fold_data = []
                 for f in model.folds:
