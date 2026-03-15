@@ -5,8 +5,10 @@ from ts_autopilot.runners.optional import (
     LightGBMRunner,
     NBEATSRunner,
     NHITSRunner,
+    OptionalRunnerStatus,
     ProphetRunner,
     get_optional_runners,
+    inspect_optional_runner_status,
 )
 
 
@@ -95,3 +97,50 @@ def test_get_optional_runners_includes_neural_when_probe_passes(monkeypatch):
 
     assert "NHITS" in names
     assert "NBEATS" in names
+
+
+def test_inspect_optional_runner_status_marks_neural_not_requested():
+    statuses = inspect_optional_runner_status(include_neural=False, safe_mode=True)
+
+    neural_status = next(
+        status for status in statuses if status.label == "NeuralForecast"
+    )
+
+    assert neural_status.available is False
+    assert neural_status.reason == "not requested"
+
+
+def test_get_optional_runners_uses_status_inspection(monkeypatch):
+    monkeypatch.setattr(
+        "ts_autopilot.runners.optional.inspect_optional_runner_status",
+        lambda include_neural=True, safe_mode=True: [
+            OptionalRunnerStatus(
+                label="Prophet",
+                available=True,
+                reason="available",
+                runner_names=["Prophet"],
+            ),
+            OptionalRunnerStatus(
+                label="LightGBM",
+                available=False,
+                reason="missing dependency: lightgbm",
+                runner_names=["LightGBM"],
+            ),
+            OptionalRunnerStatus(
+                label="XGBoost",
+                available=False,
+                reason="missing dependency: xgboost",
+                runner_names=["XGBoost"],
+            ),
+            OptionalRunnerStatus(
+                label="NeuralForecast",
+                available=False,
+                reason="failed health check",
+                runner_names=["NHITS", "NBEATS", "TiDE", "DeepAR", "PatchTST", "TFT"],
+            ),
+        ],
+    )
+
+    runners = get_optional_runners(include_neural=True, safe_mode=True)
+
+    assert [runner.name for runner in runners] == ["Prophet"]

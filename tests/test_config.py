@@ -94,6 +94,16 @@ def test_tollama_models_as_string(tmp_path):
     assert cfg.tollama_models == ["chronos2", "timesfm"]
 
 
+def test_optional_model_flags_in_config(tmp_path):
+    cfg_path = tmp_path / "config.yml"
+    cfg_path.write_text(
+        "include_optional_models: true\ninclude_neural_models: true\n"
+    )
+    cfg = load_config(cfg_path)
+    assert cfg.include_optional_models is True
+    assert cfg.include_neural_models is True
+
+
 def test_cli_config_flag(tmp_path):
     """Integration: --config loads settings and runs benchmark."""
     import pandas as pd

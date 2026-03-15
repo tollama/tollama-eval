@@ -10,6 +10,7 @@ import importlib.util
 import subprocess
 import sys
 import time
+from dataclasses import dataclass, field
 
 import pandas as pd
 
@@ -18,6 +19,16 @@ from ts_autopilot.logging_config import get_logger
 from ts_autopilot.runners.base import BaseRunner
 
 logger = get_logger("runners.optional")
+
+
+@dataclass
+class OptionalRunnerStatus:
+    """Availability status for one optional dependency group."""
+
+    label: str
+    available: bool
+    reason: str
+    runner_names: list[str] = field(default_factory=list)
 
 
 def _module_available(module_name: str) -> bool:
@@ -52,6 +63,106 @@ def _module_imports_safely(module_name: str, timeout_sec: float = 10.0) -> bool:
         )
         return False
     return True
+
+
+def _missing_modules(*module_names: str) -> list[str]:
+    """Return the subset of modules that cannot be resolved."""
+    return [name for name in module_names if not _module_available(name)]
+
+
+def inspect_optional_runner_status(
+    *,
+    include_neural: bool = True,
+    safe_mode: bool = True,
+) -> list[OptionalRunnerStatus]:
+    """Inspect optional runner availability without importing heavy stacks."""
+    statuses: list[OptionalRunnerStatus] = []
+
+    prophet_missing = _missing_modules("prophet")
+    statuses.append(
+        OptionalRunnerStatus(
+            label="Prophet",
+            available=not prophet_missing,
+            reason=(
+                "available"
+                if not prophet_missing
+                else f"missing dependency: {', '.join(prophet_missing)}"
+            ),
+            runner_names=["Prophet"],
+        )
+    )
+
+    lightgbm_missing = _missing_modules("lightgbm", "mlforecast")
+    statuses.append(
+        OptionalRunnerStatus(
+            label="LightGBM",
+            available=not lightgbm_missing,
+            reason=(
+                "available"
+                if not lightgbm_missing
+                else f"missing dependency: {', '.join(lightgbm_missing)}"
+            ),
+            runner_names=["LightGBM"],
+        )
+    )
+
+    xgboost_missing = _missing_modules("xgboost", "mlforecast")
+    statuses.append(
+        OptionalRunnerStatus(
+            label="XGBoost",
+            available=not xgboost_missing,
+            reason=(
+                "available"
+                if not xgboost_missing
+                else f"missing dependency: {', '.join(xgboost_missing)}"
+            ),
+            runner_names=["XGBoost"],
+        )
+    )
+
+    if not include_neural:
+        statuses.append(
+            OptionalRunnerStatus(
+                label="NeuralForecast",
+                available=False,
+                reason="not requested",
+                runner_names=["NHITS", "NBEATS", "TiDE", "DeepAR", "PatchTST", "TFT"],
+            )
+        )
+        return statuses
+
+    neural_missing = _missing_modules("neuralforecast")
+    if neural_missing:
+        statuses.append(
+            OptionalRunnerStatus(
+                label="NeuralForecast",
+                available=False,
+                reason=f"missing dependency: {', '.join(neural_missing)}",
+                runner_names=["NHITS", "NBEATS", "TiDE", "DeepAR", "PatchTST", "TFT"],
+            )
+        )
+        return statuses
+
+    if safe_mode and not _module_imports_safely("neuralforecast"):
+        statuses.append(
+            OptionalRunnerStatus(
+                label="NeuralForecast",
+                available=False,
+                reason="failed health check",
+                runner_names=["NHITS", "NBEATS", "TiDE", "DeepAR", "PatchTST", "TFT"],
+            )
+        )
+        return statuses
+
+    statuses.append(
+        OptionalRunnerStatus(
+            label="NeuralForecast",
+            available=True,
+            reason="available",
+            runner_names=["NHITS", "NBEATS", "TiDE", "DeepAR", "PatchTST", "TFT"],
+        )
+    )
+    return statuses
 
 
 class ProphetRunner(BaseRunner):
@@ -532,42 +643,37 @@ def get_optional_runners(
     Neural runners can additionally be health-checked in a subprocess to
     prevent unstable installs from crashing the main process.
     """
+    runner_factories: dict[str, tuple[type[BaseRunner], ...]] = {
+        "Prophet": (ProphetRunner,),
+        "LightGBM": (LightGBMRunner,),
+        "XGBoost": (XGBoostRunner,),
+        "NeuralForecast": (
+            NHITSRunner,
+            NBEATSRunner,
+            TiDERunner,
+            DeepARRunner,
+            PatchTSTRunner,
+            TFTRunner,
+        ),
+    }
     runners: list[BaseRunner] = []
 
-    if _module_available("prophet"):
-        runners.append(ProphetRunner())
-        logger.debug("Prophet runner available")
-    else:
-        logger.debug("Prophet not installed, skipping")
-
-    if _module_available("lightgbm") and _module_available("mlforecast"):
-        runners.append(LightGBMRunner())
-        logger.debug("LightGBM runner available")
-    else:
-        logger.debug("LightGBM/mlforecast not installed, skipping")
-
-    if _module_available("xgboost") and _module_available("mlforecast"):
-        runners.append(XGBoostRunner())
-        logger.debug("XGBoost runner available")
-    else:
-        logger.debug("XGBoost/mlforecast not installed, skipping")
-
-    neural_available = include_neural and _module_available("neuralforecast")
-    if neural_available and safe_mode:
-        neural_available = _module_imports_safely("neuralforecast")
-
-    if neural_available:
-        runners.append(NHITSRunner())
-        runners.append(NBEATSRunner())
-        runners.append(TiDERunner())
-        runners.append(DeepARRunner())
-        runners.append(PatchTSTRunner())
-        runners.append(TFTRunner())
-        logger.debug(
-            "NeuralForecast runners available"
-            " (NHITS, NBEATS, TiDE, DeepAR, PatchTST, TFT)"
-        )
-    elif include_neural:
-        logger.debug("neuralforecast not installed, skipping")
+    for status in inspect_optional_runner_status(
+        include_neural=include_neural,
+        safe_mode=safe_mode,
+    ):
+        if status.available:
+            runners.extend(factory() for factory in runner_factories[status.label])
+            logger.debug(
+                "Optional runners available for %s: %s",
+                status.label,
+                ", ".join(status.runner_names),
+            )
+        else:
+            logger.debug(
+                "Skipping %s optional runners: %s",
+                status.label,
+                status.reason,
+            )
 
     return runners

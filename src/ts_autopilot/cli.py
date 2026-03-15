@@ -147,6 +147,38 @@ def _make_plain_progress_cb(quiet: bool, verbose: bool) -> object:
     return cb
 
 
+def _echo_optional_runner_summary(
+    *,
+    include_optional: bool,
+    include_neural: bool,
+    quiet: bool,
+) -> None:
+    """Print a concise summary of optional model discovery."""
+    if quiet or not (include_optional or include_neural):
+        return
+
+    from ts_autopilot.runners.optional import inspect_optional_runner_status
+
+    statuses = inspect_optional_runner_status(
+        include_neural=include_neural,
+        safe_mode=True,
+    )
+    enabled_models = sum(
+        len(status.runner_names) for status in statuses if status.available
+    )
+
+    typer.echo("")
+    typer.secho("Optional Models:", bold=True)
+    for status in statuses:
+        if status.available:
+            typer.echo(
+                f"  enabled {status.label}: {', '.join(status.runner_names)}"
+            )
+        else:
+            typer.echo(f"  skipped {status.label}: {status.reason}")
+    typer.echo(f"  Total optional models enabled: {enabled_models}")
+
+
 def _merge_config(
     file_cfg: Any,
     *,
@@ -487,6 +519,12 @@ def run(
 
     # Initialize structured logging
     setup_logging(verbose=verbose, quiet=quiet, log_json=log_json)
+
+    _echo_optional_runner_summary(
+        include_optional=include_optional,
+        include_neural=include_neural,
+        quiet=quiet,
+    )
 
     model_names = None
     if models is not None:

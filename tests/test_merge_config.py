@@ -30,6 +30,8 @@ def test_merge_config_cli_defaults_use_file():
         cli_no_cache=False,
         cli_cache_dir=None,
         cli_parallel_models=False,
+        cli_include_optional_models=False,
+        cli_include_neural_models=False,
         default_timeout=300.0,
     )
     assert m["input"] == Path("data.csv")
@@ -55,6 +57,8 @@ def test_merge_config_cli_overrides_file():
         cli_no_cache=False,
         cli_cache_dir=None,
         cli_parallel_models=False,
+        cli_include_optional_models=False,
+        cli_include_neural_models=False,
         default_timeout=300.0,
     )
     assert m["input"] == Path("custom.csv")
@@ -82,6 +86,8 @@ def test_merge_config_cache_settings():
         cli_no_cache=False,
         cli_cache_dir=None,
         cli_parallel_models=False,
+        cli_include_optional_models=False,
+        cli_include_neural_models=False,
         default_timeout=300.0,
     )
     assert m["no_cache"] is True
@@ -104,6 +110,8 @@ def test_merge_config_parallel_models():
         cli_no_cache=False,
         cli_cache_dir=None,
         cli_parallel_models=False,
+        cli_include_optional_models=False,
+        cli_include_neural_models=False,
         default_timeout=300.0,
     )
     assert m["parallel_models"] is True
@@ -125,6 +133,8 @@ def test_merge_config_timeout_from_file():
         cli_no_cache=False,
         cli_cache_dir=None,
         cli_parallel_models=False,
+        cli_include_optional_models=False,
+        cli_include_neural_models=False,
         default_timeout=300.0,
     )
     assert m["model_timeout_sec"] == 60.0
@@ -146,6 +156,32 @@ def test_merge_config_models_from_file():
         cli_no_cache=False,
         cli_cache_dir=None,
         cli_parallel_models=False,
+        cli_include_optional_models=False,
+        cli_include_neural_models=False,
         default_timeout=300.0,
     )
     assert m["models"] == "SeasonalNaive,AutoETS"
+
+
+def test_merge_config_optional_model_flags():
+    """Optional model flags merge from config and CLI."""
+    cfg = FileConfig(include_optional_models=True, include_neural_models=False)
+    m = _merge_config(
+        cfg,
+        cli_input=None,
+        cli_output=Path("out/"),
+        cli_horizon=14,
+        cli_n_folds=3,
+        cli_models=None,
+        cli_tollama_url=None,
+        cli_tollama_models=None,
+        cli_n_jobs=1,
+        cli_no_cache=False,
+        cli_cache_dir=None,
+        cli_parallel_models=False,
+        cli_include_optional_models=False,
+        cli_include_neural_models=True,
+        default_timeout=300.0,
+    )
+    assert m["include_optional_models"] is True
+    assert m["include_neural_models"] is True
