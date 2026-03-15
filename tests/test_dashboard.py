@@ -20,6 +20,7 @@ from ts_autopilot.reporting.dashboard import (
     _render_diagnostics_panel,
     _render_forecast_panels,
     _render_optional_model_environment,
+    _render_per_series_panel,
 )
 from ts_autopilot.runners.optional import OptionalRunnerStatus
 
@@ -389,3 +390,39 @@ def test_render_diagnostics_panel_outputs_metrics_and_charts() -> None:
     assert fake_st.subheaders == ["Residual Diagnostics"]
     assert fake_st.columns_created[2].metrics == [("Ljung-Box p", "0.4200")]
     assert fake_st.plotly_calls == 2
+
+
+def test_render_per_series_panel_outputs_charts_and_table() -> None:
+    fake_st = _FakeStreamlit()
+
+    _render_per_series_panel(
+        fake_st,
+        {
+            "series_total": 2,
+            "models": ["AutoETS", "SeasonalNaive"],
+            "winner_summary": [
+                {"name": "AutoETS", "count": 2},
+            ],
+            "heatmap_series": ["s2", "s1"],
+            "heatmap_z": [[0.975, 1.06], [0.775, 0.94]],
+            "heatmap_text": [["0.9750", "1.0600"], ["0.7750", "0.9400"]],
+            "table_rows": [
+                {
+                    "series_id": "s2",
+                    "winner": "AutoETS",
+                    "winner_mase": 0.975,
+                    "runner_up": "SeasonalNaive",
+                    "runner_up_mase": 1.06,
+                    "margin": 0.085,
+                    "spread": 0.085,
+                }
+            ],
+            "insights": [
+                "AutoETS wins 2 of 2 comparable series.",
+            ],
+        },
+    )
+
+    assert fake_st.subheaders == ["Per-Series Winners"]
+    assert fake_st.plotly_calls == 2
+    assert fake_st.dataframes

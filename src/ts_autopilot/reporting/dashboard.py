@@ -423,6 +423,7 @@ def _render_result_dashboard(
     from ts_autopilot.reporting.html_report import (
         _build_diagnostics_chart_data,
         _build_forecast_chart_data,
+        _build_per_series_competition_data,
     )
 
     st.divider()
@@ -514,6 +515,10 @@ def _render_result_dashboard(
             fig2.update_layout(title="MASE Stability Across Folds", height=350)
             st.plotly_chart(fig2, use_container_width=True)
 
+    per_series_chart = _build_per_series_competition_data(result)
+    if per_series_chart:
+        _render_per_series_panel(st, per_series_chart)
+
     forecast_chart = _build_forecast_chart_data(result)
     if forecast_chart.get("models"):
         _render_forecast_panels(st, forecast_chart)
@@ -600,6 +605,78 @@ def _render_forecast_panels(st: Any, forecast_chart: dict[str, Any]) -> None:
                     legend={"orientation": "h"},
                 )
                 st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_per_series_panel(st: Any, per_series_chart: dict[str, Any]) -> None:
+    """Render per-series winner concentration and hardest-series views."""
+    import pandas as pd
+    import plotly.graph_objects as go
+
+    st.subheader("Per-Series Winners")
+    st.caption(
+        f"{per_series_chart['series_total']} comparable series were evaluated "
+        "across the available models."
+    )
+    for insight in per_series_chart.get("insights", []):
+        st.caption(insight)
+
+    winner_summary = per_series_chart.get("winner_summary", [])
+    if winner_summary:
+        winner_fig = go.Figure(
+            go.Bar(
+                x=[row["name"] for row in winner_summary],
+                y=[row["count"] for row in winner_summary],
+                marker_color="#2563eb",
+                name="Series Wins",
+            )
+        )
+        winner_fig.update_layout(
+            title="Series Wins by Model",
+            height=320,
+            margin={"l": 20, "r": 20, "t": 50, "b": 20},
+        )
+        st.plotly_chart(winner_fig, use_container_width=True)
+
+    if per_series_chart.get("heatmap_z"):
+        heatmap = go.Figure(
+            go.Heatmap(
+                z=per_series_chart["heatmap_z"],
+                x=per_series_chart["models"],
+                y=per_series_chart["heatmap_series"],
+                text=per_series_chart["heatmap_text"],
+                texttemplate="%{text}",
+                colorscale="Blues",
+                hovertemplate=(
+                    "Series=%{y}<br>Model=%{x}<br>MASE=%{z:.4f}<extra></extra>"
+                ),
+            )
+        )
+        heatmap.update_layout(
+            title="Per-Series MASE Heatmap",
+            height=max(360, 28 * len(per_series_chart["heatmap_series"]) + 120),
+            margin={"l": 20, "r": 20, "t": 50, "b": 20},
+        )
+        st.plotly_chart(heatmap, use_container_width=True)
+
+    if per_series_chart.get("table_rows"):
+        table_rows = []
+        for row in per_series_chart["table_rows"]:
+            table_rows.append(
+                {
+                    "Series": row["series_id"],
+                    "Winner": row["winner"],
+                    "Winner MASE": row["winner_mase"],
+                    "Runner-up": row["runner_up"],
+                    "Runner-up MASE": row["runner_up_mase"],
+                    "Margin": row["margin"],
+                    "Spread": row["spread"],
+                }
+            )
+        st.dataframe(
+            pd.DataFrame(table_rows),
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 def _render_diagnostics_panel(st: Any, diagnostics_chart: dict[str, Any]) -> None:
