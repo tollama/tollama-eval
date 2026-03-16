@@ -19,7 +19,16 @@ from ts_autopilot.contracts import (
     LeaderboardEntry,
     ModelResult,
 )
-from ts_autopilot.reporting.dashboard import _load_result_artifacts, _open_saved_results
+from ts_autopilot.reporting.dashboard import (
+    _build_dashboard_artifact_bundle,
+    _build_dashboard_filtered_details_json,
+    _build_dashboard_filtered_results_json,
+    _build_dashboard_snapshot_html,
+    _filter_result_for_dashboard,
+    _load_result_artifacts,
+    _open_saved_results,
+    _parse_dashboard_query_artifact_paths,
+)
 from ts_autopilot.runners.optional import OptionalRunnerStatus
 
 
@@ -228,6 +237,80 @@ def open_saved_dashboard_artifact_dir(
     return fake_st
 
 
+def reopen_saved_dashboard_artifact_dir_via_query_params(
+    artifact_dir: dict[str, Any],
+    *,
+    monkeypatch: Any,
+    install_streamlit: Any,
+    query_updates: dict[str, str] | None = None,
+) -> Any:
+    """Open saved dashboard artifacts via query-param path resolution."""
+    fake_st = install_streamlit(monkeypatch)
+    fake_st.query_params.update(
+        {
+            "results": str(artifact_dir["results_path"]),
+            "details": str(artifact_dir["details_path"]),
+            **(query_updates or {}),
+        }
+    )
+    parsed_results, parsed_details = _parse_dashboard_query_artifact_paths(fake_st)
+    _open_saved_results(parsed_results, parsed_details)
+    return fake_st
+
+
+def build_filtered_dashboard_exports(
+    result: BenchmarkResult,
+    *,
+    selected_model_names: list[str],
+    max_rank: int | None = None,
+) -> dict[str, Any]:
+    """Build the full filtered dashboard export set from one filtered view."""
+    filtered = _filter_result_for_dashboard(
+        result,
+        selected_model_names=selected_model_names,
+        max_rank=max_rank,
+    )
+    return {
+        "filtered_result": filtered,
+        "results_json": _build_dashboard_filtered_results_json(filtered),
+        "details_json": _build_dashboard_filtered_details_json(filtered),
+        "snapshot_html": _build_dashboard_snapshot_html(filtered),
+        "bundle": _build_dashboard_artifact_bundle(filtered),
+    }
+
+
+def write_filtered_artifact_dir(
+    output_dir: str | Path,
+    *,
+    result: BenchmarkResult,
+    selected_model_names: list[str],
+    max_rank: int | None = None,
+) -> dict[str, Any]:
+    """Write filtered results/detail artifacts for saved-results reopen tests."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    exports = build_filtered_dashboard_exports(
+        result,
+        selected_model_names=selected_model_names,
+        max_rank=max_rank,
+    )
+    results_path = output_path / "results.json"
+    details_path = output_path / "details.json"
+    results_path.write_text(exports["results_json"], encoding="utf-8")
+    details_json = exports["details_json"]
+    if details_json is None:
+        raise AssertionError("Filtered dashboard exports did not produce details.json")
+    details_path.write_text(details_json, encoding="utf-8")
+
+    return {
+        "output_dir": output_path,
+        "results_path": results_path,
+        "details_path": details_path,
+        **exports,
+    }
+
+
 def decode_dashboard_bundle(bundle: bytes) -> dict[str, object]:
     """Return decoded files and parsed manifest from a dashboard artifact zip."""
     with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
@@ -276,6 +359,33 @@ def assert_saved_dashboard_rich_sections(
         f"View forecasts for {leader_name}" in item["text"]
         for item in fake_st.markdowns
     )
+
+
+def assert_saved_dashboard_artifact_surface(
+    fake_st: Any,
+    *,
+    snapshot_filename: str,
+    overall_status: str = "Complete",
+    details_status: str = "Loaded",
+) -> None:
+    """Assert saved-results dashboard health, manifest, and export surface."""
+    assert "Artifact Health" in fake_st.subheaders
+    assert "Artifact Manifest" in fake_st.subheaders
+    assert "Snapshot Export" in fake_st.subheaders
+    assert any(
+        f"Overall: {overall_status}" in item["text"]
+        for item in fake_st.markdowns
+    )
+    assert any(
+        "results.json: Loaded" in item["text"]
+        for item in fake_st.markdowns
+    )
+    assert any(
+        f"details.json: {details_status}" in item["text"]
+        for item in fake_st.markdowns
+    )
+    assert fake_st.downloads
+    assert fake_st.downloads[0]["file_name"] == snapshot_filename
 
 
 def assert_filtered_export_coherence(

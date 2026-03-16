@@ -11,9 +11,13 @@ import pytest
 
 from tests.artifact_test_utils import (
     assert_filtered_export_coherence,
+    assert_saved_dashboard_artifact_surface,
     assert_saved_dashboard_rich_sections,
+    build_filtered_dashboard_exports,
     make_rich_result,
     open_saved_dashboard_artifact_dir,
+    reopen_saved_dashboard_artifact_dir_via_query_params,
+    write_filtered_artifact_dir,
     write_rich_artifact_dir,
 )
 from ts_autopilot.contracts import (
@@ -21,7 +25,6 @@ from ts_autopilot.contracts import (
     BenchmarkResult,
     DataProfile,
     DiagnosticsResult,
-    FoldResult,
     ForecastData,
     LeaderboardEntry,
     ModelResult,
@@ -444,10 +447,10 @@ def test_open_saved_results_via_artifact_dir_launch_renders_dashboard(
 
     _open_saved_results(parsed_results, parsed_details)
 
-    assert "Artifact Health" in fake_st.subheaders
-    assert "Artifact Manifest" in fake_st.subheaders
-    assert "Snapshot Export" in fake_st.subheaders
-    assert fake_st.downloads
+    assert_saved_dashboard_artifact_surface(
+        fake_st,
+        snapshot_filename="dashboard-snapshot-seasonalnaive.html",
+    )
 
 
 def test_open_saved_results_via_query_param_reopen_renders_dashboard(
@@ -482,144 +485,62 @@ def test_open_saved_results_via_query_param_reopen_renders_dashboard(
 
     _open_saved_results(parsed_results, parsed_details)
 
-    assert "Artifact Health" in fake_st.subheaders
+    assert_saved_dashboard_artifact_surface(
+        fake_st,
+        snapshot_filename="dashboard-snapshot-seasonalnaive.html",
+    )
     assert "Forecast vs Actual" in fake_st.subheaders
-    assert fake_st.downloads[0]["file_name"] == "dashboard-snapshot-seasonalnaive.html"
 
 
 def test_filtered_export_roundtrip_renders_filtered_saved_results(
     tmp_path,
     monkeypatch,
 ) -> None:
-    result = BenchmarkResult(
-        profile=DataProfile(
-            n_series=2,
-            frequency="D",
-            missing_ratio=0.0,
-            season_length_guess=7,
-            min_length=60,
-            max_length=60,
-            total_rows=120,
-        ),
-        config=BenchmarkConfig(horizon=7, n_folds=2),
-        models=[
-            ModelResult(
-                name="AutoETS",
-                runtime_sec=0.5,
-                folds=[
-                    FoldResult(
-                        fold=1,
-                        cutoff="2020-06-26",
-                        mase=0.9,
-                        smape=8.2,
-                        rmsse=0.88,
-                        mae=0.75,
-                        series_scores={"s1": 0.81, "s2": 0.99},
-                    ),
-                    FoldResult(
-                        fold=2,
-                        cutoff="2020-07-01",
-                        mase=0.85,
-                        smape=7.9,
-                        rmsse=0.84,
-                        mae=0.7,
-                        series_scores={"s1": 0.79, "s2": 0.96},
-                    ),
-                ],
-                mean_mase=0.875,
-                std_mase=0.025,
-                mean_smape=8.05,
-                mean_rmsse=0.86,
-                mean_mae=0.725,
-            ),
-            ModelResult(
-                name="SeasonalNaive",
-                runtime_sec=0.1,
-                folds=[
-                    FoldResult(
-                        fold=1,
-                        cutoff="2020-06-26",
-                        mase=1.02,
-                        smape=9.6,
-                        rmsse=1.01,
-                        mae=0.93,
-                        series_scores={"s1": 1.08, "s2": 0.96},
-                    ),
-                    FoldResult(
-                        fold=2,
-                        cutoff="2020-07-01",
-                        mase=0.98,
-                        smape=9.1,
-                        rmsse=0.97,
-                        mae=0.89,
-                        series_scores={"s1": 1.02, "s2": 0.94},
-                    ),
-                ],
-                mean_mase=1.0,
-                std_mase=0.0,
-                mean_smape=9.35,
-                mean_rmsse=0.99,
-                mean_mae=0.91,
-            ),
-        ],
-        leaderboard=[
-            LeaderboardEntry(
-                rank=1,
-                name="AutoETS",
-                mean_mase=0.875,
-                mean_smape=8.05,
-                mean_rmsse=0.86,
-                mean_mae=0.725,
-            ),
-            LeaderboardEntry(
-                rank=2,
-                name="SeasonalNaive",
-                mean_mase=1.0,
-                mean_smape=9.35,
-                mean_rmsse=0.99,
-                mean_mae=0.91,
-            ),
-        ],
-        forecast_data=[
-            ForecastData(
-                model_name="AutoETS",
-                fold=2,
-                unique_id=["s1"],
-                ds=["2020-07-02"],
-                y_hat=[10.0],
-                y_actual=[10.5],
-            ),
-            ForecastData(
-                model_name="SeasonalNaive",
-                fold=2,
-                unique_id=["s1"],
-                ds=["2020-07-02"],
-                y_hat=[9.8],
-                y_actual=[10.5],
-            ),
-        ],
-    )
-    filtered = _filter_result_for_dashboard(
-        result,
+    artifact_dir = write_filtered_artifact_dir(
+        tmp_path / "filtered-out",
+        result=make_rich_result(),
         selected_model_names=["SeasonalNaive"],
         max_rank=2,
     )
-    results_path = tmp_path / "filtered-results.json"
-    details_path = tmp_path / "filtered-details.json"
-    results_path.write_text(
-        _build_dashboard_filtered_results_json(filtered),
-        encoding="utf-8",
+    fake_st = open_saved_dashboard_artifact_dir(
+        artifact_dir,
+        monkeypatch=monkeypatch,
+        install_streamlit=_install_fake_streamlit_module,
     )
-    details_payload = _build_dashboard_filtered_details_json(filtered)
-    assert details_payload is not None
-    details_path.write_text(details_payload, encoding="utf-8")
 
-    fake_st = _install_fake_streamlit_module(monkeypatch)
-    _open_saved_results(results_path, details_path)
-
-    assert fake_st.downloads[0]["file_name"] == "dashboard-snapshot-seasonalnaive.html"
+    assert_saved_dashboard_artifact_surface(
+        fake_st,
+        snapshot_filename="dashboard-snapshot-seasonalnaive.html",
+    )
     assert "SeasonalNaive" in fake_st.downloads[0]["data"]
     assert "AutoETS" not in fake_st.downloads[0]["data"]
+
+
+def test_filtered_export_query_param_reopen_renders_filtered_saved_results(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    artifact_dir = write_filtered_artifact_dir(
+        tmp_path / "filtered-query-out",
+        result=make_rich_result(),
+        selected_model_names=["SeasonalNaive"],
+        max_rank=2,
+    )
+    fake_st = reopen_saved_dashboard_artifact_dir_via_query_params(
+        artifact_dir,
+        monkeypatch=monkeypatch,
+        install_streamlit=_install_fake_streamlit_module,
+        query_updates={"forecast_series": '["s1"]'},
+    )
+
+    assert_saved_dashboard_artifact_surface(
+        fake_st,
+        snapshot_filename="dashboard-snapshot-seasonalnaive.html",
+    )
+    assert "Forecast vs Actual" in fake_st.subheaders
+    assert fake_st.query_params["results"] == str(artifact_dir["results_path"])
+    assert fake_st.query_params["details"] == str(artifact_dir["details_path"])
+    assert fake_st.query_params["forecast_series"] == '["s1"]'
 
 
 def test_write_output_artifacts_roundtrip_preserves_rich_dashboard_views(
@@ -633,7 +554,10 @@ def test_write_output_artifacts_roundtrip_preserves_rich_dashboard_views(
         install_streamlit=_install_fake_streamlit_module,
     )
 
-    assert "Artifact Health" in fake_st.subheaders
+    assert_saved_dashboard_artifact_surface(
+        fake_st,
+        snapshot_filename="dashboard-snapshot-autoets.html",
+    )
     assert_saved_dashboard_rich_sections(
         fake_st,
         leader_name="AutoETS",
@@ -1207,28 +1131,55 @@ def test_build_dashboard_filtered_details_json_includes_filtered_details() -> No
 
 def test_filtered_export_artifacts_remain_coherent_across_json_html_and_bundle(
 ) -> None:
-    result = make_rich_result()
-    filtered = _filter_result_for_dashboard(
-        result,
+    exports = build_filtered_dashboard_exports(
+        make_rich_result(),
         selected_model_names=["AutoETS"],
         max_rank=1,
     )
-
-    results_json = _build_dashboard_filtered_results_json(filtered)
-    details_json = _build_dashboard_filtered_details_json(filtered)
-    snapshot_html = _build_dashboard_snapshot_html(filtered)
-    bundle = _build_dashboard_artifact_bundle(filtered)
-
-    assert details_json is not None
+    assert exports["details_json"] is not None
     assert_filtered_export_coherence(
-        results_json=results_json,
-        details_json=details_json,
-        snapshot_html=snapshot_html,
-        bundle=bundle,
+        results_json=exports["results_json"],
+        details_json=exports["details_json"],
+        snapshot_html=exports["snapshot_html"],
+        bundle=exports["bundle"],
         expected_model_names=["AutoETS"],
         forbidden_model_names=["SeasonalNaive"],
         expect_per_series_section=False,
         upload_factory=_FakeUpload,
+    )
+
+
+def test_build_filtered_dashboard_exports_applies_selected_model_scope() -> None:
+    exports = build_filtered_dashboard_exports(
+        make_rich_result(),
+        selected_model_names=["AutoETS"],
+        max_rank=1,
+    )
+
+    filtered = exports["filtered_result"]
+
+    assert [model.name for model in filtered.models] == ["AutoETS"]
+    assert [entry.name for entry in filtered.leaderboard] == ["AutoETS"]
+    assert exports["details_json"] is not None
+    assert '"AutoETS"' in exports["results_json"]
+    assert '"SeasonalNaive"' not in exports["results_json"]
+
+
+def test_write_filtered_artifact_dir_writes_filtered_saved_results(
+    tmp_path,
+) -> None:
+    artifact_dir = write_filtered_artifact_dir(
+        tmp_path / "filtered-dir",
+        result=make_rich_result(),
+        selected_model_names=["AutoETS"],
+        max_rank=1,
+    )
+
+    assert artifact_dir["results_path"].exists()
+    assert artifact_dir["details_path"].exists()
+    assert '"AutoETS"' in artifact_dir["results_path"].read_text(encoding="utf-8")
+    assert '"SeasonalNaive"' not in artifact_dir["results_path"].read_text(
+        encoding="utf-8"
     )
 
 
