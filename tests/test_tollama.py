@@ -3,129 +3,140 @@
 from __future__ import annotations
 
 import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from threading import Thread
-from typing import ClassVar
+import urllib.error
+from dataclasses import dataclass, field
 
 import pytest
 
+import ts_autopilot.tollama.client as tollama_client
 from ts_autopilot.tollama.client import TollamaError, TollamaForecastResponse, forecast
 
 
-class _MockTollamaHandler(BaseHTTPRequestHandler):
-    """Simple HTTP handler that returns a canned tollama forecast response."""
+@dataclass
+class _MockTollamaTransport:
+    """Capture outgoing requests and return canned forecast responses."""
 
-    response_body: ClassVar[dict] = {
-        "mean": [10.0, 11.0, 12.0],
-        "model": "chronos2",
-        "quantiles": {"0.1": [9.0, 9.5, 10.0], "0.9": [11.0, 12.5, 14.0]},
-    }
-    status_code: ClassVar[int] = 200
+    response_body: dict = field(
+        default_factory=lambda: {
+            "mean": [10.0, 11.0, 12.0],
+            "model": "chronos2",
+            "quantiles": {"0.1": [9.0, 9.5, 10.0], "0.9": [11.0, 12.5, 14.0]},
+        }
+    )
+    requests: list[dict] = field(default_factory=list)
 
-    def do_POST(self):
-        content_length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_length)
-        # Validate the request payload structure
-        data = json.loads(body)
-        assert "model" in data
-        assert "series" in data
-        assert "horizon" in data
-        self.send_response(self.status_code)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps(self.response_body).encode())
+    def urlopen(self, req, timeout=120):
+        payload = json.loads(req.data.decode())
+        self.requests.append(
+            {
+                "url": req.full_url,
+                "timeout": timeout,
+                "payload": payload,
+            }
+        )
+        return _MockHTTPResponse(self.response_body)
 
-    def log_message(self, format, *args):
-        pass  # suppress server logs in tests
+
+class _MockHTTPResponse:
+    """Minimal urllib response object for tollama client tests."""
+
+    def __init__(self, body: dict) -> None:
+        self._body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self) -> bytes:
+        return json.dumps(self._body).encode()
 
 
 @pytest.fixture()
-def tollama_server():
-    """Start a mock tollama server on a random port."""
-    server = HTTPServer(("127.0.0.1", 0), _MockTollamaHandler)
-    port = server.server_address[1]
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    yield f"http://127.0.0.1:{port}"
-    server.shutdown()
+def mock_tollama(monkeypatch: pytest.MonkeyPatch) -> _MockTollamaTransport:
+    """Patch urllib transport so tests do not require a local TCP server."""
+    transport = _MockTollamaTransport()
+    monkeypatch.setattr(tollama_client.urllib.request, "urlopen", transport.urlopen)
+    return transport
 
 
-def test_forecast_success(tollama_server):
+def test_forecast_success(mock_tollama: _MockTollamaTransport):
     resp = forecast(
         target=[1.0, 2.0, 3.0, 4.0, 5.0],
         freq="D",
         horizon=3,
         model="chronos2",
-        tollama_url=tollama_server,
+        tollama_url="http://tollama.test",
     )
     assert isinstance(resp, TollamaForecastResponse)
     assert resp.mean == [10.0, 11.0, 12.0]
     assert resp.model == "chronos2"
     assert "0.1" in resp.quantiles
     assert "0.9" in resp.quantiles
+    assert mock_tollama.requests[0]["url"] == "http://tollama.test/v1/forecast"
+    assert mock_tollama.requests[0]["payload"] == {
+        "model": "chronos2",
+        "series": {"target": [1.0, 2.0, 3.0, 4.0, 5.0], "freq": "D"},
+        "horizon": 3,
+    }
 
 
-def test_forecast_unreachable():
+def test_forecast_unreachable(monkeypatch: pytest.MonkeyPatch):
+    def fake_urlopen(req, timeout=120):
+        raise urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(tollama_client.urllib.request, "urlopen", fake_urlopen)
+
     with pytest.raises(TollamaError, match="unavailable"):
         forecast(
             target=[1.0, 2.0, 3.0],
             freq="D",
             horizon=3,
             model="chronos2",
-            tollama_url="http://127.0.0.1:1",
+            tollama_url="http://tollama.test",
             timeout=1,
         )
 
 
-def test_forecast_bad_json(tollama_server):
-    _MockTollamaHandler.response_body = {"bad": "response"}
-    try:
-        with pytest.raises(TollamaError, match="Invalid"):
-            forecast(
-                target=[1.0, 2.0, 3.0],
-                freq="D",
-                horizon=3,
-                model="chronos2",
-                tollama_url=tollama_server,
-            )
-    finally:
-        _MockTollamaHandler.response_body = {
-            "mean": [10.0, 11.0, 12.0],
-            "model": "chronos2",
-            "quantiles": {"0.1": [9.0, 9.5, 10.0], "0.9": [11.0, 12.5, 14.0]},
-        }
+def test_forecast_bad_json(mock_tollama: _MockTollamaTransport):
+    mock_tollama.response_body = {"bad": "response"}
+
+    with pytest.raises(TollamaError, match="Invalid"):
+        forecast(
+            target=[1.0, 2.0, 3.0],
+            freq="D",
+            horizon=3,
+            model="chronos2",
+            tollama_url="http://tollama.test",
+        )
 
 
-def test_forecast_url_trailing_slash(tollama_server):
+def test_forecast_url_trailing_slash(mock_tollama: _MockTollamaTransport):
     resp = forecast(
         target=[1.0, 2.0, 3.0, 4.0, 5.0],
         freq="D",
         horizon=3,
         model="chronos2",
-        tollama_url=tollama_server + "/",
+        tollama_url="http://tollama.test/",
     )
     assert isinstance(resp, TollamaForecastResponse)
     assert len(resp.mean) == 3
+    assert mock_tollama.requests[0]["url"] == "http://tollama.test/v1/forecast"
 
 
-def test_forecast_wrong_length(tollama_server):
+def test_forecast_wrong_length(mock_tollama: _MockTollamaTransport):
     """Server returns wrong number of forecast values."""
-    _MockTollamaHandler.response_body = {
-        "mean": [10.0, 11.0],  # only 2, but horizon=3
+    mock_tollama.response_body = {
+        "mean": [10.0, 11.0],
         "model": "chronos2",
     }
-    try:
-        with pytest.raises(TollamaError, match="Expected 3"):
-            forecast(
-                target=[1.0, 2.0, 3.0],
-                freq="D",
-                horizon=3,
-                model="chronos2",
-                tollama_url=tollama_server,
-            )
-    finally:
-        _MockTollamaHandler.response_body = {
-            "mean": [10.0, 11.0, 12.0],
-            "model": "chronos2",
-            "quantiles": {"0.1": [9.0, 9.5, 10.0], "0.9": [11.0, 12.5, 14.0]},
-        }
+
+    with pytest.raises(TollamaError, match="Expected 3"):
+        forecast(
+            target=[1.0, 2.0, 3.0],
+            freq="D",
+            horizon=3,
+            model="chronos2",
+            tollama_url="http://tollama.test",
+        )

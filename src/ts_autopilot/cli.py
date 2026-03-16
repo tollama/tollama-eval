@@ -8,6 +8,8 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
 
 import importlib
+import importlib.util
+import subprocess
 import sys
 import time
 import traceback
@@ -89,6 +91,47 @@ def _try_rich() -> bool:
         return True
     except ImportError:
         return False
+
+
+def _module_available(module_name: str) -> bool:
+    """Check whether a module can be resolved without importing it."""
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _probe_hardware_acceleration(timeout_sec: float = 10.0) -> str:
+    """Detect hardware acceleration in a subprocess to avoid hard crashes."""
+    if not _module_available("torch"):
+        return "cpu (torch not installed)"
+
+    probe = (
+        "import torch\n"
+        "acc = 'cpu'\n"
+        "if torch.backends.mps.is_available():\n"
+        "    acc = 'MPS (Metal)'\n"
+        "elif torch.cuda.is_available():\n"
+        "    acc = f\"CUDA ({torch.cuda.get_device_name(0)})\"\n"
+        "print(acc)\n"
+    )
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-c", probe],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"cpu (torch probe failed: {exc})"
+
+    if completed.returncode != 0:
+        stderr = completed.stderr.strip().splitlines()
+        reason = stderr[-1] if stderr else f"exit code {completed.returncode}"
+        return f"cpu (torch probe failed: {reason})"
+
+    return completed.stdout.strip() or "cpu"
 
 
 def _make_rich_progress_cb(
@@ -1057,10 +1100,9 @@ def doctor() -> None:
         "streamlit": "Dashboard",
     }
     for dep, label in optional_deps.items():
-        try:
-            importlib.import_module(dep)
+        if _module_available(dep):
             checks.append((f"Optional: {label}", True, "available"))
-        except (ImportError, OSError):
+        else:
             checks.append((f"Optional: {label}", False, "not installed"))
 
     # Output directory
@@ -1075,17 +1117,7 @@ def doctor() -> None:
         checks.append(("Output dir writable", False, str(exc)))
 
     # Accelerator check (GPU/MPS)
-    try:
-        import torch
-
-        acc = "cpu"
-        if torch.backends.mps.is_available():
-            acc = "MPS (Metal)"
-        elif torch.cuda.is_available():
-            acc = f"CUDA ({torch.cuda.get_device_name(0)})"
-        checks.append(("Hardware acceleration", True, acc))
-    except ImportError:
-        checks.append(("Hardware acceleration", True, "cpu (torch not installed)"))
+    checks.append(("Hardware acceleration", True, _probe_hardware_acceleration()))
 
     # Print results
     typer.secho("\ntollama-eval doctor", bold=True)

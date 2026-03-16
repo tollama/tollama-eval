@@ -32,6 +32,41 @@ def is_available() -> bool:
     return HAS_RAY
 
 
+def _run_benchmark_local(
+    *,
+    df: Any,
+    horizon: int,
+    n_folds: int,
+    runners: list[BaseRunner] | None,
+    model_names: list[str] | None,
+    n_jobs: int,
+    reason: str,
+    **kwargs: Any,
+) -> BenchmarkResult:
+    """Execute the standard local benchmark path with a fallback reason."""
+    logger.warning("%s Falling back to local execution.", reason)
+    from ts_autopilot.pipeline import run_benchmark
+
+    return run_benchmark(
+        df=df,
+        horizon=horizon,
+        n_folds=n_folds,
+        runners=runners,
+        model_names=model_names,
+        n_jobs=n_jobs,
+        **kwargs,
+    )
+
+
+def _should_fallback_from_bootstrap_error(exc: Exception) -> bool:
+    """Return whether a Ray bootstrap failure should fall back locally."""
+    if isinstance(exc, (PermissionError, OSError)):
+        return True
+
+    module_name = exc.__class__.__module__
+    return module_name.startswith(("ray", "psutil"))
+
+
 def run_benchmark_distributed(
     df: Any,
     horizon: int,
@@ -62,31 +97,43 @@ def run_benchmark_distributed(
         BenchmarkResult.
     """
     if not HAS_RAY:
-        logger.warning(
-            "Ray not installed, falling back to local execution. "
-            'Install with: pip install "tollama-eval[distributed]"'
-        )
-        from ts_autopilot.pipeline import run_benchmark
-
-        return run_benchmark(
+        return _run_benchmark_local(
             df=df,
             horizon=horizon,
             n_folds=n_folds,
             runners=runners,
             model_names=model_names,
             n_jobs=n_jobs,
+            reason=(
+                "Ray not installed. "
+                'Install with: pip install "tollama-eval[distributed]".'
+            ),
             **kwargs,
         )
 
     # Initialize Ray
-    if not ray.is_initialized():
-        init_kwargs: dict[str, Any] = {}
-        if ray_address:
-            init_kwargs["address"] = ray_address
-        if num_cpus:
-            init_kwargs["num_cpus"] = num_cpus
-        ray.init(**init_kwargs)
-        logger.info("Ray initialized: %s", ray.cluster_resources())
+    try:
+        if not ray.is_initialized():
+            init_kwargs: dict[str, Any] = {}
+            if ray_address:
+                init_kwargs["address"] = ray_address
+            if num_cpus:
+                init_kwargs["num_cpus"] = num_cpus
+            ray.init(**init_kwargs)
+            logger.info("Ray initialized: %s", ray.cluster_resources())
+    except Exception as exc:
+        if not _should_fallback_from_bootstrap_error(exc):
+            raise
+        return _run_benchmark_local(
+            df=df,
+            horizon=horizon,
+            n_folds=n_folds,
+            runners=runners,
+            model_names=model_names,
+            n_jobs=n_jobs,
+            reason=f"Ray initialization failed: {exc}",
+            **kwargs,
+        )
 
     return _run_distributed(
         df=df,
