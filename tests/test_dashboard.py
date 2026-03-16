@@ -13,6 +13,7 @@ from tests.artifact_test_utils import (
     assert_filtered_export_coherence,
     assert_saved_dashboard_rich_sections,
     make_rich_result,
+    open_saved_dashboard_artifact_dir,
     write_rich_artifact_dir,
 )
 from ts_autopilot.contracts import (
@@ -626,10 +627,10 @@ def test_write_output_artifacts_roundtrip_preserves_rich_dashboard_views(
     monkeypatch,
 ) -> None:
     artifact_dir = write_rich_artifact_dir(tmp_path / "rich-out")
-    fake_st = _install_fake_streamlit_module(monkeypatch)
-    _open_saved_results(
-        artifact_dir["results_path"],
-        artifact_dir["details_path"],
+    fake_st = open_saved_dashboard_artifact_dir(
+        artifact_dir,
+        monkeypatch=monkeypatch,
+        install_streamlit=_install_fake_streamlit_module,
     )
 
     assert "Artifact Health" in fake_st.subheaders
@@ -690,8 +691,11 @@ def test_cross_artifact_outputs_stay_consistent_for_rich_result(
     assert ("s1", "AutoETS", 0.8, "SeasonalNaive") in winner_rows
     assert ("s2", "SeasonalNaive", 0.95, "AutoETS") in winner_rows
 
-    fake_st = _install_fake_streamlit_module(monkeypatch)
-    _open_saved_results(out_dir / "results.json", out_dir / "details.json")
+    fake_st = open_saved_dashboard_artifact_dir(
+        artifact_dir,
+        monkeypatch=monkeypatch,
+        install_streamlit=_install_fake_streamlit_module,
+    )
 
     assert_saved_dashboard_rich_sections(
         fake_st,

@@ -19,7 +19,7 @@ from ts_autopilot.contracts import (
     LeaderboardEntry,
     ModelResult,
 )
-from ts_autopilot.reporting.dashboard import _load_result_artifacts
+from ts_autopilot.reporting.dashboard import _load_result_artifacts, _open_saved_results
 from ts_autopilot.runners.optional import OptionalRunnerStatus
 
 
@@ -211,6 +211,21 @@ def write_rich_artifact_dir(
         "details_path": output_path / "details.json",
         "report_path": output_path / "report.html",
     }
+
+
+def open_saved_dashboard_artifact_dir(
+    artifact_dir: dict[str, Any],
+    *,
+    monkeypatch: Any,
+    install_streamlit: Any,
+) -> Any:
+    """Open a written artifact directory through the saved-results dashboard path."""
+    fake_st = install_streamlit(monkeypatch)
+    _open_saved_results(
+        artifact_dir["results_path"],
+        artifact_dir["details_path"],
+    )
+    return fake_st
 
 
 def decode_dashboard_bundle(bundle: bytes) -> dict[str, object]:
