@@ -1,15 +1,11 @@
 """Tests for enhanced report features."""
 
+from tests.artifact_test_utils import make_rich_result
 from ts_autopilot.contracts import (
     BenchmarkConfig,
     BenchmarkResult,
     DataCharacteristics,
     DataProfile,
-    DiagnosticsResult,
-    FoldResult,
-    ForecastData,
-    LeaderboardEntry,
-    ModelResult,
 )
 from ts_autopilot.reporting.html_report import render_report
 from ts_autopilot.runners.optional import OptionalRunnerStatus
@@ -17,114 +13,11 @@ from ts_autopilot.runners.optional import OptionalRunnerStatus
 
 def _make_enriched_result():
     """Create a BenchmarkResult with forecast data and diagnostics."""
-    return BenchmarkResult(
-        profile=DataProfile(
-            n_series=2,
-            frequency="D",
-            missing_ratio=0.0,
-            season_length_guess=7,
-            min_length=60,
-            max_length=60,
-            total_rows=120,
-        ),
-        config=BenchmarkConfig(horizon=7, n_folds=2),
-        models=[
-            ModelResult(
-                name="AutoETS",
-                runtime_sec=0.5,
-                folds=[
-                    FoldResult(
-                        fold=1,
-                        cutoff="2020-06-01",
-                        mase=0.85,
-                        series_scores={"s1": 0.75, "s2": 0.95},
-                    ),
-                    FoldResult(
-                        fold=2,
-                        cutoff="2020-07-01",
-                        mase=0.90,
-                        series_scores={"s1": 0.80, "s2": 1.00},
-                    ),
-                ],
-                mean_mase=0.875,
-                std_mase=0.025,
-                mean_smape=5.0,
-                mean_rmsse=0.9,
-                mean_mae=1.5,
-            ),
-            ModelResult(
-                name="SeasonalNaive",
-                runtime_sec=0.1,
-                folds=[
-                    FoldResult(
-                        fold=1,
-                        cutoff="2020-06-01",
-                        mase=1.0,
-                        series_scores={"s1": 0.92, "s2": 1.08},
-                    ),
-                    FoldResult(
-                        fold=2,
-                        cutoff="2020-07-01",
-                        mase=1.0,
-                        series_scores={"s1": 0.96, "s2": 1.04},
-                    ),
-                ],
-                mean_mase=1.0,
-                std_mase=0.0,
-            ),
-        ],
-        leaderboard=[
-            LeaderboardEntry(
-                rank=1,
-                name="AutoETS",
-                mean_mase=0.875,
-                mean_smape=5.0,
-                mean_rmsse=0.9,
-                mean_mae=1.5,
-            ),
-            LeaderboardEntry(rank=2, name="SeasonalNaive", mean_mase=1.0),
-        ],
-        forecast_data=[
-            ForecastData(
-                model_name="AutoETS",
-                fold=2,
-                unique_id=["s1", "s1", "s2", "s2"],
-                ds=["2020-07-02", "2020-07-03", "2020-07-02", "2020-07-03"],
-                y_hat=[10.0, 11.0, 20.0, 21.0],
-                y_actual=[10.5, 10.8, 20.3, 21.2],
-                train_unique_id=["s1", "s1", "s2", "s2"],
-                ds_train_tail=["2020-06-30", "2020-07-01", "2020-06-30", "2020-07-01"],
-                y_train_tail=[9.0, 9.5, 19.1, 19.6],
-            ),
-            ForecastData(
-                model_name="SeasonalNaive",
-                fold=2,
-                unique_id=["s1", "s1", "s2", "s2"],
-                ds=["2020-07-02", "2020-07-03", "2020-07-02", "2020-07-03"],
-                y_hat=[9.8, 10.1, 19.7, 20.4],
-                y_actual=[10.5, 10.8, 20.3, 21.2],
-                train_unique_id=["s1", "s1", "s2", "s2"],
-                ds_train_tail=["2020-06-30", "2020-07-01", "2020-06-30", "2020-07-01"],
-                y_train_tail=[9.0, 9.5, 19.1, 19.6],
-            ),
-        ],
-        diagnostics=[
-            DiagnosticsResult(
-                model_name="AutoETS",
-                residual_mean=0.1,
-                residual_std=0.5,
-                residual_skew=0.1,
-                residual_kurtosis=-0.2,
-                ljung_box_p=0.42,
-                histogram_bins=[0.0, 0.5, 1.0],
-                histogram_counts=[3, 2],
-                acf_lags=[1, 2, 3],
-                acf_values=[0.1, -0.05, 0.02],
-                residuals=[0.1, -0.2, 0.3, 0.0],
-                fitted=[10.0, 11.0, 20.0, 21.0],
-            ),
-        ],
-    )
+    result = make_rich_result()
+    result.data_characteristics = None
+    if hasattr(result, "_optional_runner_statuses"):
+        delattr(result, "_optional_runner_statuses")
+    return result
 
 
 def test_report_has_executive_summary():
