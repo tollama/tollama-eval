@@ -1,10 +1,7 @@
 # CLAUDE.md — Project Memory for Claude Code
 
 ## Current Milestone
-MVP v0.1 — single command benchmark with SeasonalNaive + AutoETS.
-
-## Build Order
-Issues 2 → 3 → 4 → 6 → 7 → 5 → 8 → 10 → 9
+v0.2.0 Beta — 36+ models (statistical, ML, neural, foundation), AutoML, campaign mode, REST API server, fluent SDK, distributed execution, ensemble, anomaly detection, stability analysis.
 
 ## Key Invariants
 - Canonical format: unique_id (str), ds (datetime64[ns] naive), y (float64)

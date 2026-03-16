@@ -58,11 +58,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - YAML/JSON configuration file support
 - mypy strict type checking
 - Custom exception hierarchy
+- Excel workbook export (`--excel`, requires openpyxl)
+- AutoML intelligent model selection (`--auto-select`)
+- Anomaly detection with 4 methods (`--detect-anomalies`)
+- Ensemble construction (simple average, inverse-MASE weighted, best-per-series)
+- Model stability analysis (fold CV, series CV, rank consistency)
+- Speed benchmarking with Pareto frontier analysis
+- Composite metric scoring with configurable weights (`--metric-weights`)
+- Exogenous variable support (`--exog-cols`)
+- Fluent Python SDK (`TSAutopilot` builder class)
+- REST API server with FastAPI (`tollama-eval serve`)
+- Ray distributed execution (`--distributed`)
+- Result caching (`--no-cache`, `--cache-dir`)
+- Parallel model execution (`--parallel-models`)
+- CSV export files (leaderboard, fold details, per-series scores, per-series winners)
 - Feature inventory documentation (FEATURES.md)
 
 ### Changed
 - Tollama rewritten from LLM interpretation to direct TSFM runner
-- Expanded model catalog: 5 core + 4 optional + 7 foundation models
+- Expanded model catalog to 36+ models: 5 core + 9 extended + 6 intermittent demand + 3 ML + 6 neural + 7 foundation
 
 ## [0.1.0] - 2024-12-01
 

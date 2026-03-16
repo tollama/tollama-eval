@@ -35,10 +35,12 @@ NOT an LLM service. It provides access to models like Chronos-2, TimesFM, Moirai
 ## results.json Schema (frozen — do not rename fields)
 ```json
 {
-  "profile": { ... },
+  "metadata": { "version": str, "generated_at": str, "total_runtime_sec": float },
+  "profile": { "n_series": int, "frequency": str, "missing_ratio": float, "season_length_guess": int, "min_length": int, "max_length": int, "total_rows": int },
   "config": { "horizon": int, "n_folds": int },
-  "models": [{ "name": str, "runtime_sec": float, "folds": [...], "mean_mase": float, "std_mase": float }],
-  "leaderboard": [{ "rank": int, "name": str, "mean_mase": float }]
+  "models": [{ "name": str, "runtime_sec": float, "folds": [{ "fold": int, "cutoff": str, "mase": float, "smape": float, "rmsse": float, "mae": float }], "mean_mase": float, "std_mase": float, "mean_smape": float, "mean_rmsse": float, "mean_mae": float }],
+  "leaderboard": [{ "rank": int, "name": str, "mean_mase": float, "mean_smape": float, "mean_rmsse": float, "mean_mae": float }],
+  "warnings": [str]
 }
 ```
 

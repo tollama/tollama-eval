@@ -11,9 +11,23 @@ with cross-validated metrics and a visual report.
 - YAML/JSON config file support (`-c`)
 - Verbose (`-v`) / quiet (`-q`) modes
 - PDF report export (`--pdf`, requires weasyprint)
+- Excel workbook export (`--excel`, requires openpyxl)
 - Structured JSON logging (`--log-json`)
+- Result caching (`--no-cache`, `--cache-dir`)
+- Parallel model execution (`--parallel-models`)
+- AutoML model selection (`--auto-select`)
+- Optional model discovery (`--include-optional`, `--include-neural`)
+- Anomaly detection (`--detect-anomalies`)
+- Composite metric scoring (`--metric-weights`)
+- Exogenous variable support (`--exog-cols`)
+- Distributed execution (`--distributed`, requires Ray)
 - Tollama integration flags (`--tollama-url`, `--tollama-models`, `--no-tollama`)
 - Version flag (`-V`)
+
+### 1b. Additional CLI Commands
+- **`tollama-eval campaign`** — multi-dataset benchmarking across a directory of CSVs
+- **`tollama-eval doctor`** — environment diagnostics (Python version, dependencies, hardware acceleration)
+- **`tollama-eval serve`** — REST API server (FastAPI, requires `tollama-eval[server]`)
 
 ### 2. Data Ingestion & Validation
 - **Long format** (canonical: `unique_id`, `ds`, `y`) and **wide format** auto-detection with conversion
@@ -128,7 +142,12 @@ with cross-validated metrics and a visual report.
 - `results.json` — frozen schema, machine-readable benchmark results
 - `details.json` — forecast data and diagnostics for report reproducibility
 - `report.html` — interactive HTML report with Plotly charts
-- `report.pdf` — optional PDF export (requires weasyprint)
+- `leaderboard.csv` — ranked model summary table
+- `fold_details.csv` — fold-level metrics by model
+- `per_series_scores.csv` — per-series error table
+- `per_series_winners.csv` — per-series winner and margin summary
+- `report.pdf` — optional PDF export (`--pdf`, requires weasyprint)
+- `report.xlsx` — optional Excel workbook export (`--excel`, requires openpyxl)
 
 #### Report Sections
 - Executive summary (auto-generated narrative, no LLM required)
@@ -165,8 +184,21 @@ with cross-validated metrics and a visual report.
 ### 11. Python API
 - `run_benchmark(df, horizon, n_folds, runners, model_names, ...)` — full benchmark on DataFrame
 - `run_from_csv(csv_path, horizon, n_folds, output_dir, ...)` — end-to-end CSV to results
+- **Fluent SDK**: `TSAutopilot(df).with_models([...]).with_horizon(14).run()`
 - Individual metric functions: `mase()`, `smape()`, `rmsse()`, `mae()`
 - Extensible via `BaseRunner` subclass for custom models
+
+### 11b. REST API Server (`tollama-eval serve`)
+- FastAPI-based REST server with async job execution
+- Endpoints: `POST /benchmark`, `GET /status/{run_id}`, `GET /results/{run_id}`, `GET /health`
+- Authentication: API key, JWT, OIDC support
+- Multi-tenancy, job persistence, retention policies
+- Prometheus metrics, webhook notifications
+- Rate limiting via slowapi
+
+### 11c. Distributed Execution
+- **Ray integration** (`--distributed`) for parallel fold execution across workers
+- Safe hardware probe with Ray fallback
 
 ### 12. Data Contracts (Frozen Schema)
 - DataProfile, BenchmarkConfig, ModelResult, FoldResult, LeaderboardEntry
@@ -192,19 +224,14 @@ with cross-validated metrics and a visual report.
 
 ### v0.3 — Intelligence Phase
 - LLM-powered result interpretation (via separate LLM API, not Tollama)
-- Natural-language summaries in reports
-- Model comparison narratives
-- Exogenous variable support
-- Hierarchical forecasting reconciliation (via hierarchicalforecast)
+- Natural-language model comparison narratives
+- Hierarchical reconciliation GA (currently experimental)
+- Confidence band visualization in reports
 
 ### v0.4 — Scale Phase
-- Multi-dataset campaign analytics with cross-dataset comparison
-- Distributed execution via Ray
-- REST API server (FastAPI-based)
-- Fluent Python SDK: `TSAutopilot(df).with_models([...]).run()`
+- Export to PowerPoint and Jupyter notebook
+- Streamlit dashboard GA (currently experimental)
 - Custom model plugin system via entry points
-- Export to PowerPoint, Excel, Jupyter notebook
-- Enhanced reporting: confidence bands, anomaly sections, Pareto charts
 
 ## Architectural Principles
 - **Zero-config default** — works out of the box with just a CSV
