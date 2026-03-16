@@ -13,6 +13,7 @@ from tests.artifact_test_utils import (
     assert_filtered_export_coherence,
     assert_saved_dashboard_artifact_surface,
     assert_saved_dashboard_rich_sections,
+    assert_saved_dashboard_sidebar_surface,
     build_filtered_dashboard_exports,
     make_rich_result,
     open_saved_dashboard_artifact_dir,
@@ -48,7 +49,6 @@ from ts_autopilot.reporting.dashboard import (
     _filter_per_series_chart_data,
     _filter_result_for_dashboard,
     _load_result_artifacts,
-    _open_saved_results,
     _optional_model_environment_summary,
     _parse_dashboard_args,
     _parse_dashboard_query_artifact_paths,
@@ -411,8 +411,6 @@ def test_open_saved_results_via_artifact_dir_launch_renders_dashboard(
     tmp_path,
     monkeypatch,
 ) -> None:
-    from ts_autopilot.pipeline import write_output_artifacts
-
     result = _make_result()
     result.forecast_data = [
         ForecastData(
@@ -437,19 +435,32 @@ def test_open_saved_results_via_artifact_dir_launch_renders_dashboard(
             ljung_box_p=0.35,
         )
     ]
-    out_dir = tmp_path / "out"
-    write_output_artifacts(result, out_dir)
+    artifact_dir = write_filtered_artifact_dir(
+        tmp_path / "out",
+        result=result,
+        selected_model_names=["SeasonalNaive"],
+        max_rank=1,
+    )
 
     parsed_results, parsed_details = _parse_dashboard_args(
-        ["--artifact-dir", str(out_dir)]
+        ["--artifact-dir", str(artifact_dir["output_dir"])]
     )
-    fake_st = _install_fake_streamlit_module(monkeypatch)
-
-    _open_saved_results(parsed_results, parsed_details)
+    assert parsed_results == artifact_dir["results_path"]
+    assert parsed_details == artifact_dir["details_path"]
+    fake_st = open_saved_dashboard_artifact_dir(
+        artifact_dir,
+        monkeypatch=monkeypatch,
+        install_streamlit=_install_fake_streamlit_module,
+    )
 
     assert_saved_dashboard_artifact_surface(
         fake_st,
         snapshot_filename="dashboard-snapshot-seasonalnaive.html",
+    )
+    assert_saved_dashboard_sidebar_surface(
+        fake_st,
+        results_source=str(artifact_dir["results_path"]),
+        details_source=str(artifact_dir["details_path"]),
     )
 
 
@@ -457,8 +468,6 @@ def test_open_saved_results_via_query_param_reopen_renders_dashboard(
     tmp_path,
     monkeypatch,
 ) -> None:
-    from ts_autopilot.pipeline import write_output_artifacts
-
     result = _make_result()
     result.forecast_data = [
         ForecastData(
@@ -470,24 +479,27 @@ def test_open_saved_results_via_query_param_reopen_renders_dashboard(
             y_actual=[1.1],
         )
     ]
-    out_dir = tmp_path / "out"
-    write_output_artifacts(result, out_dir)
-
-    fake_st = _install_fake_streamlit_module(monkeypatch)
-    fake_st.query_params.update(
-        {
-            "results": str(out_dir / "results.json"),
-            "details": str(out_dir / "details.json"),
-            "forecast_series": '["s1"]',
-        }
+    artifact_dir = write_filtered_artifact_dir(
+        tmp_path / "out",
+        result=result,
+        selected_model_names=["SeasonalNaive"],
+        max_rank=1,
     )
-    parsed_results, parsed_details = _parse_dashboard_query_artifact_paths(fake_st)
-
-    _open_saved_results(parsed_results, parsed_details)
+    fake_st = reopen_saved_dashboard_artifact_dir_via_query_params(
+        artifact_dir,
+        monkeypatch=monkeypatch,
+        install_streamlit=_install_fake_streamlit_module,
+        query_updates={"forecast_series": '["s1"]'},
+    )
 
     assert_saved_dashboard_artifact_surface(
         fake_st,
         snapshot_filename="dashboard-snapshot-seasonalnaive.html",
+    )
+    assert_saved_dashboard_sidebar_surface(
+        fake_st,
+        results_source=str(artifact_dir["results_path"]),
+        details_source=str(artifact_dir["details_path"]),
     )
     assert "Forecast vs Actual" in fake_st.subheaders
 
@@ -511,6 +523,11 @@ def test_filtered_export_roundtrip_renders_filtered_saved_results(
     assert_saved_dashboard_artifact_surface(
         fake_st,
         snapshot_filename="dashboard-snapshot-seasonalnaive.html",
+    )
+    assert_saved_dashboard_sidebar_surface(
+        fake_st,
+        results_source=str(artifact_dir["results_path"]),
+        details_source=str(artifact_dir["details_path"]),
     )
     assert "SeasonalNaive" in fake_st.downloads[0]["data"]
     assert "AutoETS" not in fake_st.downloads[0]["data"]
@@ -537,6 +554,11 @@ def test_filtered_export_query_param_reopen_renders_filtered_saved_results(
         fake_st,
         snapshot_filename="dashboard-snapshot-seasonalnaive.html",
     )
+    assert_saved_dashboard_sidebar_surface(
+        fake_st,
+        results_source=str(artifact_dir["results_path"]),
+        details_source=str(artifact_dir["details_path"]),
+    )
     assert "Forecast vs Actual" in fake_st.subheaders
     assert fake_st.query_params["results"] == str(artifact_dir["results_path"])
     assert fake_st.query_params["details"] == str(artifact_dir["details_path"])
@@ -557,6 +579,11 @@ def test_write_output_artifacts_roundtrip_preserves_rich_dashboard_views(
     assert_saved_dashboard_artifact_surface(
         fake_st,
         snapshot_filename="dashboard-snapshot-autoets.html",
+    )
+    assert_saved_dashboard_sidebar_surface(
+        fake_st,
+        results_source=str(artifact_dir["results_path"]),
+        details_source=str(artifact_dir["details_path"]),
     )
     assert_saved_dashboard_rich_sections(
         fake_st,

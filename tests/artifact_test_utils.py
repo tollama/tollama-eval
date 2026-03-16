@@ -28,6 +28,7 @@ from ts_autopilot.reporting.dashboard import (
     _load_result_artifacts,
     _open_saved_results,
     _parse_dashboard_query_artifact_paths,
+    _render_saved_artifact_sidebar,
 )
 from ts_autopilot.runners.optional import OptionalRunnerStatus
 
@@ -230,6 +231,11 @@ def open_saved_dashboard_artifact_dir(
 ) -> Any:
     """Open a written artifact directory through the saved-results dashboard path."""
     fake_st = install_streamlit(monkeypatch)
+    _render_saved_artifact_sidebar(
+        fake_st,
+        artifact_dir["results_path"],
+        artifact_dir["details_path"],
+    )
     _open_saved_results(
         artifact_dir["results_path"],
         artifact_dir["details_path"],
@@ -254,6 +260,12 @@ def reopen_saved_dashboard_artifact_dir_via_query_params(
         }
     )
     parsed_results, parsed_details = _parse_dashboard_query_artifact_paths(fake_st)
+    if parsed_results is not None:
+        _render_saved_artifact_sidebar(
+            fake_st,
+            parsed_results,
+            parsed_details,
+        )
     _open_saved_results(parsed_results, parsed_details)
     return fake_st
 
@@ -386,6 +398,27 @@ def assert_saved_dashboard_artifact_surface(
     )
     assert fake_st.downloads
     assert fake_st.downloads[0]["file_name"] == snapshot_filename
+
+
+def assert_saved_dashboard_sidebar_surface(
+    fake_st: Any,
+    *,
+    results_source: str,
+    details_source: str,
+    details_status: str = "Loaded",
+) -> None:
+    """Assert saved-results sidebar badges and source labels."""
+    assert fake_st.headers == ["Loaded Artifacts"]
+    assert any(
+        "results.json: Loaded" in item["text"]
+        for item in fake_st.markdowns
+    )
+    assert any(
+        f"details.json: {details_status}" in item["text"]
+        for item in fake_st.markdowns
+    )
+    assert results_source in fake_st.captions
+    assert details_source in fake_st.captions
 
 
 def assert_filtered_export_coherence(
