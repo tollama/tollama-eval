@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import zipfile
+from pathlib import Path
 from typing import Any
 
 from ts_autopilot.contracts import (
@@ -189,6 +190,27 @@ def make_rich_result() -> BenchmarkResult:
         ),
     ]
     return result
+
+
+def write_rich_artifact_dir(
+    output_dir: str | Path,
+    *,
+    result: BenchmarkResult | None = None,
+) -> dict[str, Any]:
+    """Write a rich benchmark artifact directory for integration tests."""
+    from ts_autopilot.pipeline import write_output_artifacts
+
+    output_path = Path(output_dir)
+    rich_result = result if result is not None else make_rich_result()
+    written_paths = write_output_artifacts(rich_result, output_path)
+    return {
+        "result": rich_result,
+        "output_dir": output_path,
+        "written_paths": written_paths,
+        "results_path": output_path / "results.json",
+        "details_path": output_path / "details.json",
+        "report_path": output_path / "report.html",
+    }
 
 
 def decode_dashboard_bundle(bundle: bytes) -> dict[str, object]:

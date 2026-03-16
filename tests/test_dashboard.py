@@ -13,6 +13,7 @@ from tests.artifact_test_utils import (
     assert_filtered_export_coherence,
     assert_saved_dashboard_rich_sections,
     make_rich_result,
+    write_rich_artifact_dir,
 )
 from ts_autopilot.contracts import (
     BenchmarkConfig,
@@ -624,14 +625,12 @@ def test_write_output_artifacts_roundtrip_preserves_rich_dashboard_views(
     tmp_path,
     monkeypatch,
 ) -> None:
-    from ts_autopilot.pipeline import write_output_artifacts
-
-    result = make_rich_result()
-
-    out_dir = tmp_path / "rich-out"
-    write_output_artifacts(result, out_dir)
+    artifact_dir = write_rich_artifact_dir(tmp_path / "rich-out")
     fake_st = _install_fake_streamlit_module(monkeypatch)
-    _open_saved_results(out_dir / "results.json", out_dir / "details.json")
+    _open_saved_results(
+        artifact_dir["results_path"],
+        artifact_dir["details_path"],
+    )
 
     assert "Artifact Health" in fake_st.subheaders
     assert_saved_dashboard_rich_sections(
@@ -645,14 +644,13 @@ def test_cross_artifact_outputs_stay_consistent_for_rich_result(
     tmp_path,
     monkeypatch,
 ) -> None:
-    from ts_autopilot.pipeline import write_output_artifacts
     from ts_autopilot.reporting.export import export_excel
 
     openpyxl = pytest.importorskip("openpyxl")
 
-    result = make_rich_result()
-    out_dir = tmp_path / "artifact-consistency"
-    write_output_artifacts(result, out_dir)
+    artifact_dir = write_rich_artifact_dir(tmp_path / "artifact-consistency")
+    result = artifact_dir["result"]
+    out_dir = artifact_dir["output_dir"]
     excel_path = export_excel(result, out_dir / "report.xlsx")
 
     results_payload = json.loads((out_dir / "results.json").read_text(encoding="utf-8"))
