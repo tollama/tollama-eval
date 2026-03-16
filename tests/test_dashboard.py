@@ -2,6 +2,8 @@
 
 import io
 import json
+import sys
+import types
 import zipfile
 from pathlib import Path
 
@@ -33,6 +35,7 @@ from ts_autopilot.reporting.dashboard import (
     _filter_per_series_chart_data,
     _filter_result_for_dashboard,
     _load_result_artifacts,
+    _open_saved_results,
     _optional_model_environment_summary,
     _parse_dashboard_args,
     _parse_dashboard_query_artifact_paths,
@@ -217,6 +220,33 @@ class _FakeUpload:
         return self._payload
 
 
+def _install_fake_streamlit_module(monkeypatch) -> _FakeStreamlit:
+    fake_st = _FakeStreamlit()
+    fake_module = types.ModuleType("streamlit")
+    for attr in (
+        "header",
+        "subheader",
+        "caption",
+        "markdown",
+        "columns",
+        "dataframe",
+        "expander",
+        "plotly_chart",
+        "slider",
+        "multiselect",
+        "warning",
+        "error",
+        "info",
+        "divider",
+        "download_button",
+        "text_input",
+    ):
+        setattr(fake_module, attr, getattr(fake_st, attr))
+    fake_module.query_params = fake_st.query_params
+    monkeypatch.setitem(sys.modules, "streamlit", fake_module)
+    return fake_st
+
+
 def test_optional_model_environment_summary_counts_models_and_groups() -> None:
     result = _make_result()
     result._optional_runner_statuses = [
@@ -362,6 +392,166 @@ def test_written_artifacts_roundtrip_into_dashboard_loader(tmp_path) -> None:
     assert loaded.leaderboard[0].name == "SeasonalNaive"
     assert loaded.forecast_data[0].model_name == "SeasonalNaive"
     assert loaded._optional_runner_statuses[0]["label"] == "Prophet"
+
+
+def test_open_saved_results_via_artifact_dir_launch_renders_dashboard(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from ts_autopilot.pipeline import write_output_artifacts
+
+    result = _make_result()
+    result.forecast_data = [
+        ForecastData(
+            model_name="SeasonalNaive",
+            fold=1,
+            unique_id=["s1"],
+            ds=["2020-01-02"],
+            y_hat=[1.0],
+            y_actual=[1.1],
+            train_unique_id=["s1"],
+            ds_train_tail=["2020-01-01"],
+            y_train_tail=[0.9],
+        )
+    ]
+    result.diagnostics = [
+        DiagnosticsResult(
+            model_name="SeasonalNaive",
+            residual_mean=0.0,
+            residual_std=0.6,
+            residual_skew=0.0,
+            residual_kurtosis=-0.1,
+            ljung_box_p=0.35,
+        )
+    ]
+    out_dir = tmp_path / "out"
+    write_output_artifacts(result, out_dir)
+
+    parsed_results, parsed_details = _parse_dashboard_args(
+        ["--artifact-dir", str(out_dir)]
+    )
+    fake_st = _install_fake_streamlit_module(monkeypatch)
+
+    _open_saved_results(parsed_results, parsed_details)
+
+    assert "Artifact Health" in fake_st.subheaders
+    assert "Artifact Manifest" in fake_st.subheaders
+    assert "Snapshot Export" in fake_st.subheaders
+    assert fake_st.downloads
+
+
+def test_open_saved_results_via_query_param_reopen_renders_dashboard(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from ts_autopilot.pipeline import write_output_artifacts
+
+    result = _make_result()
+    result.forecast_data = [
+        ForecastData(
+            model_name="SeasonalNaive",
+            fold=1,
+            unique_id=["s1"],
+            ds=["2020-01-02"],
+            y_hat=[1.0],
+            y_actual=[1.1],
+        )
+    ]
+    out_dir = tmp_path / "out"
+    write_output_artifacts(result, out_dir)
+
+    fake_st = _install_fake_streamlit_module(monkeypatch)
+    fake_st.query_params.update(
+        {
+            "results": str(out_dir / "results.json"),
+            "details": str(out_dir / "details.json"),
+            "forecast_series": '["s1"]',
+        }
+    )
+    parsed_results, parsed_details = _parse_dashboard_query_artifact_paths(fake_st)
+
+    _open_saved_results(parsed_results, parsed_details)
+
+    assert "Artifact Health" in fake_st.subheaders
+    assert "Forecast vs Actual" in fake_st.subheaders
+    assert fake_st.downloads[0]["file_name"] == "dashboard-snapshot-seasonalnaive.html"
+
+
+def test_filtered_export_roundtrip_renders_filtered_saved_results(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=120,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[
+            ModelResult(
+                name="AutoETS",
+                runtime_sec=0.5,
+                folds=[],
+                mean_mase=0.875,
+                std_mase=0.025,
+            ),
+            ModelResult(
+                name="SeasonalNaive",
+                runtime_sec=0.1,
+                folds=[],
+                mean_mase=1.0,
+                std_mase=0.0,
+            ),
+        ],
+        leaderboard=[
+            LeaderboardEntry(rank=1, name="AutoETS", mean_mase=0.875),
+            LeaderboardEntry(rank=2, name="SeasonalNaive", mean_mase=1.0),
+        ],
+        forecast_data=[
+            ForecastData(
+                model_name="AutoETS",
+                fold=2,
+                unique_id=["s1"],
+                ds=["2020-07-02"],
+                y_hat=[10.0],
+                y_actual=[10.5],
+            ),
+            ForecastData(
+                model_name="SeasonalNaive",
+                fold=2,
+                unique_id=["s1"],
+                ds=["2020-07-02"],
+                y_hat=[9.8],
+                y_actual=[10.5],
+            ),
+        ],
+    )
+    filtered = _filter_result_for_dashboard(
+        result,
+        selected_model_names=["SeasonalNaive"],
+        max_rank=2,
+    )
+    results_path = tmp_path / "filtered-results.json"
+    details_path = tmp_path / "filtered-details.json"
+    results_path.write_text(
+        _build_dashboard_filtered_results_json(filtered),
+        encoding="utf-8",
+    )
+    details_payload = _build_dashboard_filtered_details_json(filtered)
+    assert details_payload is not None
+    details_path.write_text(details_payload, encoding="utf-8")
+
+    fake_st = _install_fake_streamlit_module(monkeypatch)
+    _open_saved_results(results_path, details_path)
+
+    assert fake_st.downloads[0]["file_name"] == "dashboard-snapshot-seasonalnaive.html"
+    assert "SeasonalNaive" in fake_st.downloads[0]["data"]
+    assert "AutoETS" not in fake_st.downloads[0]["data"]
 
 
 def test_filter_result_for_dashboard_trims_models_forecasts_and_diagnostics() -> None:
