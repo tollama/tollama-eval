@@ -1391,6 +1391,97 @@ def test_build_dashboard_filtered_details_json_includes_filtered_details() -> No
     assert '"AutoETS"' not in payload
 
 
+def test_filtered_export_artifacts_remain_coherent_across_json_html_and_bundle(
+) -> None:
+    result = _make_rich_result()
+    filtered = _filter_result_for_dashboard(
+        result,
+        selected_model_names=["AutoETS"],
+        max_rank=1,
+    )
+
+    results_json = _build_dashboard_filtered_results_json(filtered)
+    details_json = _build_dashboard_filtered_details_json(filtered)
+    snapshot_html = _build_dashboard_snapshot_html(filtered)
+    bundle = _build_dashboard_artifact_bundle(filtered)
+
+    assert details_json is not None
+
+    results_payload = json.loads(results_json)
+    details_payload = json.loads(details_json)
+
+    assert [model["name"] for model in results_payload["models"]] == ["AutoETS"]
+    assert [entry["name"] for entry in results_payload["leaderboard"]] == ["AutoETS"]
+    assert [fd["model_name"] for fd in details_payload["forecast_data"]] == ["AutoETS"]
+    assert [diag["model_name"] for diag in details_payload["diagnostics"]] == [
+        "AutoETS"
+    ]
+    assert details_payload["optional_model_environment"][0]["label"] == "Prophet"
+    assert details_payload["optional_model_environment"][1]["label"] == (
+        "NeuralForecast"
+    )
+    assert "SeasonalNaive" not in details_json
+
+    assert "Filtered Benchmark Snapshot" in snapshot_html
+    assert "Snapshot provenance" in snapshot_html
+    assert "Forecast vs Actual" in snapshot_html
+    assert "Residual Diagnostics" in snapshot_html
+    assert "Optional Model Environment" in snapshot_html
+    assert 'id="per-series"' not in snapshot_html
+    assert "AutoETS" in snapshot_html
+    assert "SeasonalNaive" not in snapshot_html
+
+    with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
+        names = set(zf.namelist())
+        assert names == {
+            "manifest.json",
+            "README.txt",
+            "dashboard-snapshot-autoets.html",
+            "dashboard-filtered-results-autoets.json",
+            "dashboard-filtered-details-autoets.json",
+        }
+
+        bundled_results = zf.read("dashboard-filtered-results-autoets.json").decode(
+            "utf-8"
+        )
+        bundled_details = zf.read("dashboard-filtered-details-autoets.json").decode(
+            "utf-8"
+        )
+        bundled_snapshot = zf.read("dashboard-snapshot-autoets.html").decode("utf-8")
+        manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
+        readme = zf.read("README.txt").decode("utf-8")
+
+    assert bundled_results == results_json
+    assert bundled_details == details_json
+    assert bundled_snapshot == snapshot_html
+    assert manifest["bundle"] == "dashboard-filtered-bundle-autoets.zip"
+    assert manifest["leader"] == "AutoETS"
+    assert manifest["model_count"] == 1
+    assert manifest["artifacts"][2]["features"] == [
+        "forecast_data",
+        "diagnostics",
+        "data_characteristics",
+        "optional_model_environment",
+    ]
+    assert "dashboard-snapshot-autoets.html" in readme
+    assert "dashboard-filtered-results-autoets.json" in readme
+    assert "dashboard-filtered-details-autoets.json" in readme
+
+    loaded = _load_result_artifacts(
+        _FakeUpload(
+            json.loads(bundled_results),
+            name="dashboard-filtered-results.json",
+        ),
+        _FakeUpload(
+            json.loads(bundled_details),
+            name="dashboard-filtered-details.json",
+        ),
+    )
+    assert [model.name for model in loaded.models] == ["AutoETS"]
+    assert [fd.model_name for fd in loaded.forecast_data] == ["AutoETS"]
+    assert [diag.model_name for diag in loaded.diagnostics] == ["AutoETS"]
+
+
 def test_build_dashboard_artifact_bundle_contains_expected_files() -> None:
     result = _make_result()
     result.forecast_data = [
