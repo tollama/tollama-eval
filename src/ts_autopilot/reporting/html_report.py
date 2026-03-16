@@ -126,22 +126,34 @@ def _build_optional_model_environment_data(result: BenchmarkResult) -> dict:
     skipped_groups: list[str] = []
 
     for status in raw_statuses:
-        model_names = ", ".join(status.runner_names)
-        if status.available:
+        runner_names = (
+            list(status.get("runner_names", []))
+            if isinstance(status, dict)
+            else list(status.runner_names)
+        )
+        label = status.get("label", "") if isinstance(status, dict) else status.label
+        available = (
+            bool(status.get("available", False))
+            if isinstance(status, dict)
+            else status.available
+        )
+        reason = status.get("reason", "") if isinstance(status, dict) else status.reason
+        model_names = ", ".join(runner_names)
+        if available:
             enabled_groups += 1
-            enabled_models += len(status.runner_names)
+            enabled_models += len(runner_names)
             detail = "Dependency stack available"
             state = "Enabled"
             state_class = "metric-good"
         else:
-            skipped_groups.append(status.label)
-            detail = status.reason
+            skipped_groups.append(label)
+            detail = reason
             state = "Skipped"
             state_class = "metric-bad"
 
         rows.append(
             {
-                "label": status.label,
+                "label": label,
                 "state": state,
                 "state_class": state_class,
                 "models": model_names,
