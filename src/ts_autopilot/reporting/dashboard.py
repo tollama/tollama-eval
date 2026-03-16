@@ -1126,6 +1126,7 @@ def _render_result_dashboard(
 
     from ts_autopilot.reporting.executive_summary import generate_executive_summary
     from ts_autopilot.reporting.view_data import (
+        build_data_overview_chart_data,
         build_diagnostics_chart_data,
         build_forecast_chart_data,
         build_per_series_competition_data,
@@ -1161,6 +1162,10 @@ def _render_result_dashboard(
                 st.warning(w)
 
     _render_optional_model_environment(st, filtered_result)
+
+    data_overview_chart = build_data_overview_chart_data(filtered_result)
+    if data_overview_chart.get("series"):
+        _render_data_overview_panel(st, data_overview_chart)
 
     st.subheader("Leaderboard")
     lb_data = []
@@ -1304,6 +1309,49 @@ def _filter_forecast_chart_data(
         ],
         "models": models,
     }
+
+
+def _render_data_overview_panel(st: Any, data_overview_chart: dict[str, Any]) -> None:
+    """Render representative data-window charts for the benchmarked series."""
+    import plotly.graph_objects as go
+
+    st.subheader("Data Overview")
+    st.caption(
+        "Recent training history plus holdout actuals from "
+        f"fold {data_overview_chart['fold']}."
+    )
+    for insight in data_overview_chart.get("insights", []):
+        st.caption(insight)
+
+    for series in data_overview_chart["series"]:
+        st.caption(series["summary"])
+        fig = go.Figure()
+        if series["ds_history"] and series["y_history"]:
+            fig.add_trace(
+                go.Scatter(
+                    x=series["ds_history"],
+                    y=series["y_history"],
+                    mode="lines+markers",
+                    name="Train Tail",
+                    line={"color": "#94a3b8"},
+                )
+            )
+        fig.add_trace(
+            go.Scatter(
+                x=series["ds_actual"],
+                y=series["y_actual"],
+                mode="lines+markers",
+                name="Holdout Actual",
+                line={"color": "#1d4ed8"},
+            )
+        )
+        fig.update_layout(
+            title=series["name"],
+            height=300,
+            margin={"l": 20, "r": 20, "t": 50, "b": 20},
+            legend={"orientation": "h"},
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def _render_forecast_panels(st: Any, forecast_chart: dict[str, Any]) -> None:

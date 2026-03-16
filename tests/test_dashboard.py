@@ -37,6 +37,7 @@ from ts_autopilot.reporting.dashboard import (
     _parse_dashboard_query_artifact_paths,
     _render_artifact_health,
     _render_artifact_manifest,
+    _render_data_overview_panel,
     _render_diagnostics_panel,
     _render_display_filters,
     _render_forecast_panels,
@@ -1195,6 +1196,37 @@ def test_render_diagnostics_panel_outputs_metrics_and_charts() -> None:
     assert fake_st.subheaders == ["Residual Diagnostics"]
     assert fake_st.columns_created[2].metrics == [("Ljung-Box p", "0.4200")]
     assert fake_st.plotly_calls == 2
+
+
+def test_render_data_overview_panel_outputs_chart_blocks() -> None:
+    fake_st = _FakeStreamlit()
+
+    _render_data_overview_panel(
+        fake_st,
+        {
+            "fold": 2,
+            "insights": [
+                "No missing values were detected in the input data.",
+            ],
+            "series": [
+                {
+                    "name": "s1",
+                    "summary": (
+                        "s1 shows 2 recent training points and 2 holdout "
+                        "observations."
+                    ),
+                    "ds_history": ["2020-06-30", "2020-07-01"],
+                    "y_history": [9.0, 9.5],
+                    "ds_actual": ["2020-07-02", "2020-07-03"],
+                    "y_actual": [10.5, 10.8],
+                }
+            ],
+        },
+    )
+
+    assert fake_st.subheaders == ["Data Overview"]
+    assert "No missing values were detected in the input data." in fake_st.captions
+    assert fake_st.plotly_calls == 1
 
 
 def test_render_per_series_panel_outputs_charts_and_table() -> None:
