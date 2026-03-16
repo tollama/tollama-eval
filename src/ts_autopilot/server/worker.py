@@ -6,10 +6,8 @@ runs them in background threads, and updates the job store.
 
 from __future__ import annotations
 
-import signal
 import threading
 from pathlib import Path
-from typing import Any
 
 from ts_autopilot.logging_config import get_logger
 from ts_autopilot.server.job_store import JobRecord, JobStatus, JobStore
@@ -113,7 +111,9 @@ class BenchmarkWorker:
             Number of jobs that were still running when timeout expired.
         """
         self._shutdown.set()
-        logger.info("Worker draining — waiting up to %.0fs for in-flight jobs", timeout_sec)
+        logger.info(
+            "Worker draining — waiting up to %.0fs", timeout_sec
+        )
 
         with self._lock:
             active = {k: t for k, t in self._threads.items() if t.is_alive()}

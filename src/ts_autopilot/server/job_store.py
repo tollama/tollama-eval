@@ -182,8 +182,10 @@ class SQLiteJobStore(JobStore):
         try:
             conn.execute(
                 """INSERT INTO jobs
-                   (run_id, status, tenant_id, user_id, csv_path, horizon, n_folds,
-                    model_names, error, callback_url, created_at, updated_at, completed_at)
+                   (run_id, status, tenant_id, user_id,
+                    csv_path, horizon, n_folds, model_names,
+                    error, callback_url,
+                    created_at, updated_at, completed_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     job.run_id,
@@ -223,7 +225,10 @@ class SQLiteJobStore(JobStore):
         error: str | None = None,
     ) -> None:
         now = time.time()
-        completed_at = now if status in (JobStatus.COMPLETED, JobStatus.FAILED) else None
+        is_terminal = status in (
+            JobStatus.COMPLETED, JobStatus.FAILED,
+        )
+        completed_at = now if is_terminal else None
         conn = self._get_conn()
         try:
             conn.execute(
@@ -288,7 +293,9 @@ class SQLiteJobStore(JobStore):
         conn = self._get_conn()
         try:
             cursor = conn.execute(
-                """UPDATE jobs SET status = ?, error = ?, updated_at = ?, completed_at = ?
+                """UPDATE jobs
+                   SET status = ?, error = ?,
+                       updated_at = ?, completed_at = ?
                    WHERE status IN (?, ?)""",
                 (
                     JobStatus.FAILED.value,
@@ -327,7 +334,9 @@ class SQLiteJobStore(JobStore):
         try:
             if tenant_id is not None:
                 row = conn.execute(
-                    "SELECT COUNT(*) as c FROM jobs WHERE tenant_id = ? AND status IN (?, ?)",
+                    "SELECT COUNT(*) as c FROM jobs "
+                    "WHERE tenant_id = ? "
+                    "AND status IN (?, ?)",
                     (tenant_id, JobStatus.PENDING.value, JobStatus.RUNNING.value),
                 ).fetchone()
             else:

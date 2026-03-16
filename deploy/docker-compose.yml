@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  tollama-eval:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    command: ["serve", "--port", "8000", "--host", "0.0.0.0"]
+    ports:
+      - "8000:8000"
+    environment:
+      - TOLLAMA_AUTH_MODE=apikey
+      - TOLLAMA_API_KEYS=admin:sk-dev-key-change-me
+      - TOLLAMA_MAX_CONCURRENT_JOBS=4
+    volumes:
+      - results-data:/app/out
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+volumes:
+  results-data:
+  redis-data:

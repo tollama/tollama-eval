@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import os
 import resource
-import signal
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path

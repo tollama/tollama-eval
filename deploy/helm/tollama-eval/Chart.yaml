@@ -1,0 +1,14 @@
+apiVersion: v2
+name: tollama-eval
+description: Automated time series benchmarking as a service
+type: application
+version: 0.2.0
+appVersion: "0.2.0"
+keywords:
+  - time-series
+  - forecasting
+  - benchmarking
+  - automl
+maintainers:
+  - name: tollama-eval contributors
+    url: https://github.com/tollama/tollama-eval
