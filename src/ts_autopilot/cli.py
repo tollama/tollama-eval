@@ -1060,7 +1060,7 @@ def doctor() -> None:
         try:
             importlib.import_module(dep)
             checks.append((f"Optional: {label}", True, "available"))
-        except ImportError:
+        except (ImportError, OSError):
             checks.append((f"Optional: {label}", False, "not installed"))
 
     # Output directory
