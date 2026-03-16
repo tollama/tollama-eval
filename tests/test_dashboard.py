@@ -7,6 +7,8 @@ import types
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from ts_autopilot.contracts import (
     BenchmarkConfig,
     BenchmarkResult,
@@ -84,6 +86,174 @@ def _make_result() -> BenchmarkResult:
             LeaderboardEntry(rank=1, name="SeasonalNaive", mean_mase=1.0),
         ],
     )
+
+
+def _make_rich_result() -> BenchmarkResult:
+    result = BenchmarkResult(
+        profile=DataProfile(
+            n_series=2,
+            frequency="D",
+            missing_ratio=0.0,
+            season_length_guess=7,
+            min_length=60,
+            max_length=60,
+            total_rows=120,
+        ),
+        config=BenchmarkConfig(horizon=7, n_folds=2),
+        models=[
+            ModelResult(
+                name="AutoETS",
+                runtime_sec=0.5,
+                folds=[
+                    FoldResult(
+                        fold=1,
+                        cutoff="2020-06-26",
+                        mase=0.9,
+                        smape=8.2,
+                        rmsse=0.88,
+                        mae=0.75,
+                        series_scores={"s1": 0.81, "s2": 0.99},
+                    ),
+                    FoldResult(
+                        fold=2,
+                        cutoff="2020-07-01",
+                        mase=0.85,
+                        smape=7.9,
+                        rmsse=0.84,
+                        mae=0.7,
+                        series_scores={"s1": 0.79, "s2": 0.96},
+                    ),
+                ],
+                mean_mase=0.875,
+                std_mase=0.025,
+                mean_smape=8.05,
+                mean_rmsse=0.86,
+                mean_mae=0.725,
+            ),
+            ModelResult(
+                name="SeasonalNaive",
+                runtime_sec=0.1,
+                folds=[
+                    FoldResult(
+                        fold=1,
+                        cutoff="2020-06-26",
+                        mase=1.02,
+                        smape=9.6,
+                        rmsse=1.01,
+                        mae=0.93,
+                        series_scores={"s1": 1.08, "s2": 0.96},
+                    ),
+                    FoldResult(
+                        fold=2,
+                        cutoff="2020-07-01",
+                        mase=0.98,
+                        smape=9.1,
+                        rmsse=0.97,
+                        mae=0.89,
+                        series_scores={"s1": 1.02, "s2": 0.94},
+                    ),
+                ],
+                mean_mase=1.0,
+                std_mase=0.0,
+                mean_smape=9.35,
+                mean_rmsse=0.99,
+                mean_mae=0.91,
+            ),
+        ],
+        leaderboard=[
+            LeaderboardEntry(
+                rank=1,
+                name="AutoETS",
+                mean_mase=0.875,
+                mean_smape=8.05,
+                mean_rmsse=0.86,
+                mean_mae=0.725,
+            ),
+            LeaderboardEntry(
+                rank=2,
+                name="SeasonalNaive",
+                mean_mase=1.0,
+                mean_smape=9.35,
+                mean_rmsse=0.99,
+                mean_mae=0.91,
+            ),
+        ],
+        forecast_data=[
+            ForecastData(
+                model_name="AutoETS",
+                fold=2,
+                unique_id=["s1", "s1", "s2", "s2"],
+                ds=["2020-07-02", "2020-07-03", "2020-07-02", "2020-07-03"],
+                y_hat=[10.0, 11.0, 20.0, 21.0],
+                y_actual=[10.5, 10.8, 20.3, 21.2],
+                train_unique_id=["s1", "s1", "s2", "s2"],
+                ds_train_tail=[
+                    "2020-06-30",
+                    "2020-07-01",
+                    "2020-06-30",
+                    "2020-07-01",
+                ],
+                y_train_tail=[9.0, 9.5, 19.1, 19.6],
+            ),
+            ForecastData(
+                model_name="SeasonalNaive",
+                fold=2,
+                unique_id=["s1", "s1", "s2", "s2"],
+                ds=["2020-07-02", "2020-07-03", "2020-07-02", "2020-07-03"],
+                y_hat=[9.8, 10.1, 19.7, 20.4],
+                y_actual=[10.5, 10.8, 20.3, 21.2],
+                train_unique_id=["s1", "s1", "s2", "s2"],
+                ds_train_tail=[
+                    "2020-06-30",
+                    "2020-07-01",
+                    "2020-06-30",
+                    "2020-07-01",
+                ],
+                y_train_tail=[9.0, 9.5, 19.1, 19.6],
+            ),
+        ],
+        diagnostics=[
+            DiagnosticsResult(
+                model_name="AutoETS",
+                residual_mean=0.1,
+                residual_std=0.5,
+                residual_skew=0.1,
+                residual_kurtosis=-0.2,
+                ljung_box_p=0.42,
+                histogram_bins=[0.0, 0.5, 1.0],
+                histogram_counts=[3, 2],
+                acf_lags=[1, 2, 3],
+                acf_values=[0.1, -0.05, 0.02],
+                residuals=[0.1, -0.2, 0.3, 0.0],
+                fitted=[10.0, 11.0, 20.0, 21.0],
+            ),
+        ],
+        data_characteristics=DataCharacteristics(
+            y_mean=15.0,
+            y_std=5.0,
+            y_min=9.0,
+            y_max=21.2,
+            y_median=15.4,
+            trend_strength=0.35,
+            seasonality_strength=0.72,
+            series_heterogeneity=0.78,
+        ),
+    )
+    result._optional_runner_statuses = [
+        OptionalRunnerStatus(
+            label="Prophet",
+            available=True,
+            reason="available",
+            runner_names=["Prophet"],
+        ),
+        OptionalRunnerStatus(
+            label="NeuralForecast",
+            available=False,
+            reason="failed health check",
+            runner_names=["NHITS", "NBEATS"],
+        ),
+    ]
+    return result
 
 
 class _FakeColumn:
@@ -620,170 +790,7 @@ def test_write_output_artifacts_roundtrip_preserves_rich_dashboard_views(
 ) -> None:
     from ts_autopilot.pipeline import write_output_artifacts
 
-    result = BenchmarkResult(
-        profile=DataProfile(
-            n_series=2,
-            frequency="D",
-            missing_ratio=0.0,
-            season_length_guess=7,
-            min_length=60,
-            max_length=60,
-            total_rows=120,
-        ),
-        config=BenchmarkConfig(horizon=7, n_folds=2),
-        models=[
-            ModelResult(
-                name="AutoETS",
-                runtime_sec=0.5,
-                folds=[
-                    FoldResult(
-                        fold=1,
-                        cutoff="2020-06-26",
-                        mase=0.9,
-                        smape=8.2,
-                        rmsse=0.88,
-                        mae=0.75,
-                        series_scores={"s1": 0.81, "s2": 0.99},
-                    ),
-                    FoldResult(
-                        fold=2,
-                        cutoff="2020-07-01",
-                        mase=0.85,
-                        smape=7.9,
-                        rmsse=0.84,
-                        mae=0.7,
-                        series_scores={"s1": 0.79, "s2": 0.96},
-                    ),
-                ],
-                mean_mase=0.875,
-                std_mase=0.025,
-                mean_smape=8.05,
-                mean_rmsse=0.86,
-                mean_mae=0.725,
-            ),
-            ModelResult(
-                name="SeasonalNaive",
-                runtime_sec=0.1,
-                folds=[
-                    FoldResult(
-                        fold=1,
-                        cutoff="2020-06-26",
-                        mase=1.02,
-                        smape=9.6,
-                        rmsse=1.01,
-                        mae=0.93,
-                        series_scores={"s1": 1.08, "s2": 0.96},
-                    ),
-                    FoldResult(
-                        fold=2,
-                        cutoff="2020-07-01",
-                        mase=0.98,
-                        smape=9.1,
-                        rmsse=0.97,
-                        mae=0.89,
-                        series_scores={"s1": 1.02, "s2": 0.94},
-                    ),
-                ],
-                mean_mase=1.0,
-                std_mase=0.0,
-                mean_smape=9.35,
-                mean_rmsse=0.99,
-                mean_mae=0.91,
-            ),
-        ],
-        leaderboard=[
-            LeaderboardEntry(
-                rank=1,
-                name="AutoETS",
-                mean_mase=0.875,
-                mean_smape=8.05,
-                mean_rmsse=0.86,
-                mean_mae=0.725,
-            ),
-            LeaderboardEntry(
-                rank=2,
-                name="SeasonalNaive",
-                mean_mase=1.0,
-                mean_smape=9.35,
-                mean_rmsse=0.99,
-                mean_mae=0.91,
-            ),
-        ],
-        forecast_data=[
-            ForecastData(
-                model_name="AutoETS",
-                fold=2,
-                unique_id=["s1", "s1", "s2", "s2"],
-                ds=["2020-07-02", "2020-07-03", "2020-07-02", "2020-07-03"],
-                y_hat=[10.0, 11.0, 20.0, 21.0],
-                y_actual=[10.5, 10.8, 20.3, 21.2],
-                train_unique_id=["s1", "s1", "s2", "s2"],
-                ds_train_tail=[
-                    "2020-06-30",
-                    "2020-07-01",
-                    "2020-06-30",
-                    "2020-07-01",
-                ],
-                y_train_tail=[9.0, 9.5, 19.1, 19.6],
-            ),
-            ForecastData(
-                model_name="SeasonalNaive",
-                fold=2,
-                unique_id=["s1", "s1", "s2", "s2"],
-                ds=["2020-07-02", "2020-07-03", "2020-07-02", "2020-07-03"],
-                y_hat=[9.8, 10.1, 19.7, 20.4],
-                y_actual=[10.5, 10.8, 20.3, 21.2],
-                train_unique_id=["s1", "s1", "s2", "s2"],
-                ds_train_tail=[
-                    "2020-06-30",
-                    "2020-07-01",
-                    "2020-06-30",
-                    "2020-07-01",
-                ],
-                y_train_tail=[9.0, 9.5, 19.1, 19.6],
-            ),
-        ],
-        diagnostics=[
-            DiagnosticsResult(
-                model_name="AutoETS",
-                residual_mean=0.1,
-                residual_std=0.5,
-                residual_skew=0.1,
-                residual_kurtosis=-0.2,
-                ljung_box_p=0.42,
-                histogram_bins=[0.0, 0.5, 1.0],
-                histogram_counts=[3, 2],
-                acf_lags=[1, 2, 3],
-                acf_values=[0.1, -0.05, 0.02],
-                residuals=[0.1, -0.2, 0.3, 0.0],
-                fitted=[10.0, 11.0, 20.0, 21.0],
-            ),
-        ],
-        data_characteristics=DataCharacteristics(
-            y_mean=15.0,
-            y_std=5.0,
-            y_min=9.0,
-            y_max=21.2,
-            y_median=15.4,
-            trend_strength=0.35,
-            seasonality_strength=0.72,
-            series_heterogeneity=0.78,
-        ),
-    )
-    result._optional_runner_statuses = [
-        OptionalRunnerStatus(
-            label="Prophet",
-            available=True,
-            reason="available",
-            runner_names=["Prophet"],
-        ),
-        OptionalRunnerStatus(
-            label="NeuralForecast",
-            available=False,
-            reason="failed health check",
-            runner_names=["NHITS", "NBEATS"],
-        ),
-    ]
+    result = _make_rich_result()
 
     out_dir = tmp_path / "rich-out"
     write_output_artifacts(result, out_dir)
@@ -804,6 +811,75 @@ def test_write_output_artifacts_roundtrip_preserves_rich_dashboard_views(
     assert any(
         caption == "Hardest-series drill-downs:" for caption in fake_st.captions
     )
+    assert any(
+        "Focus forecasts on AutoETS" in item["text"]
+        for item in fake_st.markdowns
+    )
+    assert any(
+        "View forecasts for AutoETS" in item["text"]
+        for item in fake_st.markdowns
+    )
+
+
+def test_cross_artifact_outputs_stay_consistent_for_rich_result(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from ts_autopilot.pipeline import write_output_artifacts
+    from ts_autopilot.reporting.export import export_excel
+
+    openpyxl = pytest.importorskip("openpyxl")
+
+    result = _make_rich_result()
+    out_dir = tmp_path / "artifact-consistency"
+    write_output_artifacts(result, out_dir)
+    excel_path = export_excel(result, out_dir / "report.xlsx")
+
+    results_payload = json.loads((out_dir / "results.json").read_text(encoding="utf-8"))
+    details_payload = json.loads((out_dir / "details.json").read_text(encoding="utf-8"))
+    report_html = (out_dir / "report.html").read_text(encoding="utf-8")
+
+    assert results_payload["leaderboard"][0]["name"] == "AutoETS"
+    assert len(details_payload["forecast_data"]) == 2
+    assert details_payload["diagnostics"][0]["model_name"] == "AutoETS"
+    assert details_payload["data_characteristics"]["seasonality_strength"] == 0.72
+    assert details_payload["optional_model_environment"][1]["reason"] == (
+        "failed health check"
+    )
+
+    for expected in (
+        "Data Overview",
+        "Forecast vs Actual",
+        "Residual Diagnostics",
+        "Per-Series Winners",
+        "Optional Model Environment",
+        "AutoETS",
+    ):
+        assert expected in report_html
+
+    workbook = openpyxl.load_workbook(excel_path)
+    assert {"Leaderboard", "Per-Series Winners", "Optional Models"}.issubset(
+        set(workbook.sheetnames)
+    )
+    assert workbook["Leaderboard"]["B2"].value == "AutoETS"
+    assert workbook["Optional Models"]["A1"].value == "Optional Model Environment"
+    assert workbook["Optional Models"]["D9"].value == "failed health check"
+
+    winner_sheet = workbook["Per-Series Winners"]
+    winner_rows = list(
+        winner_sheet.iter_rows(min_row=2, max_col=4, values_only=True)
+    )
+    assert ("s1", "AutoETS", 0.8, "SeasonalNaive") in winner_rows
+    assert ("s2", "SeasonalNaive", 0.95, "AutoETS") in winner_rows
+
+    fake_st = _install_fake_streamlit_module(monkeypatch)
+    _open_saved_results(out_dir / "results.json", out_dir / "details.json")
+
+    assert "Benchmark Environment" in fake_st.subheaders
+    assert "Data Overview" in fake_st.subheaders
+    assert "Forecast vs Actual" in fake_st.subheaders
+    assert "Residual Diagnostics" in fake_st.subheaders
+    assert "Per-Series Winners" in fake_st.subheaders
     assert any(
         "Focus forecasts on AutoETS" in item["text"]
         for item in fake_st.markdowns
