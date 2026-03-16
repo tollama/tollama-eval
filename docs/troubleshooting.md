@@ -33,6 +33,8 @@ tollama-eval run -c benchmark.yaml
 | `Loaded DataFrame uses ... MB, exceeding ...` | Data exceeds memory guard | Reduce dataset size or increase `memory_limit_mb` in config |
 | `openpyxl not installed` when using `--excel` | Excel extra not installed | `pip install "tollama-eval[excel]"` |
 | PDF generation import errors when using `--pdf` | PDF extra not installed | `pip install "tollama-eval[pdf]"` |
+| Optional models are skipped | Extra dependency missing, neural health check failed, or group not requested | Install the relevant extra and rerun with `--include-optional` or `--include-neural` |
+| Distributed run warns and falls back to local | Ray is not installed or could not initialize cleanly | Install `tollama-eval[distributed]`, or continue with local execution |
 | `Tollama URL ... resolves to private address ...` | SSRF protection blocks private/local URLs by default | Use config file with `allow_private_urls: true` for trusted local/private Tollama servers |
 | Tollama warnings and NaN predictions | Tollama server/model unavailable or returned invalid response | Verify server URL, model name, and server logs; run can continue with NaN fallback |
 
@@ -64,6 +66,20 @@ Notes:
 4. If benchmark runs but Tollama model outputs are bad:
 - Check for warnings in stderr.
 - Expect NaN fallback when per-series requests fail.
+
+## Dashboard / Artifact Checklist
+
+If the dashboard opens but looks incomplete:
+
+1. Confirm `results.json` exists.
+2. Confirm `details.json` exists if you expect forecasts, diagnostics, or richer provenance.
+3. Open saved artifacts directly:
+
+```bash
+streamlit run -m ts_autopilot.reporting.dashboard -- --artifact-dir out/
+```
+
+4. If `details.json` is absent, expect a reduced but still valid saved-results view.
 
 ## CI/Lint/Type Failures (Contributors)
 

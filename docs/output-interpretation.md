@@ -5,8 +5,12 @@ After a run, `tollama-eval` writes files to your output directory (default: `out
 ## Output Files
 
 - `results.json`: core benchmark result object (stable schema)
-- `details.json`: extra forecast and diagnostics data used for report reproducibility
+- `details.json`: extra forecast, diagnostics, data-characteristics, and provenance data used for report/dashboard reproducibility
 - `report.html`: interactive report for human review
+- `leaderboard.csv`: ranked summary table
+- `fold_details.csv`: per-fold metrics by model
+- `per_series_scores.csv`: per-series model error table
+- `per_series_winners.csv`: per-series winner and margin summary
 - `report.pdf`: optional PDF export when `--pdf` is enabled
 - `report.xlsx`: optional Excel workbook when `--excel` is enabled
 
@@ -68,10 +72,28 @@ Use `runtime_sec` to evaluate speed/accuracy tradeoffs:
 The HTML report is best for quick model selection:
 
 1. Start with leaderboard and runtime table
-2. Check fold heatmap for consistency
-3. Review per-series errors (box plots, distributions)
-4. If available, review significance and critical difference sections
-5. Validate diagnostics for the winner model before deployment
+2. Check the data overview section to understand series length, variability, and representative shapes
+3. Check fold heatmap for consistency
+4. Review forecast panels for each model and compare train tail, actuals, and forecasts
+5. Review per-series winners to see whether one global winner is fragmenting by series
+6. If available, review significance and critical difference sections
+7. Validate diagnostics for the winner model before deployment
+
+## Dashboard Interpretation
+
+The Streamlit dashboard is best when you want to inspect or share a filtered view:
+
+- Run live benchmarks from CSV, or open saved `results.json` + `details.json`
+- Filter models by rank or explicit selection
+- Drill down from leaderboard to forecasts, diagnostics, and per-series winners
+- Export a filtered HTML snapshot, filtered JSON pair, or a zip bundle for handoff
+
+Launch it with:
+
+```bash
+streamlit run -m ts_autopilot.reporting.dashboard
+streamlit run -m ts_autopilot.reporting.dashboard -- --artifact-dir out/
+```
 
 ## NaN Values in Results
 
@@ -80,6 +102,12 @@ If you see NaNs in forecasts or aggregate metrics:
 - A model may have failed on one or more folds/series
 - Optional model dependencies may be missing
 - Tollama requests may have failed and used NaN fallback
+
+If `details.json` is missing:
+
+- `results.json` is still valid and stable
+- the dashboard can still open the run in base-results mode
+- forecast panels, diagnostics, and richer provenance/report context will be reduced
 
 Investigate with:
 

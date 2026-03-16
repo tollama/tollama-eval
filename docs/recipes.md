@@ -10,7 +10,7 @@ Use this when you want a quick benchmark with defaults.
 tollama-eval run -i data.csv
 ```
 
-Output defaults to `out/` with `results.json`, `details.json`, and `report.html`.
+Output defaults to `out/` with `results.json`, `details.json`, `report.html`, `leaderboard.csv`, `fold_details.csv`, `per_series_scores.csv`, and `per_series_winners.csv`.
 
 ## 2) Run Specific Models Only
 
@@ -66,7 +66,18 @@ Then run:
 tollama-eval run -i data.csv --pdf --excel
 ```
 
-## 8) Run Tollama TSFM Models (Remote URL)
+## 8) Include Optional Models Safely
+
+Use this when you want to opt in to optional extras without breaking core runs in partially installed environments.
+
+```bash
+tollama-eval run -i data.csv --include-optional
+tollama-eval run -i data.csv --include-neural
+```
+
+The CLI prints which optional groups were enabled or skipped and why.
+
+## 9) Run Tollama TSFM Models (Remote URL)
 
 Use this when your Tollama server is reachable via a non-private URL.
 
@@ -76,7 +87,7 @@ tollama-eval run -i data.csv \
   --tollama-models chronos2,timesfm,moirai
 ```
 
-## 9) Run Tollama TSFM Models (Local/Private URL)
+## 10) Run Tollama TSFM Models (Local/Private URL)
 
 Private/local URLs are blocked by default. Use config with `allow_private_urls: true`.
 
@@ -97,7 +108,7 @@ allow_private_urls: true
 tollama-eval run -c local_tollama.yaml
 ```
 
-## 10) Benchmark a Directory of CSVs
+## 11) Benchmark a Directory of CSVs
 
 Use campaign mode for many datasets.
 
@@ -105,7 +116,7 @@ Use campaign mode for many datasets.
 tollama-eval campaign -d datasets/ -o campaign_out/ -H 14 -k 3
 ```
 
-## 11) Run in Distributed Mode
+## 12) Run in Distributed Mode
 
 Install distributed extra:
 
@@ -119,7 +130,29 @@ Run:
 tollama-eval run -i data.csv --distributed
 ```
 
-## 12) Reproducible Config-Based Runs
+If Ray is unavailable or cannot initialize in the current environment, the command falls back to the standard local execution path.
+
+## 13) Open the Dashboard on Saved Results
+
+Install the dashboard extra:
+
+```bash
+pip install "tollama-eval[dashboard]"
+```
+
+Then open a previously generated artifact directory:
+
+```bash
+streamlit run -m ts_autopilot.reporting.dashboard -- --artifact-dir out/
+```
+
+Or open specific files:
+
+```bash
+streamlit run -m ts_autopilot.reporting.dashboard -- --results out/results.json --details out/details.json
+```
+
+## 14) Reproducible Config-Based Runs
 
 Use a config file instead of long CLI commands:
 
@@ -142,7 +175,7 @@ model_timeout_sec: 300
 tollama-eval run -c benchmark.yaml
 ```
 
-## 13) Python API One-Liner
+## 15) Python API One-Liner
 
 ```python
 from ts_autopilot.pipeline import run_from_csv

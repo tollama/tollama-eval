@@ -65,13 +65,17 @@ tollama-eval run -i your_data.csv
 
 ### 3. Read the results
 
-Three files appear in `out/`:
+Standard runs write a full artifact set to `out/`:
 
 - **`results.json`** — Machine-readable benchmark results (schema is frozen across versions, safe to build on)
-- **`details.json`** — Forecast data and diagnostics for report reproducibility
-- **`report.html`** — Interactive visual report with leaderboard, per-fold breakdown, and per-series scores
+- **`details.json`** — Forecast, diagnostics, data-characteristics, and provenance context for rich reports
+- **`report.html`** — Interactive visual report with leaderboard, forecasts, diagnostics, and per-series winner analysis
+- **`leaderboard.csv`** — Ranked summary table
+- **`fold_details.csv`** — Fold-level metrics by model
+- **`per_series_scores.csv`** — Per-series model error table
+- **`per_series_winners.csv`** — Per-series winner and margin summary
 
-Add `--pdf` to also generate a PDF report.
+Add `--pdf` to also generate `report.pdf`. Add `--excel` to generate `report.xlsx`.
 
 ---
 
@@ -98,6 +102,7 @@ pip install "tollama-eval[lightgbm]"     # LightGBM via mlforecast
 pip install "tollama-eval[xgboost]"      # XGBoost via mlforecast
 pip install "tollama-eval[neural]"       # NHITS, NBEATS, TiDE, DeepAR, PatchTST, TFT
 pip install "tollama-eval[pdf]"          # PDF report export
+pip install "tollama-eval[excel]"        # Excel workbook export
 pip install "tollama-eval[server]"       # REST API server (FastAPI)
 pip install "tollama-eval[distributed]"  # Ray distributed execution
 pip install "tollama-eval[dashboard]"    # Streamlit interactive dashboard
@@ -285,6 +290,7 @@ Core:
 
 Advanced:
   --pdf                    Generate PDF report (requires weasyprint)
+  --excel                  Generate Excel workbook (requires openpyxl)
   --log-json               Emit structured JSON logs to stderr
   --no-cache               Disable result caching
   --cache-dir PATH         Custom cache directory
@@ -292,6 +298,8 @@ Advanced:
   --detect-anomalies       Run anomaly detection on input data
   --metric-weights TEXT    Custom metric weights (e.g. 'mase=0.5,smape=0.3,speed=0.2')
   --auto-select            Auto-select models based on data characteristics
+  --include-optional       Safely enable optional non-core models when available
+  --include-neural         Safely enable optional neural models when available
   --exog-cols TEXT          Comma-separated exogenous column names
   --distributed            Use Ray for distributed fold execution
 
@@ -311,11 +319,23 @@ tollama-eval campaign -d data_dir/ -o results/ -H 14 -k 3
 
 ### `tollama-eval doctor`
 
-Run diagnostic checks on your environment — verifies Python version, core/optional dependencies, and output directory writability.
+Run diagnostic checks on your environment. It verifies Python version, core/optional dependencies, output directory writability, and hardware acceleration via a safe probe.
 
 ```bash
 tollama-eval doctor
 ```
+
+### Dashboard
+
+Launch the Streamlit dashboard to run new benchmarks or inspect saved artifacts:
+
+```bash
+streamlit run -m ts_autopilot.reporting.dashboard
+streamlit run -m ts_autopilot.reporting.dashboard -- --artifact-dir out/
+streamlit run -m ts_autopilot.reporting.dashboard -- --results out/results.json --details out/details.json
+```
+
+Requires `pip install "tollama-eval[dashboard]"`.
 
 ### `tollama-eval serve`
 
@@ -487,9 +507,14 @@ The `results.json` schema is **frozen** — field names will never change across
 
 Output files:
 - **`results.json`** — Machine-readable benchmark results
-- **`details.json`** — Forecast data and diagnostics
+- **`details.json`** — Forecast data, diagnostics, data characteristics, and optional-model environment context
 - **`report.html`** — Interactive visual report (Plotly charts)
+- **`leaderboard.csv`** — Ranked model summary
+- **`fold_details.csv`** — Fold-level metrics by model
+- **`per_series_scores.csv`** — Per-series error table
+- **`per_series_winners.csv`** — Per-series winner summary
 - **`report.pdf`** — PDF export (optional, with `--pdf`)
+- **`report.xlsx`** — Excel export (optional, with `--excel`)
 
 ```json
 {
