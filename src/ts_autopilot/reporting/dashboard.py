@@ -1025,11 +1025,24 @@ def _update_dashboard_query_params(st: Any, updates: dict[str, str | None]) -> N
 
 def _build_dashboard_shareable_link(st: Any) -> str | None:
     """Build a copy-friendly relative URL for the current dashboard filters."""
+    return _build_dashboard_query_link(st, {})
+
+
+def _build_dashboard_query_link(
+    st: Any,
+    updates: dict[str, str | None],
+) -> str | None:
+    """Build a relative dashboard URL with query-param overrides."""
     params = _read_dashboard_query_params(st)
-    filtered_params = [
-        (key, params[key])
+    merged = {
+        key: params.get(key)
         for key in _DASHBOARD_QUERY_PARAM_KEYS
-        if params.get(key)
+    }
+    merged.update(updates)
+    filtered_params = [
+        (key, merged[key])
+        for key in _DASHBOARD_QUERY_PARAM_KEYS
+        if merged.get(key)
     ]
     if not filtered_params:
         return None
@@ -1051,6 +1064,25 @@ def _render_shareable_link(st: Any) -> None:
         st.text_input("Shareable URL", value=shareable_link)
     else:
         st.caption(shareable_link)
+
+
+def _render_drilldown_links(
+    st: Any,
+    title: str,
+    links: list[tuple[str, str]],
+) -> None:
+    """Render markdown links for cross-section drill-downs."""
+    if not links:
+        return
+
+    st.caption(title)
+    if hasattr(st, "markdown"):
+        st.markdown(
+            "\n".join(f"- [{label}]({href})" for label, href in links)
+        )
+    else:
+        for label, href in links:
+            st.caption(f"{label}: {href}")
 
 
 def _render_display_filters(st: Any, result: Any) -> Any:
@@ -1182,6 +1214,49 @@ def _render_result_dashboard(
         )
     if lb_data:
         st.dataframe(pd.DataFrame(lb_data), use_container_width=True, hide_index=True)
+        if filtered_result.leaderboard:
+            best_model = filtered_result.leaderboard[0].name
+            leaderboard_links = [
+                (
+                    f"Focus forecasts on {best_model}",
+                    _build_dashboard_query_link(
+                        st,
+                        {
+                            "display_models": _encode_query_param_list([best_model]),
+                            "forecast_models": _encode_query_param_list([best_model]),
+                        },
+                    ),
+                ),
+                (
+                    f"Focus per-series view on {best_model}",
+                    _build_dashboard_query_link(
+                        st,
+                        {
+                            "per_series_models": _encode_query_param_list([best_model]),
+                        },
+                    ),
+                ),
+                (
+                    f"Focus diagnostics on {best_model}",
+                    _build_dashboard_query_link(
+                        st,
+                        {
+                            "display_models": _encode_query_param_list([best_model]),
+                            "forecast_models": _encode_query_param_list([best_model]),
+                            "per_series_models": _encode_query_param_list([best_model]),
+                        },
+                    ),
+                ),
+            ]
+            _render_drilldown_links(
+                st,
+                "Drill-down shortcuts from the current leaderboard winner:",
+                [
+                    (label, href)
+                    for label, href in leaderboard_links
+                    if href is not None
+                ],
+            )
 
     if filtered_result.leaderboard:
         st.subheader("Model Comparison")
@@ -1414,6 +1489,38 @@ def _render_forecast_panels(st: Any, forecast_chart: dict[str, Any]) -> None:
             expanded=model.get("rank") == 1,
         ):
             st.caption(model["summary"])
+            drilldowns = [
+                (
+                    f"View per-series winners for {model['name']}",
+                    _build_dashboard_query_link(
+                        st,
+                        {
+                            "per_series_models": _encode_query_param_list(
+                                [model["name"]]
+                            ),
+                        },
+                    ),
+                ),
+                (
+                    f"Filter dashboard to {model['name']}",
+                    _build_dashboard_query_link(
+                        st,
+                        {
+                            "display_models": _encode_query_param_list(
+                                [model["name"]]
+                            ),
+                            "forecast_models": _encode_query_param_list(
+                                [model["name"]]
+                            ),
+                        },
+                    ),
+                ),
+            ]
+            _render_drilldown_links(
+                st,
+                "Model drill-downs:",
+                [(label, href) for label, href in drilldowns if href is not None],
+            )
             for series in model["series"]:
                 fig = go.Figure()
                 if series["ds_history"] and series["y_history"]:
@@ -1570,6 +1677,54 @@ def _render_per_series_panel(st: Any, per_series_chart: dict[str, Any]) -> None:
         st.warning("No per-series panels match the current per-series filters.")
         return
 
+    if filtered_chart.get("table_rows"):
+        focus_row = filtered_chart["table_rows"][0]
+        compare_models = [
+            name
+            for name in [focus_row["winner"], focus_row["runner_up"]]
+            if name
+        ]
+        per_series_links = [
+            (
+                f"Open forecasts for hardest series {focus_row['series_id']}",
+                _build_dashboard_query_link(
+                    st,
+                    {
+                        "forecast_series": _encode_query_param_list(
+                            [focus_row["series_id"]]
+                        ),
+                        "per_series_series": _encode_query_param_list(
+                            [focus_row["series_id"]]
+                        ),
+                    },
+                ),
+            ),
+            (
+                (
+                    f"Compare {focus_row['winner']} vs {focus_row['runner_up']} "
+                    f"on {focus_row['series_id']}"
+                ),
+                _build_dashboard_query_link(
+                    st,
+                    {
+                        "forecast_models": _encode_query_param_list(compare_models),
+                        "forecast_series": _encode_query_param_list(
+                            [focus_row["series_id"]]
+                        ),
+                        "per_series_models": _encode_query_param_list(compare_models),
+                        "per_series_series": _encode_query_param_list(
+                            [focus_row["series_id"]]
+                        ),
+                    },
+                ),
+            ),
+        ]
+        _render_drilldown_links(
+            st,
+            "Hardest-series drill-downs:",
+            [(label, href) for label, href in per_series_links if href is not None],
+        )
+
     winner_summary = filtered_chart.get("winner_summary", [])
     if winner_summary:
         winner_fig = go.Figure(
@@ -1642,6 +1797,38 @@ def _render_diagnostics_panel(st: Any, diagnostics_chart: dict[str, Any]) -> Non
     col1.metric("Residual Mean", f"{diagnostics_chart['residual_mean']:.4f}")
     col2.metric("Residual Std", f"{diagnostics_chart['residual_std']:.4f}")
     col3.metric("Ljung-Box p", f"{diagnostics_chart['ljung_box_p']:.4f}")
+    diagnostics_links = [
+        (
+            f"Filter dashboard to {diagnostics_chart['model_name']}",
+            _build_dashboard_query_link(
+                st,
+                {
+                    "display_models": _encode_query_param_list(
+                        [diagnostics_chart["model_name"]]
+                    ),
+                    "forecast_models": _encode_query_param_list(
+                        [diagnostics_chart["model_name"]]
+                    ),
+                },
+            ),
+        ),
+        (
+            f"View forecasts for {diagnostics_chart['model_name']}",
+            _build_dashboard_query_link(
+                st,
+                {
+                    "forecast_models": _encode_query_param_list(
+                        [diagnostics_chart["model_name"]]
+                    ),
+                },
+            ),
+        ),
+    ]
+    _render_drilldown_links(
+        st,
+        "Diagnostics drill-downs:",
+        [(label, href) for label, href in diagnostics_links if href is not None],
+    )
 
     hist = go.Figure(
         go.Bar(

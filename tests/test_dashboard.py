@@ -22,6 +22,7 @@ from ts_autopilot.reporting.dashboard import (
     _build_dashboard_bundle_readme,
     _build_dashboard_filtered_details_json,
     _build_dashboard_filtered_results_json,
+    _build_dashboard_query_link,
     _build_dashboard_shareable_link,
     _build_dashboard_snapshot_html,
     _dashboard_bundle_filename,
@@ -40,6 +41,7 @@ from ts_autopilot.reporting.dashboard import (
     _render_data_overview_panel,
     _render_diagnostics_panel,
     _render_display_filters,
+    _render_drilldown_links,
     _render_forecast_panels,
     _render_optional_model_environment,
     _render_per_series_panel,
@@ -700,6 +702,27 @@ def test_build_dashboard_shareable_link_encodes_current_filters() -> None:
     assert "forecast_series=%5B%22s1%22%5D" in link
 
 
+def test_build_dashboard_query_link_applies_overrides() -> None:
+    fake_st = _FakeStreamlit()
+    fake_st.query_params = {
+        "display_models": '["AutoETS","SeasonalNaive"]',
+        "forecast_series": '["s1"]',
+    }
+
+    link = _build_dashboard_query_link(
+        fake_st,
+        {
+            "forecast_models": '["AutoETS"]',
+            "forecast_series": '["s2"]',
+        },
+    )
+
+    assert link is not None
+    assert "display_models=%5B%22AutoETS%22%2C%22SeasonalNaive%22%5D" in link
+    assert "forecast_models=%5B%22AutoETS%22%5D" in link
+    assert "forecast_series=%5B%22s2%22%5D" in link
+
+
 def test_render_shareable_link_outputs_copyable_url() -> None:
     fake_st = _FakeStreamlit()
     fake_st.query_params = {
@@ -712,6 +735,21 @@ def test_render_shareable_link_outputs_copyable_url() -> None:
     assert fake_st.subheaders == ["Shareable Link"]
     assert fake_st.text_inputs[0]["label"] == "Shareable URL"
     assert fake_st.text_inputs[0]["value"].startswith("?display_rank=2")
+
+
+def test_render_drilldown_links_outputs_markdown_links() -> None:
+    fake_st = _FakeStreamlit()
+
+    _render_drilldown_links(
+        fake_st,
+        "Drill-down shortcuts:",
+        [("Focus winner", "?display_models=%5B%22AutoETS%22%5D")],
+    )
+
+    assert fake_st.captions == ["Drill-down shortcuts:"]
+    assert "[Focus winner](?display_models=%5B%22AutoETS%22%5D)" in fake_st.markdowns[
+        0
+    ]["text"]
 
 
 def test_build_dashboard_filtered_results_json_respects_filtered_models() -> None:
@@ -1178,6 +1216,9 @@ def test_filter_forecast_chart_data_limits_models_and_series() -> None:
 
 def test_render_diagnostics_panel_outputs_metrics_and_charts() -> None:
     fake_st = _FakeStreamlit()
+    fake_st.query_params = {
+        "display_models": '["AutoETS","SeasonalNaive"]',
+    }
 
     _render_diagnostics_panel(
         fake_st,
@@ -1196,6 +1237,8 @@ def test_render_diagnostics_panel_outputs_metrics_and_charts() -> None:
     assert fake_st.subheaders == ["Residual Diagnostics"]
     assert fake_st.columns_created[2].metrics == [("Ljung-Box p", "0.4200")]
     assert fake_st.plotly_calls == 2
+    assert "Diagnostics drill-downs:" in fake_st.captions
+    assert "View forecasts for AutoETS" in fake_st.markdowns[0]["text"]
 
 
 def test_render_data_overview_panel_outputs_chart_blocks() -> None:
@@ -1267,6 +1310,8 @@ def test_render_per_series_panel_outputs_charts_and_table() -> None:
     assert fake_st.subheaders == ["Per-Series Winners"]
     assert fake_st.plotly_calls == 2
     assert fake_st.dataframes
+    assert "Hardest-series drill-downs:" in fake_st.captions
+    assert "Open forecasts for hardest series s2" in fake_st.markdowns[0]["text"]
     assert fake_st.query_params["per_series_models"] == '["AutoETS"]'
     assert fake_st.query_params["per_series_series"] == '["s2"]'
 
