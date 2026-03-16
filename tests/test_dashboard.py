@@ -256,6 +256,152 @@ def _make_rich_result() -> BenchmarkResult:
     return result
 
 
+def _decode_dashboard_bundle(bundle: bytes) -> dict[str, object]:
+    with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
+        names = set(zf.namelist())
+        text_files = {
+            name: zf.read(name).decode("utf-8")
+            for name in names
+            if name.endswith((".json", ".txt", ".html"))
+        }
+    return {
+        "names": names,
+        "texts": text_files,
+        "manifest": json.loads(text_files["manifest.json"]),
+        "readme": text_files["README.txt"],
+    }
+
+
+def _assert_saved_dashboard_rich_sections(
+    fake_st: "_FakeStreamlit",
+    *,
+    leader_name: str,
+    expect_per_series: bool,
+) -> None:
+    assert "Benchmark Environment" in fake_st.subheaders
+    assert "Data Overview" in fake_st.subheaders
+    assert "Forecast vs Actual" in fake_st.subheaders
+    assert "Residual Diagnostics" in fake_st.subheaders
+    if expect_per_series:
+        assert "Per-Series Winners" in fake_st.subheaders
+        assert any(
+            caption == "Hardest-series drill-downs:" for caption in fake_st.captions
+        )
+    assert any(
+        caption == "Drill-down shortcuts from the current leaderboard winner:"
+        for caption in fake_st.captions
+    )
+    assert any(
+        caption == "Diagnostics drill-downs:" for caption in fake_st.captions
+    )
+    assert any(
+        f"Focus forecasts on {leader_name}" in item["text"]
+        for item in fake_st.markdowns
+    )
+    assert any(
+        f"View forecasts for {leader_name}" in item["text"]
+        for item in fake_st.markdowns
+    )
+
+
+def _assert_filtered_export_coherence(
+    *,
+    results_json: str,
+    details_json: str,
+    snapshot_html: str,
+    bundle: bytes,
+    expected_model_names: list[str],
+    forbidden_model_names: list[str],
+    expect_per_series_section: bool,
+) -> None:
+    leader_slug = "".join(
+        ch.lower() if ch.isalnum() else "-" for ch in expected_model_names[0]
+    ).strip("-")
+    results_payload = json.loads(results_json)
+    details_payload = json.loads(details_json)
+    bundle_data = _decode_dashboard_bundle(bundle)
+
+    assert [model["name"] for model in results_payload["models"]] == (
+        expected_model_names
+    )
+    assert [entry["name"] for entry in results_payload["leaderboard"]] == (
+        expected_model_names
+    )
+    assert [fd["model_name"] for fd in details_payload["forecast_data"]] == (
+        expected_model_names
+    )
+    assert [diag["model_name"] for diag in details_payload["diagnostics"]] == (
+        expected_model_names
+    )
+    assert details_payload["optional_model_environment"][0]["label"] == "Prophet"
+    assert details_payload["optional_model_environment"][1]["label"] == (
+        "NeuralForecast"
+    )
+    for forbidden_name in forbidden_model_names:
+        assert forbidden_name not in details_json
+
+    assert "Filtered Benchmark Snapshot" in snapshot_html
+    assert "Snapshot provenance" in snapshot_html
+    assert "Forecast vs Actual" in snapshot_html
+    assert "Residual Diagnostics" in snapshot_html
+    assert "Optional Model Environment" in snapshot_html
+    if expect_per_series_section:
+        assert 'id="per-series"' in snapshot_html
+    else:
+        assert 'id="per-series"' not in snapshot_html
+    for expected_name in expected_model_names:
+        assert expected_name in snapshot_html
+    for forbidden_name in forbidden_model_names:
+        assert forbidden_name not in snapshot_html
+
+    names = bundle_data["names"]
+    assert names == {
+        "manifest.json",
+        "README.txt",
+        f"dashboard-snapshot-{leader_slug}.html",
+        f"dashboard-filtered-results-{leader_slug}.json",
+        f"dashboard-filtered-details-{leader_slug}.json",
+    }
+
+    text_files = bundle_data["texts"]
+    results_name = f"dashboard-filtered-results-{leader_slug}.json"
+    details_name = f"dashboard-filtered-details-{leader_slug}.json"
+    snapshot_name = f"dashboard-snapshot-{leader_slug}.html"
+    assert text_files[results_name] == results_json
+    assert text_files[details_name] == details_json
+    assert text_files[snapshot_name] == snapshot_html
+
+    manifest = bundle_data["manifest"]
+    assert manifest["bundle"] == f"dashboard-filtered-bundle-{leader_slug}.zip"
+    assert manifest["leader"] == expected_model_names[0]
+    assert manifest["model_count"] == len(expected_model_names)
+    assert manifest["artifacts"][2]["features"] == [
+        "forecast_data",
+        "diagnostics",
+        "data_characteristics",
+        "optional_model_environment",
+    ]
+
+    readme = bundle_data["readme"]
+    assert snapshot_name in readme
+    assert results_name in readme
+    assert details_name in readme
+
+    loaded = _load_result_artifacts(
+        _FakeUpload(
+            json.loads(text_files[results_name]),
+            name="dashboard-filtered-results.json",
+        ),
+        _FakeUpload(
+            json.loads(text_files[details_name]),
+            name="dashboard-filtered-details.json",
+        ),
+    )
+    assert [model.name for model in loaded.models] == expected_model_names
+    assert [fd.model_name for fd in loaded.forecast_data] == expected_model_names
+    assert [diag.model_name for diag in loaded.diagnostics] == expected_model_names
+
+
 class _FakeColumn:
     def __init__(self) -> None:
         self.metrics: list[tuple[str, object]] = []
@@ -798,26 +944,10 @@ def test_write_output_artifacts_roundtrip_preserves_rich_dashboard_views(
     _open_saved_results(out_dir / "results.json", out_dir / "details.json")
 
     assert "Artifact Health" in fake_st.subheaders
-    assert "Benchmark Environment" in fake_st.subheaders
-    assert "Data Overview" in fake_st.subheaders
-    assert "Forecast vs Actual" in fake_st.subheaders
-    assert "Residual Diagnostics" in fake_st.subheaders
-    assert "Per-Series Winners" in fake_st.subheaders
-    assert any(
-        caption == "Drill-down shortcuts from the current leaderboard winner:"
-        for caption in fake_st.captions
-    )
-    assert any(caption == "Diagnostics drill-downs:" for caption in fake_st.captions)
-    assert any(
-        caption == "Hardest-series drill-downs:" for caption in fake_st.captions
-    )
-    assert any(
-        "Focus forecasts on AutoETS" in item["text"]
-        for item in fake_st.markdowns
-    )
-    assert any(
-        "View forecasts for AutoETS" in item["text"]
-        for item in fake_st.markdowns
+    _assert_saved_dashboard_rich_sections(
+        fake_st,
+        leader_name="AutoETS",
+        expect_per_series=True,
     )
 
 
@@ -875,18 +1005,10 @@ def test_cross_artifact_outputs_stay_consistent_for_rich_result(
     fake_st = _install_fake_streamlit_module(monkeypatch)
     _open_saved_results(out_dir / "results.json", out_dir / "details.json")
 
-    assert "Benchmark Environment" in fake_st.subheaders
-    assert "Data Overview" in fake_st.subheaders
-    assert "Forecast vs Actual" in fake_st.subheaders
-    assert "Residual Diagnostics" in fake_st.subheaders
-    assert "Per-Series Winners" in fake_st.subheaders
-    assert any(
-        "Focus forecasts on AutoETS" in item["text"]
-        for item in fake_st.markdowns
-    )
-    assert any(
-        "View forecasts for AutoETS" in item["text"]
-        for item in fake_st.markdowns
+    _assert_saved_dashboard_rich_sections(
+        fake_st,
+        leader_name="AutoETS",
+        expect_per_series=True,
     )
 
 
@@ -1406,80 +1528,15 @@ def test_filtered_export_artifacts_remain_coherent_across_json_html_and_bundle(
     bundle = _build_dashboard_artifact_bundle(filtered)
 
     assert details_json is not None
-
-    results_payload = json.loads(results_json)
-    details_payload = json.loads(details_json)
-
-    assert [model["name"] for model in results_payload["models"]] == ["AutoETS"]
-    assert [entry["name"] for entry in results_payload["leaderboard"]] == ["AutoETS"]
-    assert [fd["model_name"] for fd in details_payload["forecast_data"]] == ["AutoETS"]
-    assert [diag["model_name"] for diag in details_payload["diagnostics"]] == [
-        "AutoETS"
-    ]
-    assert details_payload["optional_model_environment"][0]["label"] == "Prophet"
-    assert details_payload["optional_model_environment"][1]["label"] == (
-        "NeuralForecast"
+    _assert_filtered_export_coherence(
+        results_json=results_json,
+        details_json=details_json,
+        snapshot_html=snapshot_html,
+        bundle=bundle,
+        expected_model_names=["AutoETS"],
+        forbidden_model_names=["SeasonalNaive"],
+        expect_per_series_section=False,
     )
-    assert "SeasonalNaive" not in details_json
-
-    assert "Filtered Benchmark Snapshot" in snapshot_html
-    assert "Snapshot provenance" in snapshot_html
-    assert "Forecast vs Actual" in snapshot_html
-    assert "Residual Diagnostics" in snapshot_html
-    assert "Optional Model Environment" in snapshot_html
-    assert 'id="per-series"' not in snapshot_html
-    assert "AutoETS" in snapshot_html
-    assert "SeasonalNaive" not in snapshot_html
-
-    with zipfile.ZipFile(io.BytesIO(bundle)) as zf:
-        names = set(zf.namelist())
-        assert names == {
-            "manifest.json",
-            "README.txt",
-            "dashboard-snapshot-autoets.html",
-            "dashboard-filtered-results-autoets.json",
-            "dashboard-filtered-details-autoets.json",
-        }
-
-        bundled_results = zf.read("dashboard-filtered-results-autoets.json").decode(
-            "utf-8"
-        )
-        bundled_details = zf.read("dashboard-filtered-details-autoets.json").decode(
-            "utf-8"
-        )
-        bundled_snapshot = zf.read("dashboard-snapshot-autoets.html").decode("utf-8")
-        manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
-        readme = zf.read("README.txt").decode("utf-8")
-
-    assert bundled_results == results_json
-    assert bundled_details == details_json
-    assert bundled_snapshot == snapshot_html
-    assert manifest["bundle"] == "dashboard-filtered-bundle-autoets.zip"
-    assert manifest["leader"] == "AutoETS"
-    assert manifest["model_count"] == 1
-    assert manifest["artifacts"][2]["features"] == [
-        "forecast_data",
-        "diagnostics",
-        "data_characteristics",
-        "optional_model_environment",
-    ]
-    assert "dashboard-snapshot-autoets.html" in readme
-    assert "dashboard-filtered-results-autoets.json" in readme
-    assert "dashboard-filtered-details-autoets.json" in readme
-
-    loaded = _load_result_artifacts(
-        _FakeUpload(
-            json.loads(bundled_results),
-            name="dashboard-filtered-results.json",
-        ),
-        _FakeUpload(
-            json.loads(bundled_details),
-            name="dashboard-filtered-details.json",
-        ),
-    )
-    assert [model.name for model in loaded.models] == ["AutoETS"]
-    assert [fd.model_name for fd in loaded.forecast_data] == ["AutoETS"]
-    assert [diag.model_name for diag in loaded.diagnostics] == ["AutoETS"]
 
 
 def test_build_dashboard_artifact_bundle_contains_expected_files() -> None:
