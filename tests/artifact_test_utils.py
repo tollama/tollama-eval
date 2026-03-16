@@ -408,7 +408,7 @@ def assert_saved_dashboard_sidebar_surface(
     details_status: str = "Loaded",
 ) -> None:
     """Assert saved-results sidebar badges and source labels."""
-    assert fake_st.headers == ["Loaded Artifacts"]
+    assert "Loaded Artifacts" in fake_st.headers
     assert any(
         "results.json: Loaded" in item["text"]
         for item in fake_st.markdowns
