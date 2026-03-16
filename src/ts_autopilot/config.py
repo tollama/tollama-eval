@@ -40,6 +40,27 @@ class FileConfig(BaseModel):
     include_optional_models: bool = False
     include_neural_models: bool = False
 
+    # --- Server / enterprise settings ---
+    auth_mode: str = Field("none", pattern=r"^(none|apikey|jwt|both)$")
+    auth_api_key_file: str | None = None
+    oidc_issuer_url: str | None = None
+    oidc_audience: str = "tollama-eval"
+    rate_limit_global: int = Field(100, ge=1)
+    rate_limit_benchmark: int = Field(10, ge=1)
+    drain_timeout_sec: float = Field(300, gt=0)
+    max_concurrent_jobs: int = Field(4, ge=1)
+    # Tenant quotas
+    tenant_max_concurrent_jobs: int | None = Field(None, ge=1)
+    tenant_max_csv_size_mb: int | None = Field(None, ge=1)
+    tenant_max_retention_days: int | None = Field(None, ge=1)
+    # Notifications
+    notification_url: str | None = None
+    notification_type: str | None = Field(None, pattern=r"^(slack|teams|generic)$")
+    # Retention
+    retention_max_age_days: int | None = Field(None, ge=1)
+    retention_max_total_size_mb: int | None = Field(None, ge=1)
+    retention_max_results_count: int | None = Field(None, ge=1)
+
     @field_validator("models", "tollama_models", mode="before")
     @classmethod
     def _parse_csv_list(cls, v: object) -> object:
